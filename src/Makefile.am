@@ -1,17 +1,18 @@
 sbin_PROGRAMS = pkg_chk
 pkg_chk_SOURCES = \
-	makevars.c makevars.h \
-	main.c \
-	env.c env.h \
-	msg.c msg.h \
-	nursery.c nursery.h \
-	options.c options.h
-pkg_chk_CFLAGS = \
-	$(PTHREAD_CFLAGS) \
+	makevars.cxx makevars.hxx \
+	main.cxx \
+	environment.cxx environment.hxx \
+	fdstream.hxx fdstream.cxx \
+	harness.hxx harness.cxx \
+	message.hxx \
+	nursery.cxx nursery.hxx \
+	options.cxx options.hxx
+pkg_chk_CXXFLAGS = \
 	-DCFG_BMAKE='"$(BMAKE)"' \
 	-DCFG_MAKECONF='"$(MAKECONF)"' \
 	-DCFG_PREFIX='"$(prefix)"'
-pkg_chk_LIBS = \
-	$(PTHREAD_LIBS)
 
-AM_CFLAGS = -std=c11 -Wall
+AM_CFLAGS = $(WARN_CFLAGS)
+AM_CXXFLAGS = $(WARN_CXXFLAGS)
+AM_LDFLAGS = $(WARN_LDFLAGS)

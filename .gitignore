@@ -1,8 +1,10 @@
 *~
 *.cache
+*.core
 *.log
 *.scan
 *.o
+ktrace.out
 
 .deps
 Makefile
