@@ -4,10 +4,10 @@
 #include "environment.hxx"
 #include "message.hxx"
 #include "options.hxx"
+#include "todo.hxx"
 
 int main(int argc, char* argv[]) {
     using namespace pkg_chk;
-
     try {
         options opts(argc, argv);
 
@@ -17,14 +17,16 @@ int main(int argc, char* argv[]) {
         }
         verbose(opts) << std::endl;
 
-        if (opts.mode == mode::HELP) {
+        environment env(opts);
+        switch (opts.mode) {
+        case mode::HELP:
             usage(argv[0]);
             return 1;
+
+        case mode::LOOKUP_TODO:
+            lookup_todo(env);
+            break;
         }
-
-        environment env(opts);
-        env.PACKAGES.get(); // REMOVE THIS
-
         return 0;
     }
     catch (bad_options& e) {

@@ -9,10 +9,6 @@
 
 #include "harness.hxx"
 
-extern "C" {
-    extern char** environ;
-}
-
 namespace {
     std::array<int, 2>
     cpipe() {

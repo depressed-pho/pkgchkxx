@@ -2,9 +2,11 @@
 
 #include <filesystem>
 #include <future>
+#include <set>
 #include <string>
 
 #include "options.hxx"
+#include "tag.hxx"
 
 namespace pkg_chk {
     /** Values from the environment such as various Makefiles. Most of such
@@ -16,11 +18,18 @@ namespace pkg_chk {
      */
     struct environment {
         environment(pkg_chk::options const& opts);
-        virtual ~environment() {}
 
         std::shared_future<std::filesystem::path> PKG_PATH;
         std::shared_future<std::filesystem::path> MAKECONF;
         std::shared_future<std::filesystem::path> PKGSRCDIR;
         std::shared_future<std::filesystem::path> PACKAGES;
+        std::shared_future<std::filesystem::path> PKG_DBDIR;
+        std::shared_future<std::string>           PKG_INFO;
+        std::shared_future<std::string>           PKG_SUFX;
+        std::shared_future<std::filesystem::path> PKGCHK_CONF;
+        std::shared_future<tagset>                PKGCHK_NOTAGS;
+        std::shared_future<tagset>                PKGCHK_TAGS;
+        std::shared_future<std::filesystem::path> PKGCHK_UPDATE_CONF;
+        std::shared_future<std::string>           SU_CMD;
     };
 }

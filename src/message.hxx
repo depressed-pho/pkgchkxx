@@ -2,24 +2,31 @@
 
 #include <cstdlib>
 #include <iostream>
+#include <optional>
 #include <string>
 
 #include "options.hxx"
 
 namespace pkg_chk {
     struct logger: public std::ostream {
+        logger()
+            : std::ostream(nullptr) {}
+
         logger(pkg_chk::options const& opts, bool to_stderr)
             : std::ostream(nullptr)
-            , _buf(opts, to_stderr) {
+            , _buf(std::in_place, opts, to_stderr) {
 
-            rdbuf(&_buf);
+            rdbuf(&_buf.value());
         }
 
         logger(logger&& l)
             : std::ostream(std::move(l))
-            , _buf(std::move(l._buf)) {}
+            , _buf(std::move(l._buf)) {
 
-        virtual ~logger() {}
+            if (_buf) {
+                rdbuf(&_buf.value());
+            }
+        }
 
     private:
         struct logger_buf: public std::streambuf {
@@ -39,7 +46,7 @@ namespace pkg_chk {
             bool _to_stderr;
         };
 
-        logger_buf _buf;
+        std::optional<logger_buf> _buf;
     };
 
     inline logger
@@ -49,23 +56,25 @@ namespace pkg_chk {
 
     inline logger
     verbose(pkg_chk::options const& opts) {
-        return logger(opts, true);
+        if (opts.verbose) {
+            return logger(opts, true);
+        }
+        else {
+            return logger();
+        }
     }
 
-    inline void
+    void
     verbose_var(
         pkg_chk::options const& opts,
         std::string const& var,
-        std::string const& value) {
-
-        verbose(opts)
-            << "Variable: " << var << " = " << (value.empty() ? "(empty)" : value) << std::endl;
-    }
+        std::string const& value);
 
     template <typename Function>
     [[noreturn]] inline void
     fatal(pkg_chk::options const& opts, Function const& f) {
         logger l(opts, true);
+        l << "** ";
         f(l);
         std::exit(1);
     }

@@ -7,7 +7,10 @@ pkg_chk_SOURCES = \
 	harness.hxx harness.cxx \
 	message.cxx message.hxx \
 	nursery.cxx nursery.hxx \
-	options.cxx options.hxx
+	options.cxx options.hxx \
+	pkgname.cxx pkgname.hxx \
+	tag.hxx \
+	todo.hxx todo.cxx
 pkg_chk_CXXFLAGS = \
 	$(WARN_CXXFLAGS) \
 	-DCFG_BMAKE='"$(BMAKE)"' \

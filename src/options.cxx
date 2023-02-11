@@ -9,29 +9,21 @@ extern "C" {
     extern int optind;
 }
 
-namespace {
-    template <typename StrT, typename Sep>
-    inline std::vector<StrT>
-    split(StrT const& str, Sep const& sep) {
-        std::vector<StrT> ret;
-        typename StrT::size_type last_sep = 0;
-        while (true) {
-            auto const next_sep = str.find_first_of(sep, last_sep + 1);
-            if (next_sep == std::string::npos) {
-                ret.push_back(str.substr(last_sep + 1));
-                break;
-            }
-            else {
-                last_sep = next_sep;
-            }
-        }
-        return ret;
-    }
-}
-
 namespace pkg_chk {
     options::options(int argc, char* const argv[])
-        : mode(mode::UNKNOWN) {
+        : mode(mode::UNKNOWN)
+        , add_missing(false)
+        , include_build_version(false)
+        , use_binary_pkgs(false)
+        , no_clean(false)
+        , fetch(false)
+        , continue_on_errors(false)
+        , dry_run(false)
+        , list_ver_diffs(false)
+        , delete_mismatched(false)
+        , build_from_source(false)
+        , update(false)
+        , verbose(false) {
 
         int ch;
         while ((ch = getopt(argc, argv, "BC:D:L:P:U:abcdfghiklNnpqrsuv")) != -1) {
@@ -56,9 +48,7 @@ namespace pkg_chk {
                 list_ver_diffs = true;
                 break;
             case 'D':
-                for (auto const& tag: split(std::string(optarg), ',')) {
-                    add_tags.insert(tag);
-                }
+                add_tags = tagset(optarg);
                 break;
             case 'f':
                 fetch = true;
@@ -80,6 +70,7 @@ namespace pkg_chk {
                 break;
             case 'L':
                 logfile.open(optarg, std::ios_base::app);
+                logfile.exceptions(std::ios_base::badbit);
                 break;
             case 'l':
                 mode = mode::LIST_BIN_PKGS;
@@ -107,9 +98,7 @@ namespace pkg_chk {
                 build_from_source = true;
                 break;
             case 'U':
-                for (auto const& tag: split(std::string(optarg), ',')) {
-                    remove_tags.insert(tag);
-                }
+                remove_tags = tagset(optarg);
                 break;
             case 'u':
                 mode   = mode::ADD_UPDATE;

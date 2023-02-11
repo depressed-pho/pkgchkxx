@@ -6,6 +6,8 @@
 #include <set>
 #include <string>
 
+#include "tag.hxx"
+
 namespace pkg_chk {
     enum class mode {
         UNKNOWN = 0,
@@ -27,14 +29,13 @@ namespace pkg_chk {
     struct options {
         /// Throws 'bad_options' on failure.
         options(int argc, char* const argv[]);
-        virtual ~options() {}
 
         pkg_chk::mode mode;
         bool add_missing;                       // -a
         bool include_build_version;             // -B
         bool use_binary_pkgs;                   // -b
         std::filesystem::path pkgchk_conf_path; // -C
-        std::set<std::string> add_tags;         // -D
+        tagset add_tags;                        // -D
         bool no_clean;                          // -d
         bool fetch;                             // -f
         bool continue_on_errors;                // -k
@@ -44,7 +45,7 @@ namespace pkg_chk {
         bool list_ver_diffs;                    // -q
         bool delete_mismatched;                 // -r
         bool build_from_source;                 // -s
-        std::set<std::string> remove_tags;      // -U
+        tagset remove_tags;                     // -U
         bool update;                            // -u
         bool verbose;                           // -v
     };
