@@ -48,7 +48,7 @@ namespace pkg_chk {
             lock_t lk(_mtx);
 
             _pending_children.emplace_back(
-                std::unique_ptr<child>(new child(std::forward(f), std::forward(args...))));
+                new child(std::forward(f), std::forward(args...)));
             start_some();
         }
 

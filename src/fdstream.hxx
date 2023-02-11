@@ -4,7 +4,7 @@
  */
 
 #include <array>
-#include <memory>
+#include <optional>
 #include <ostream>
 #include <istream>
 #include <streambuf>
@@ -39,8 +39,8 @@ namespace pkg_chk {
         using buffer_t = std::array<char_type, buf_size>;
 
         int _fd;
-        std::unique_ptr<buffer_t> _read_buf;
-        std::unique_ptr<buffer_t> _write_buf;
+        std::optional<buffer_t> _read_buf;
+        std::optional<buffer_t> _write_buf;
     };
 
     /* A subclass of std::ostream that works with a POSIX file descriptor.

@@ -21,19 +21,25 @@ AC_ARG_VAR([MAKECONF], [Path to mk.conf])
 
 # Checks for compilers.
 AC_PROG_CXX
-AX_CXX_COMPILE_STDCXX([11], [noext], [mandatory])
+AX_CXX_COMPILE_STDCXX([17], [noext], [mandatory])
 AX_COMPILER_FLAGS([], [], [yes])
 
 # Checks for programs.
 
 # Checks for libraries.
+AX_CXX_STD_FILESYSTEM
+AX_CXX_STD_THREAD
 
 # Checks for header files.
 AC_CHECK_HEADERS([unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
+AC_TYPE_PID_T
+AC_TYPE_SIZE_T
+AC_TYPE_SSIZE_T
 
 # Checks for library functions.
+AC_CHECK_FUNCS([vfork])
 
 AC_CONFIG_FILES([
     Makefile

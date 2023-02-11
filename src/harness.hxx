@@ -2,6 +2,7 @@
 
 #include <istream>
 #include <memory>
+#include <optional>
 #include <ostream>
 #include <string>
 #include <sys/types.h>
@@ -15,7 +16,8 @@ namespace pkg_chk {
     struct harness {
         harness(
             std::string const& cmd,
-            std::vector<std::string> const& argv);
+            std::vector<std::string> const& argv,
+            std::optional<std::string> const& cwd = std::nullopt);
 
         ~harness() noexcept(false);
 

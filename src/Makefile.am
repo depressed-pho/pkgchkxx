@@ -5,10 +5,11 @@ pkg_chk_SOURCES = \
 	environment.cxx environment.hxx \
 	fdstream.hxx fdstream.cxx \
 	harness.hxx harness.cxx \
-	message.hxx \
+	message.cxx message.hxx \
 	nursery.cxx nursery.hxx \
 	options.cxx options.hxx
 pkg_chk_CXXFLAGS = \
+	$(WARN_CXXFLAGS) \
 	-DCFG_BMAKE='"$(BMAKE)"' \
 	-DCFG_MAKECONF='"$(MAKECONF)"' \
 	-DCFG_PREFIX='"$(prefix)"'

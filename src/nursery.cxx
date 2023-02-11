@@ -49,7 +49,7 @@ namespace pkg_chk {
                         childp->run();
                     }
                     catch (...) {
-                        lock_t lk(_mtx);
+                        lock_t _lk(_mtx);
                         if (!_ex) {
                             _ex = std::current_exception();
                         }
@@ -59,7 +59,7 @@ namespace pkg_chk {
                     // to remove it from running_children. But before doing
                     // that we have to acquire the lock.
                     {
-                        lock_t lk(_mtx);
+                        lock_t _lk(_mtx);
                         _running_children.erase(std::this_thread::get_id());
                     }
 

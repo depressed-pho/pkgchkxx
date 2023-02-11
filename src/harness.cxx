@@ -1,6 +1,8 @@
+#include "config.h"
+
 #include <array>
 #include <errno.h>
-#include <spawn.h>
+#include <string.h>
 #include <sys/wait.h>
 #include <system_error>
 #include <unistd.h>
@@ -20,95 +22,69 @@ namespace {
         }
         return fds;
     }
-
-    struct pspawn_file_actions {
-        pspawn_file_actions() {
-            if ((errno = posix_spawn_file_actions_init(&_actions)) != 0) {
-                throw std::system_error(
-                    errno, std::generic_category(), "posix_spawn_file_actions_init");
-            }
-        }
-
-        ~pspawn_file_actions() noexcept(false) {
-            if ((errno = posix_spawn_file_actions_destroy(&_actions)) != 0) {
-                throw std::system_error(
-                    errno, std::generic_category(), "posix_spawn_file_actions_destroy");
-            }
-        }
-
-        void
-        add_dup2(int old_fd, int new_fd) {
-            if ((errno = posix_spawn_file_actions_adddup2(&_actions, old_fd, new_fd)) != 0) {
-                throw std::system_error(
-                    errno, std::generic_category(), "posix_spawn_file_actions_adddup2");
-            }
-        }
-
-        void
-        add_close(int fd) {
-            if ((errno = posix_spawn_file_actions_addclose(&_actions, fd)) != 0) {
-                throw std::system_error(
-                    errno, std::generic_category(), "posix_spawn_file_actions_addclose");
-            }
-        }
-
-        operator posix_spawn_file_actions_t const*() const {
-            return &_actions;
-        }
-
-    private:
-        posix_spawn_file_actions_t _actions;
-    };
-
-    pid_t
-    cposix_spawnp(
-        std::string const& cmd,
-        pspawn_file_actions const& actions,
-        std::vector<std::string> const& argv) {
-
-        std::vector<char const*> cargv;
-        cargv.reserve(argv.size() + 1);
-        for (auto const& arg: argv) {
-            cargv.push_back(arg.c_str());
-        }
-        cargv.push_back(nullptr);
-
-        pid_t pid;
-        if ((errno = posix_spawnp(
-                 &pid,
-                 cmd.c_str(),
-                 actions,
-                 NULL,
-                 const_cast<char* const*>(cargv.data()),
-                 environ)) != 0) {
-            throw std::system_error(
-                errno, std::generic_category(), "posix_spawnp");
-        }
-        return pid;
-    }
 }
 
 namespace pkg_chk {
     harness::harness(
         std::string const& cmd,
-        std::vector<std::string> const& argv) {
+        std::vector<std::string> const& argv,
+        std::optional<std::string> const& cwd) {
 
         auto const stdin_fds  = cpipe();
         auto const stdout_fds = cpipe();
 
-        pspawn_file_actions actions;
-        actions.add_dup2(stdin_fds[0], STDIN_FILENO);
-        actions.add_close(stdin_fds[1]);
-        actions.add_close(stdout_fds[0]);
-        actions.add_dup2(stdout_fds[1], STDOUT_FILENO);
+#if defined(HAVE_VFORK)
+        _pid = vfork();
+#else
+        _pid = fork();
+#endif
+        if (_pid == 0) {
+            dup2(stdin_fds[0], STDIN_FILENO);
+            close(stdin_fds[1]);
+            close(stdout_fds[0]);
+            dup2(stdout_fds[1], STDOUT_FILENO);
 
-        _pid = cposix_spawnp(cmd, actions, argv);
+            if (cwd) {
+                // We can't use posix_spawn(3) because of this.
+                if (chdir(cwd->c_str()) != 0) {
+                    std::string const err
+                        = "harness: Cannot chdir to " + *cwd + ": " + strerror(errno) + "\n";
+                    write(STDERR_FILENO, err.c_str(), err.size());
+                    _exit(1);
+                }
+            }
 
-        close(stdin_fds[0]);
-        close(stdout_fds[1]);
+            std::vector<char const*> cargv;
+            cargv.reserve(argv.size() + 1);
+            for (auto const& arg: argv) {
+                cargv.push_back(arg.c_str());
+            }
+            cargv.push_back(nullptr);
 
-        _stdin  = std::unique_ptr<fdostream>(new fdostream(stdin_fds[1]));
-        _stdout = std::unique_ptr<fdistream>(new fdistream(stdout_fds[0]));
+            if (execvp(cmd.c_str(), const_cast<char* const*>(cargv.data())) != 0) {
+                std::string const err
+                    = "harness: Cannot exec " + cmd + ": " + strerror(errno) + "\n";
+                write(STDERR_FILENO, err.c_str(), err.size());
+            }
+            _exit(1);
+        }
+        else if (_pid > 0) {
+            close(stdin_fds[0]);
+            close(stdout_fds[1]);
+
+            _stdin  = std::make_unique<fdostream>(stdin_fds[1]);
+            _stdout = std::make_unique<fdistream>(stdout_fds[0]);
+        }
+        else {
+            throw std::system_error(
+                errno, std::generic_category(),
+#if defined(HAVE_VFORK)
+                "vfork"
+#else
+                "fork"
+#endif
+                );
+        }
     }
 
     harness::~harness() noexcept(false) {

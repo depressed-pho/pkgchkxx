@@ -14,8 +14,12 @@ namespace pkg_chk {
 
     fdstreambuf*
     fdstreambuf::close() {
-        overflow(traits_type::eof());
-        ::close(_fd);
+        if (_fd >= 0) {
+            overflow(traits_type::eof());
+            ::close(_fd);
+            _fd = -1;
+        }
+        return this;
     }
 
     fdstreambuf::int_type
@@ -23,7 +27,7 @@ namespace pkg_chk {
         if (pbase() == nullptr) {
             // An overflow has happened because we haven't allocated a
             // buffer yet.
-            _write_buf = std::unique_ptr<buffer_t>(new buffer_t());
+            _write_buf = buffer_t();
             setp(_write_buf->data(),
                  _write_buf->data() + _write_buf->size());
         }
@@ -65,7 +69,7 @@ namespace pkg_chk {
         if (eback() == nullptr) {
             // An underflow has happened because we haven't allocated a
             // buffer yet.
-            _read_buf = std::unique_ptr<buffer_t>(new buffer_t());
+            _read_buf = buffer_t();
         }
 
         while (true) {

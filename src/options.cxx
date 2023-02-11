@@ -93,6 +93,9 @@ namespace pkg_chk {
             case 'p':
                 mode = mode::PRINT_PKG_DIRS;
                 break;
+            case 'P':
+                bin_pkg_path = optarg;
+                break;
             case 'q':
                 list_ver_diffs = true;
                 break;
@@ -142,7 +145,7 @@ namespace pkg_chk {
         }
     }
 
-    void usage(const char* progname) {
+    void usage(std::filesystem::path const& progname) {
         std::cout
             << "Usage: " << progname << " [opts]" << std::endl
             << "    -a       Add all missing packages" << std::endl

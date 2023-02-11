@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
         for (int i = 0; i < argc; i++) {
             verbose(opts) << " " << argv[i];
         }
-        verbose(opts) << "\n";
+        verbose(opts) << std::endl;
 
         if (opts.mode == mode::HELP) {
             usage(argv[0]);
@@ -23,6 +23,7 @@ int main(int argc, char* argv[]) {
         }
 
         environment env(opts);
+        env.PACKAGES.get(); // REMOVE THIS
 
         return 0;
     }
