@@ -70,6 +70,9 @@ namespace pkg_chk {
 
             _stdin  = std::make_unique<fdostream>(stdin_fds[1]);
             _stdout = std::make_unique<fdistream>(stdout_fds[0]);
+
+            _stdin->exceptions(std::ios_base::badbit);
+            _stdout->exceptions(std::ios_base::badbit);
         }
         else {
             throw std::system_error(

@@ -3,7 +3,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <optional>
-#include <string>
+#include <string_view>
 
 #include "options.hxx"
 
@@ -64,11 +64,24 @@ namespace pkg_chk {
         }
     }
 
-    void
+    inline void
     verbose_var(
         pkg_chk::options const& opts,
-        std::string const& var,
-        std::string const& value);
+        std::string_view const& var,
+        std::string_view const& value) {
+
+        verbose(opts)
+            << "Variable: " << var << " = " << (value.empty() ? "(empty)" : value) << std::endl;
+    }
+
+    inline void
+    verbose_var(
+        pkg_chk::options const& opts,
+        std::string_view const& var,
+        std::string const& value) {
+
+        verbose_var(opts, var, static_cast<std::string_view>(value));
+    }
 
     template <typename Function>
     [[noreturn]] inline void

@@ -42,14 +42,4 @@ namespace pkg_chk {
         }
         return count;
     }
-
-    void
-    verbose_var(
-        pkg_chk::options const& opts,
-        std::string const& var,
-        std::string const& value) {
-
-        verbose(opts)
-            << "Variable: " << var << " = " << (value.empty() ? "(empty)" : value) << std::endl;
-    }
 }

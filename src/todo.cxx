@@ -4,7 +4,7 @@
 #include <regex>
 #include <string>
 
-#include "harness.hxx"
+#include "pkgdb.hxx"
 #include "todo.hxx"
 
 namespace {
@@ -21,11 +21,9 @@ namespace {
         "^py[0-9]+-",
         std::regex::optimize);
 
-    pkgname
-    normalize_pkgname(pkgname&& name) {
-        return pkgname(
-            std::regex_replace(name.base, RE_PYTHON_PREFIX, "py-"),
-            std::move(name.version));
+    void
+    normalize_pkgname(pkgname& name) {
+        name.base = std::regex_replace(name.base, RE_PYTHON_PREFIX, "py-");
     }
 }
 
@@ -65,27 +63,19 @@ namespace pkg_chk {
                 return todo_file(env.PKGSRCDIR.get() / "doc/TODO");
             });
 
-        harness pkg_info("/bin/sh", {"/bin/sh"});
-        pkg_info.cin() << env.PKG_INFO.get() << std::endl;
-        pkg_info.cin().close();
-
+        installed_pkgnames pkgnames(env);
         todo_file const todo(f_todo.get());
-        for (std::string line; std::getline(pkg_info.cout(), line); ) {
-            auto const spc = line.find_first_of(" \t");
-            if (spc == std::string::npos) {
-                // This shouldn't happen.
-                continue;
-            }
-            else {
-                auto const pkg = normalize_pkgname(pkgname(line.substr(0, spc)));
-                auto const it  = todo.find(pkg.base);
-                if (it != todo.end()) {
-                    std::cout << pkg.base << ": " << it->second.name;
-                    if (!it->second.comment.empty()) {
-                        std::cout << " " << it->second.comment;
-                    }
-                    std::cout << std::endl;
+
+        for (pkgname name: pkgnames) {
+            normalize_pkgname(name);
+
+            auto const it = todo.find(name.base);
+            if (it != todo.end()) {
+                std::cout << name.base << ": " << it->second.name;
+                if (!it->second.comment.empty()) {
+                    std::cout << " " << it->second.comment;
                 }
+                std::cout << std::endl;
             }
         }
     }

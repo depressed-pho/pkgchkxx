@@ -37,6 +37,10 @@ namespace pkg_chk {
                 : _kind(k)
                 , _str(str) {}
 
+            modifier(kind k, std::string&& str) noexcept
+                : _kind(k)
+                , _str(str) {}
+
             operator int() const noexcept {
                 return static_cast<int>(_kind);
             }
@@ -163,26 +167,22 @@ namespace pkg_chk {
 
     inline std::ostream&
     operator<< (std::ostream& out, pkgversion::digits const& digits) {
-        out << static_cast<int>(digits);
-        return out;
+        return out << static_cast<int>(digits);
     }
 
     inline std::ostream&
     operator<< (std::ostream& out, pkgversion::modifier const& mod) {
-        out << mod.string();
-        return out;
+        return out << mod.string();
     }
 
     inline std::ostream&
     operator<< (std::ostream& out, pkgversion::revision const& rev) {
-        out << "nb" << static_cast<int>(rev);
-        return out;
+        return out << "nb" << static_cast<int>(rev);
     }
 
     inline std::ostream&
     operator<< (std::ostream& out, pkgversion::alpha const& alpha) {
-        out << static_cast<char>(alpha);
-        return out;
+        return out << static_cast<char>(alpha);
     }
 
     inline std::ostream&
@@ -217,7 +217,6 @@ namespace pkg_chk {
 
     inline std::ostream&
     operator<< (std::ostream& out, pkgname const& name) {
-        out << name.base << "-" << name.version;
-        return out;
+        return out << name.base << "-" << name.version;
     }
 }

@@ -1,5 +1,6 @@
 sbin_PROGRAMS = pkg_chk
 pkg_chk_SOURCES = \
+	config_file.hxx config_file.cxx \
 	makevars.cxx makevars.hxx \
 	main.cxx \
 	environment.cxx environment.hxx \
@@ -8,6 +9,7 @@ pkg_chk_SOURCES = \
 	message.cxx message.hxx \
 	nursery.cxx nursery.hxx \
 	options.cxx options.hxx \
+	pkgdb.cxx pkgdb.hxx \
 	pkgname.cxx pkgname.hxx \
 	tag.hxx \
 	todo.hxx todo.cxx

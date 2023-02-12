@@ -1,6 +1,7 @@
 #include <exception>
 #include <iostream>
 
+#include "config_file.hxx"
 #include "environment.hxx"
 #include "message.hxx"
 #include "options.hxx"
@@ -19,6 +20,15 @@ int main(int argc, char* argv[]) {
 
         environment env(opts);
         switch (opts.mode) {
+        case mode::UNKNOWN:
+            // This can't happen.
+            std::cerr << "panic: unknown operation mode" << std::endl;
+            std::abort();
+
+        case mode::GENERATE_PKGCHK_CONF:
+            generate_conf_from_installed(opts, env);
+            break;
+
         case mode::HELP:
             usage(argv[0]);
             return 1;

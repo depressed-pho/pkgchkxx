@@ -48,7 +48,7 @@ namespace pkg_chk {
                 list_ver_diffs = true;
                 break;
             case 'D':
-                add_tags = tagset(optarg);
+                add_tags = tagset(std::string_view(optarg));
                 break;
             case 'f':
                 fetch = true;
@@ -98,7 +98,7 @@ namespace pkg_chk {
                 build_from_source = true;
                 break;
             case 'U':
-                remove_tags = tagset(optarg);
+                remove_tags = tagset(std::string_view(optarg));
                 break;
             case 'u':
                 mode   = mode::ADD_UPDATE;
