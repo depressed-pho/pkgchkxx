@@ -11,12 +11,12 @@
 namespace pkg_chk {
     enum class mode {
         UNKNOWN = 0,
-        ADD_UPDATE,           // Default; no -g, -h, -l, -N, or -p
-        GENERATE_PKGCHK_CONF, // -g
-        HELP,                 // -h
-        LIST_BIN_PKGS,        // -l
-        LOOKUP_TODO,          // -N
-        PRINT_PKG_DIRS,       // -p
+        ADD_UPDATE,            // Default; no -g, -h, -l, -N, or -p
+        GENERATE_PKGCHK_CONF,  // -g
+        HELP,                  // -h
+        LIST_BIN_PKGS,         // -l
+        LOOKUP_TODO,           // -N
+        PRINT_PKGDIRS_TO_CHECK // -p
     };
 
     struct bad_options: std::runtime_error {

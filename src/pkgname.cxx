@@ -2,9 +2,10 @@
 
 #include "pkgname.hxx"
 
-namespace {
-    using namespace pkg_chk;
+using namespace pkg_chk;
+using namespace std::literals;
 
+namespace {
     inline bool
     is_ascii_digit(char c) noexcept {
         return c >= '0' && c <= '9';
@@ -54,15 +55,13 @@ namespace {
 
 namespace pkg_chk {
     pkgversion::pkgversion(std::string_view const& str) {
-        using namespace std::literals;
-
         for (auto it = str.begin(); it != str.end(); ) {
             if (is_ascii_digit(*it)) {
                 int n = 0;
                 for (; it != str.end() && is_ascii_digit(*it); it++) {
                     n = n * 10 + (*it - '0');
                 }
-                _comps.emplace_back<digits>(n);
+                _comps.emplace_back(digits(n));
                 continue;
             }
             {
@@ -85,12 +84,12 @@ namespace pkg_chk {
                 for (; it != str.end() && is_ascii_digit(*it); it++) {
                     n = n * 10 + (*it - '0');
                 }
-                _comps.emplace_back<revision>(n);
+                _comps.emplace_back(revision(n));
                 continue;
             }
             if (is_ascii_alpha(*it)) {
                 _comps.emplace_back(modifier(modifier::kind::DOT, ""s));
-                _comps.emplace_back<alpha>(*it++);
+                _comps.emplace_back(alpha(*it++));
                 continue;
             }
             // Dunno what to do about this character. It's an invalid

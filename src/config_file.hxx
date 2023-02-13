@@ -5,9 +5,8 @@
 #include <ostream>
 #include <utility>
 #include <variant>
+#include <vector>
 
-#include "environment.hxx"
-#include "options.hxx"
 #include "tag.hxx"
 
 namespace pkg_chk {
@@ -17,7 +16,7 @@ namespace pkg_chk {
             group_def(std::string_view const& line);
 
             tag group;
-            std::set<tagpat> patterns_or;
+            std::vector<tagpat> patterns_or;
         };
 
         /// Package definition line: PKGDIR *PATTERN
@@ -30,7 +29,7 @@ namespace pkg_chk {
             pkg_def(std::string_view const& line);
 
             std::filesystem::path pkgdir;
-            std::set<tagpat> patterns_or;
+            std::vector<tagpat> patterns_or;
         };
 
         using definition = std::variant<
@@ -43,6 +42,11 @@ namespace pkg_chk {
 
         config() {}
         config(std::filesystem::path const& file);
+
+        /** Obtain a set of pkgdirs in the config file, filtered by
+         * applying tags. */
+        std::set<std::filesystem::path>
+        apply_tags(tagset const& included_tags, tagset const& excluded_tags) const;
 
         template <typename... Args>
         definition&
@@ -109,7 +113,4 @@ namespace pkg_chk {
         }
         return out;
     }
-
-    void
-    generate_conf_from_installed(options const& opts, environment const& env);
 }

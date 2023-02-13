@@ -4,6 +4,7 @@
 #include <ostream>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace pkg_chk {
     using tag = std::string;
@@ -32,12 +33,27 @@ namespace pkg_chk {
         }
     };
 
+    inline std::ostream&
+    operator<< (std::ostream& out, tagset const& tags) {
+        bool is_first = true;
+        for (auto const& t: tags) {
+            if (is_first) {
+                is_first = false;
+            }
+            else {
+                out << ',';
+            }
+            out << t;
+        }
+        return out;
+    }
+
     /// Tag pattern: ["-"] TAG *("+" TAG)
     struct tagpat {
         tagpat(std::string_view const& pattern);
 
         bool negative;
-        std::set<tag> tags_and;
+        std::vector<tag> tags_and;
     };
 
     inline std::ostream&

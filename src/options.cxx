@@ -4,6 +4,8 @@
 
 #include "options.hxx"
 
+using namespace std::literals;
+
 extern "C" {
     extern char* optarg;
     extern int optind;
@@ -70,6 +72,9 @@ namespace pkg_chk {
                 break;
             case 'L':
                 logfile.open(optarg, std::ios_base::app);
+                if (!logfile) {
+                    throw std::system_error(errno, std::generic_category(), "Failed to open "s + optarg);
+                }
                 logfile.exceptions(std::ios_base::badbit);
                 break;
             case 'l':
@@ -82,7 +87,7 @@ namespace pkg_chk {
                 dry_run = true;
                 break;
             case 'p':
-                mode = mode::PRINT_PKG_DIRS;
+                mode = mode::PRINT_PKGDIRS_TO_CHECK;
                 break;
             case 'P':
                 bin_pkg_path = optarg;

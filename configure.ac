@@ -13,11 +13,11 @@ AM_MAINTAINER_MODE([disable])
 AM_SILENT_RULES([no])
 
 # Precious variables
-AC_ARG_VAR([BMAKE], [bmake command])
+AC_ARG_VAR([BMAKE], [path to bmake command])
 if test -z "$BMAKE"; then
     AC_PATH_PROG([BMAKE], [bmake], [bmake])
 fi
-AC_ARG_VAR([MAKECONF], [Path to mk.conf])
+AC_ARG_VAR([MAKECONF], [path to mk.conf])
 
 # Checks for compilers.
 AC_PROG_CXX
@@ -25,6 +25,8 @@ AX_CXX_COMPILE_STDCXX([17], [noext], [mandatory])
 AX_COMPILER_FLAGS([], [], [yes])
 
 # Checks for programs.
+AC_PATH_PROG([UNAME], [uname], [uname])
+PKG_PROG_PKG_CONFIG # We have a run-time dependency on pkg-config to detect X11.
 
 # Checks for libraries.
 AX_CXX_STD_FILESYSTEM

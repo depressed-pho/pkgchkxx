@@ -1,5 +1,5 @@
 #include <algorithm>
-#include <errno.h>
+#include <cerrno>
 #include <unistd.h>
 
 #include "fdstream.hxx"

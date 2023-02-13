@@ -64,7 +64,7 @@ namespace pkg_chk {
             std::vector<std::string> const argv = {
                 CFG_BMAKE, "-f", "-", "-f", "Makefile", "x"
             };
-            harness make(CFG_BMAKE, argv, pkgpath);
+            harness make(CFG_BMAKE, argv, harness::nop_modifier, pkgpath);
 
             make.cin()
                 << ".PHONY: x" << std::endl

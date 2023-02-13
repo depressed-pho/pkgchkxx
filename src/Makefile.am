@@ -11,13 +11,18 @@ pkg_chk_SOURCES = \
 	options.cxx options.hxx \
 	pkgdb.cxx pkgdb.hxx \
 	pkgname.cxx pkgname.hxx \
-	tag.hxx \
+	string_algo.hxx \
+	tag.cxx tag.hxx \
 	todo.hxx todo.cxx
 pkg_chk_CXXFLAGS = \
 	$(WARN_CXXFLAGS) \
 	-DCFG_BMAKE='"$(BMAKE)"' \
 	-DCFG_MAKECONF='"$(MAKECONF)"' \
-	-DCFG_PREFIX='"$(prefix)"'
+	-DCFG_PKG_CONFIG='"$(PKG_CONFIG)"' \
+	-DCFG_PKG_CONFIG_PATH='"$(PKG_CONFIG_PATH)"' \
+	-DCFG_PKG_CONFIG_LIBDIR='"$(PKG_CONFIG_LIBDIR)"' \
+	-DCFG_PREFIX='"$(prefix)"' \
+	-DCFG_UNAME='"$(UNAME)"'
 
 AM_CFLAGS = $(WARN_CFLAGS)
 AM_CXXFLAGS = $(WARN_CXXFLAGS)

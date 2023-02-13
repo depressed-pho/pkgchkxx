@@ -20,7 +20,10 @@ namespace pkg_chk {
         environment(pkg_chk::options const& opts);
 
         std::shared_future<std::filesystem::path> PKG_PATH;
+        std::shared_future<std::string>           MACHINE_ARCH;
         std::shared_future<std::filesystem::path> MAKECONF;
+        std::shared_future<std::string>           OPSYS;
+        std::shared_future<std::string>           OS_VERSION;
         std::shared_future<std::filesystem::path> PKGSRCDIR;
         std::shared_future<std::filesystem::path> PACKAGES;
         std::shared_future<std::filesystem::path> PKG_DBDIR;
@@ -31,5 +34,8 @@ namespace pkg_chk {
         std::shared_future<tagset>                PKGCHK_TAGS;
         std::shared_future<std::filesystem::path> PKGCHK_UPDATE_CONF;
         std::shared_future<std::string>           SU_CMD;
+
+        std::shared_future<tagset> included_tags;
+        std::shared_future<tagset> excluded_tags;
     };
 }
