@@ -2,8 +2,10 @@
 #include <iterator>
 #include <optional>
 
+#include "ordered.hxx"
+
 namespace pkg_chk {
-    struct word_iterator {
+    struct word_iterator: equality_comparable<word_iterator> {
         using iterator_category = std::forward_iterator_tag;
         using value_type        = std::string_view;
         using pointer           = value_type*;
@@ -29,11 +31,6 @@ namespace pkg_chk {
             else {
                 return !other._current.has_value();
             }
-        }
-
-        bool
-        operator!= (word_iterator const& other) const noexcept {
-            return !(*this == other);
         }
 
         reference
@@ -124,5 +121,21 @@ namespace pkg_chk {
         else {
             return std::string_view();
         }
+    }
+
+    /** std::string::starts_with() is a C++20 thing. We can't use it
+     * atm. */
+    inline bool
+    starts_with(std::string_view const& str, std::string_view const& prefix) {
+        return str.substr(0, prefix.size()) == prefix;
+    }
+
+    /** std::string::ends_with() is a C++20 thing. We can't use it
+     * atm. */
+    inline bool
+    ends_with(std::string_view const& str, std::string_view const& suffix) {
+        return
+            str.size() >= suffix.size() &&
+            str.substr(str.size() - suffix.size()) == suffix;
     }
 }

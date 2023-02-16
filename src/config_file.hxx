@@ -7,6 +7,7 @@
 #include <variant>
 #include <vector>
 
+#include "pkgpath.hxx"
 #include "tag.hxx"
 
 namespace pkg_chk {
@@ -15,20 +16,26 @@ namespace pkg_chk {
         struct group_def {
             group_def(std::string_view const& line);
 
+            friend std::ostream&
+            operator<< (std::ostream& out, config::group_def const& def);
+
             tag group;
             std::vector<tagpat> patterns_or;
         };
 
-        /// Package definition line: PKGDIR *PATTERN
+        /// Package definition line: PKGPATH *PATTERN
         struct pkg_def {
-            template <typename Path, typename Patterns>
-            pkg_def(Path&& pkgdir_, Patterns&& patterns_or_)
-                : pkgdir(std::forward<Path>(pkgdir_))
+            template <typename Pkgpath, typename Patterns>
+            pkg_def(Pkgpath&& path_, Patterns&& patterns_or_)
+                : path(std::forward<Pkgpath>(path_))
                 , patterns_or(std::forward<Patterns>(patterns_or_)) {}
 
             pkg_def(std::string_view const& line);
 
-            std::filesystem::path pkgdir;
+            friend std::ostream&
+            operator<< (std::ostream& out, config::pkg_def const& def);
+
+            pkgpath path;
             std::vector<tagpat> patterns_or;
         };
 
@@ -43,9 +50,9 @@ namespace pkg_chk {
         config() {}
         config(std::filesystem::path const& file);
 
-        /** Obtain a set of pkgdirs in the config file, filtered by
+        /** Obtain a set of pkgpaths in the config file, filtered by
          * applying tags. */
-        std::set<std::filesystem::path>
+        std::set<pkgpath>
         apply_tags(tagset const& included_tags, tagset const& excluded_tags) const;
 
         template <typename... Args>
@@ -74,43 +81,13 @@ namespace pkg_chk {
             return _defs.end();
         }
 
+        friend std::ostream&
+        operator<< (std::ostream& out, config::definition const& def);
+
+        friend std::ostream&
+        operator<< (std::ostream& out, config const& conf);
+
     private:
         std::deque<definition> _defs;
     };
-
-    inline std::ostream&
-    operator<< (std::ostream& out, config::group_def const& def) {
-        out << def.group << " =";
-        for (auto const& pat: def.patterns_or) {
-            out << ' ' << pat;
-        }
-        return out;
-    }
-
-    inline std::ostream&
-    operator<< (std::ostream& out, config::pkg_def const& def) {
-        out << def.pkgdir.string();
-        for (auto const& pat: def.patterns_or) {
-            out << ' ' << pat;
-        }
-        return out;
-    }
-
-    inline std::ostream&
-    operator<< (std::ostream& out, config::definition const& def) {
-        std::visit(
-            [&out](auto const& d) {
-                out << d;
-            },
-            def);
-        return out;
-    }
-
-    inline std::ostream&
-    operator<< (std::ostream& out, config const& conf) {
-        for (auto const& def: conf) {
-            out << def << std::endl;
-        }
-        return out;
-    }
 }

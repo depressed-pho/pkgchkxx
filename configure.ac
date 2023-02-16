@@ -7,12 +7,12 @@ AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([src/main.cxx])
 AC_CONFIG_HEADERS([config.h])
 
-# Automake options
+# Automake options.
 AM_INIT_AUTOMAKE([foreign])
 AM_MAINTAINER_MODE([disable])
 AM_SILENT_RULES([no])
 
-# Precious variables
+# Precious variables.
 AC_ARG_VAR([BMAKE], [path to bmake command])
 if test -z "$BMAKE"; then
     AC_PATH_PROG([BMAKE], [bmake], [bmake])
@@ -26,6 +26,7 @@ AX_COMPILER_FLAGS([], [], [yes])
 
 # Checks for programs.
 AC_PATH_PROG([UNAME], [uname], [uname])
+AC_PATH_PROG([XARGS], [xargs], [xargs])
 PKG_PROG_PKG_CONFIG # We have a run-time dependency on pkg-config to detect X11.
 
 # Checks for libraries.

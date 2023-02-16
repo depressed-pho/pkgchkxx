@@ -4,10 +4,12 @@
  */
 
 #include <array>
+#include <memory>
 #include <optional>
 #include <ostream>
 #include <istream>
 #include <streambuf>
+#include <utility>
 
 namespace pkg_chk {
     /* A subclass of std::streambuf that works with a POSIX file
@@ -50,9 +52,17 @@ namespace pkg_chk {
          * destructed the fd will also be closed. */
         fdostream(int fd)
             : std::ostream(nullptr)
-            , _buf(fd) {
+            , _buf(std::make_unique<fdstreambuf>(fd)) {
 
-            rdbuf(&_buf);
+            rdbuf(_buf.get());
+        }
+
+        fdostream(fdostream&& other)
+            : std::ostream(std::move(other))
+            , _buf(std::move(other._buf)) {
+
+            other.set_rdbuf(nullptr);
+            rdbuf(_buf.get());
         }
 
         virtual
@@ -62,11 +72,13 @@ namespace pkg_chk {
 
         void
         close() {
-            _buf.close();
+            if (_buf) {
+                _buf->close();
+            }
         }
 
     private:
-        fdstreambuf _buf;
+        std::unique_ptr<fdstreambuf> _buf;
     };
 
     /* A subclass of std::istream that works with a POSIX file descriptor.
@@ -76,9 +88,17 @@ namespace pkg_chk {
          * destructed the fd will also be closed. */
         fdistream(int fd)
             : std::istream(nullptr)
-            , _buf(fd) {
+            , _buf(std::make_unique<fdstreambuf>(fd)) {
 
-            rdbuf(&_buf);
+            rdbuf(_buf.get());
+        }
+
+        fdistream(fdistream&& other)
+            : std::istream(std::move(other))
+            , _buf(std::move(other._buf)) {
+
+            other.set_rdbuf(nullptr);
+            rdbuf(_buf.get());
         }
 
         virtual
@@ -88,11 +108,13 @@ namespace pkg_chk {
 
         void
         close() {
-            _buf.close();
+            if (_buf) {
+                _buf->close();
+            }
         }
 
     private:
-        fdstreambuf _buf;
+        std::unique_ptr<fdstreambuf> _buf;
     };
 
     /* A subclass of std::iostream that works with a POSIX file descriptor.
@@ -102,9 +124,17 @@ namespace pkg_chk {
          * destructed the fd will also be closed. */
         fdstream(int fd)
             : std::iostream(nullptr)
-            , _buf(fd) {
+            , _buf(std::make_unique<fdstreambuf>(fd)) {
 
-            rdbuf(&_buf);
+            rdbuf(_buf.get());
+        }
+
+        fdstream(fdstream&& other)
+            : std::iostream(std::move(other))
+            , _buf(std::move(other._buf)) {
+
+            other.set_rdbuf(nullptr);
+            rdbuf(_buf.get());
         }
 
         virtual
@@ -114,10 +144,12 @@ namespace pkg_chk {
 
         void
         close() {
-            _buf.close();
+            if (_buf) {
+                _buf->close();
+            }
         }
 
     private:
-        fdstreambuf _buf;
+        std::unique_ptr<fdstreambuf> _buf;
     };
 }

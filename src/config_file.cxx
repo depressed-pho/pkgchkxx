@@ -25,17 +25,35 @@ namespace pkg_chk {
         }
     }
 
+    std::ostream&
+    operator<< (std::ostream& out, config::group_def const& def) {
+        out << def.group << " =";
+        for (auto const& pat: def.patterns_or) {
+            out << ' ' << pat;
+        }
+        return out;
+    }
+
     config::pkg_def::pkg_def(std::string_view const& line) {
         bool is_first = true;
         for (auto const word: words(line)) {
             if (is_first) {
-                pkgdir   = word;
+                path     = word;
                 is_first = false;
             }
             else {
                 patterns_or.emplace_back(word);
             }
         }
+    }
+
+    std::ostream&
+    operator<< (std::ostream& out, config::pkg_def const& def) {
+        out << def.path;
+        for (auto const& pat: def.patterns_or) {
+            out << ' ' << pat;
+        }
+        return out;
     }
 
     config::config(std::filesystem::path const& file) {
@@ -67,9 +85,9 @@ namespace pkg_chk {
         }
     }
 
-    std::set<std::filesystem::path>
+    std::set<pkgpath>
     config::apply_tags(tagset const& included_tags, tagset const& excluded_tags) const {
-        std::set<std::filesystem::path> pkgdirs;
+        std::set<pkgpath> pkgpaths;
 
         tagset current_tags; // included_tags - excluded_tags
         std::set_difference(
@@ -139,7 +157,7 @@ namespace pkg_chk {
         for (auto const& def: _defs) {
             std::visit(
                 [&](auto const& d) {
-                    if constexpr (std::is_same_v<decltype(d), group_def const&>) {
+                    if constexpr (std::is_same_v<group_def const&, decltype(d)>) {
                         if (eval_or(d.patterns_or)) {
                             // One of a pattern in a group definition
                             // matches. Add the group to the current set of
@@ -148,17 +166,36 @@ namespace pkg_chk {
                         }
                     }
                     else {
+                        static_assert(std::is_same_v<pkg_def const&, decltype(d)>);
                         if (d.patterns_or.empty() || eval_or(d.patterns_or)) {
                             // The package definition has no patterns, or
-                            // one of a pattern matches. Add the pkgdir to
+                            // one of a pattern matches. Add the pkgpath to
                             // the result.
-                            pkgdirs.insert(d.pkgdir);
+                            pkgpaths.insert(d.path);
                         }
                     }
                 },
                 def);
         }
 
-        return pkgdirs;
+        return pkgpaths;
+    }
+
+    std::ostream&
+    operator<< (std::ostream& out, config::definition const& def) {
+        std::visit(
+            [&out](auto const& d) {
+                out << d;
+            },
+            def);
+        return out;
+    }
+
+    std::ostream&
+    operator<< (std::ostream& out, config const& conf) {
+        for (auto const& def: conf) {
+            out << def << std::endl;
+        }
+        return out;
     }
 }

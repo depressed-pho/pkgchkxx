@@ -9,16 +9,23 @@
 #include <variant>
 #include <vector>
 
+#include "ordered.hxx"
+
 namespace pkg_chk {
     using pkgbase = std::string;
 
-    struct pkgversion {
+    struct pkgversion: ordered<pkgversion> {
         struct digits {
             digits(int num) noexcept
                 : _num(num) {};
 
             operator int() const noexcept {
                 return _num;
+            }
+
+            friend std::ostream&
+            operator<< (std::ostream& out, pkgversion::digits const& digits) {
+                return out << digits._num;
             }
 
         private:
@@ -54,6 +61,11 @@ namespace pkg_chk {
                 return _str;
             }
 
+            friend std::ostream&
+            operator<< (std::ostream& out, pkgversion::modifier const& mod) {
+                return out << mod._str;
+            }
+
         private:
             kind _kind;
             std::string _str;
@@ -66,6 +78,11 @@ namespace pkg_chk {
 
             operator int() const noexcept {
                 return _rev;
+            }
+
+            friend std::ostream&
+            operator<< (std::ostream& out, pkgversion::revision const& rev) {
+                return out << "nb" << rev._rev;
             }
 
         private:
@@ -85,6 +102,11 @@ namespace pkg_chk {
 
             operator int() const noexcept {
                 return _c >= 'a' ? _c - 'a' + 1 : _c - 'A' + 1;
+            }
+
+            friend std::ostream&
+            operator<< (std::ostream& out, pkgversion::alpha const& alpha) {
+                return out << alpha._c;
             }
 
         private:
@@ -134,28 +156,26 @@ namespace pkg_chk {
         }
 
         bool
-        operator!= (pkgversion const& other) const noexcept {
-            return compare(other) != 0;
-        }
-
-        bool
-        operator<= (pkgversion const& other) const noexcept {
-            return compare(other) <= 0;
-        }
-
-        bool
         operator< (pkgversion const& other) const noexcept {
             return compare(other) < 0;
         }
 
-        bool
-        operator>= (pkgversion const& other) const noexcept {
-            return compare(other) >= 0;
+        friend std::ostream&
+        operator<< (std::ostream& out, pkgversion::component const& comp) {
+            std::visit(
+                [&out](auto const& c) {
+                    out << c;
+                },
+                comp);
+            return out;
         }
 
-        bool
-        operator> (pkgversion const& other) const noexcept {
-            return compare(other) > 0;
+        friend std::ostream&
+        operator<< (std::ostream& out, pkgversion const& version) {
+            for (auto const& comp: version) {
+                out << comp;
+            }
+            return out;
         }
 
     private:
@@ -165,45 +185,7 @@ namespace pkg_chk {
         std::vector<component> _comps;
     };
 
-    inline std::ostream&
-    operator<< (std::ostream& out, pkgversion::digits const& digits) {
-        return out << static_cast<int>(digits);
-    }
-
-    inline std::ostream&
-    operator<< (std::ostream& out, pkgversion::modifier const& mod) {
-        return out << mod.string();
-    }
-
-    inline std::ostream&
-    operator<< (std::ostream& out, pkgversion::revision const& rev) {
-        return out << "nb" << static_cast<int>(rev);
-    }
-
-    inline std::ostream&
-    operator<< (std::ostream& out, pkgversion::alpha const& alpha) {
-        return out << static_cast<char>(alpha);
-    }
-
-    inline std::ostream&
-    operator<< (std::ostream& out, pkgversion::component const& comp) {
-        std::visit(
-            [&out](auto const& c) {
-                out << c;
-            },
-            comp);
-        return out;
-    }
-
-    inline std::ostream&
-    operator<< (std::ostream& out, pkgversion const& version) {
-        for (auto const& comp: version) {
-            out << comp;
-        }
-        return out;
-    }
-
-    struct pkgname {
+    struct pkgname: ordered<pkgname> {
         pkgname(std::string_view const& name);
 
         template <typename Base, typename Version>
@@ -211,12 +193,31 @@ namespace pkg_chk {
             : base(std::forward<Base>(base_))
             , version(std::forward<Version>(version_)) {}
 
+        friend bool
+        operator== (pkgname const& a, pkgname const& b) noexcept {
+            return
+                a.base    == b.base     &&
+                a.version == b.version;
+        }
+
+        friend bool
+        operator< (pkgname const& a, pkgname const& b) noexcept {
+            if (a.base < b.base) {
+                return true;
+            }
+            else {
+                return
+                    a.base    == b.base     &&
+                    a.version  < b.version;
+            }
+        }
+
+        friend std::ostream&
+        operator<< (std::ostream& out, pkgname const& name) {
+            return out << name.base << "-" << name.version;
+        }
+
         pkgbase    base;
         pkgversion version;
     };
-
-    inline std::ostream&
-    operator<< (std::ostream& out, pkgname const& name) {
-        return out << name.base << "-" << name.version;
-    }
 }

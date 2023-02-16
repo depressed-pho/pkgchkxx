@@ -7,6 +7,8 @@
 
 #include "environment.hxx"
 #include "harness.hxx"
+#include "ordered.hxx"
+#include "pkgpath.hxx"
 #include "pkgname.hxx"
 
 namespace pkg_chk {
@@ -16,7 +18,7 @@ namespace pkg_chk {
 
     namespace detail {
         template <typename Source>
-        struct pkg_info_iterator {
+        struct pkg_info_iterator: equality_comparable<pkg_info_iterator<Source>> {
             using iterator_category = std::input_iterator_tag;
             using value_type        = typename Source::value_type;
             using pointer           = value_type*;
@@ -37,11 +39,6 @@ namespace pkg_chk {
                 else {
                     return !other._current.has_value();
                 }
-            }
-
-            bool
-            operator!= (pkg_info_iterator const& other) const noexcept {
-                return !(*this == other);
             }
 
             reference
@@ -121,14 +118,14 @@ namespace pkg_chk {
     };
 
     /** This is a read-only container object representing a sequence of
-     * PKGDIR of installed packages. */
-    struct installed_pkgdirs: public detail::pkg_info_reader_base<installed_pkgdirs> {
-        using value_type = std::filesystem::path;
+     * PKGPATH of installed packages. */
+    struct installed_pkgpaths: public detail::pkg_info_reader_base<installed_pkgpaths> {
+        using value_type = pkgpath;
 
-        installed_pkgdirs(environment const& env);
+        installed_pkgpaths(environment const& env);
 
     private:
-        friend class detail::pkg_info_iterator<installed_pkgdirs>;
+        friend class detail::pkg_info_iterator<installed_pkgpaths>;
 
         std::optional<value_type>
         read_next();

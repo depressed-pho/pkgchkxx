@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cassert>
 #include <cerrno>
 #include <ctime>
 #include <deque>
@@ -15,6 +16,7 @@
 #include "message.hxx"
 #include "options.hxx"
 #include "pkgdb.hxx"
+#include "pkgpath.hxx"
 #include "todo.hxx"
 
 using namespace pkg_chk;
@@ -28,6 +30,11 @@ namespace {
     void
     normalize_pkgname(pkgname& name) {
         name.base = std::regex_replace(name.base, RE_PYTHON_PREFIX, "py-");
+    }
+
+    bool
+    is_binary_available(environment const& env, pkgname const& name) {
+        return env.bin_pkg_summary.get().count(name) > 0;
     }
 
     void
@@ -51,15 +58,15 @@ namespace {
         out << "# Generated automatically at "
             << std::put_time(std::localtime(&now), "%c %Z") << std::endl;
 
-        std::deque<fs::path> pkgdirs;
-        for (fs::path const& pkgdir: installed_pkgdirs(env)) {
-            pkgdirs.push_back(pkgdir);
+        std::deque<pkgpath> pkgpaths;
+        for (pkgpath const& path: installed_pkgpaths(env)) {
+            pkgpaths.push_back(path);
         }
-        std::sort(pkgdirs.begin(), pkgdirs.end());
+        std::sort(pkgpaths.begin(), pkgpaths.end());
 
         config conf;
-        for (fs::path const& pkgdir: pkgdirs) {
-            conf.emplace_back(config::pkg_def(pkgdir, std::vector<tagpat>()));
+        for (pkgpath const& path: pkgpaths) {
+            conf.emplace_back(config::pkg_def(path, std::vector<tagpat>()));
         }
         out << conf;
     }
@@ -92,12 +99,42 @@ namespace {
     }
 
     void
-    print_pkgdirs_to_check(environment const& env) {
+    print_pkgpaths_to_check(environment const& env) {
         config const conf(env.PKGCHK_CONF.get());
-        for (auto const& pkgdir:
+        for (auto const& path:
                  conf.apply_tags(
                      env.included_tags.get(), env.excluded_tags.get())) {
-            std::cout << pkgdir.string() << std::endl;
+            std::cout << path << std::endl;
+        }
+    }
+
+    void
+    list_bin_pkgs(options const& opts, environment const& env) {
+        pkgmap const& pm = env.bin_pkg_map.get();
+        config const conf(env.PKGCHK_CONF.get());
+        for (auto const& path:
+                 conf.apply_tags(
+                     env.included_tags.get(), env.excluded_tags.get())) {
+            // Examine the newest binary package that corresponds to this
+            // pkgpath.
+            if (auto pkgs = pm.find(path); pkgs != pm.end()) {
+                auto newest = pkgs->second.rbegin();
+                assert(newest != pkgs->second.rend());
+
+                if (!is_binary_available(env, newest->first)) {
+                    fatal_later(opts)
+                        << newest->first << " - no binary package found" << std::endl;
+                }
+
+                verbose(opts) << path << ": " << newest->first << std::endl;
+                for (auto const& dep: newest->second.DEPENDS) {
+                    verbose(opts) << "    depends on " << dep << std::endl;
+                    // FIXME: implementation incomplete
+                }
+            }
+            else {
+                fatal_later(opts) << path << " - Unable to extract pkgname" << std::endl;
+            }
         }
     }
 }
@@ -127,12 +164,16 @@ int main(int argc, char* argv[]) {
             usage(argv[0]);
             return 1;
 
+        case mode::LIST_BIN_PKGS:
+            list_bin_pkgs(opts, env);
+            break;
+
         case mode::LOOKUP_TODO:
             lookup_todo(env);
             break;
 
-        case mode::PRINT_PKGDIRS_TO_CHECK:
-            print_pkgdirs_to_check(env);
+        case mode::PRINT_PKGPATHS_TO_CHECK:
+            print_pkgpaths_to_check(env);
             break;
         }
         return 0;

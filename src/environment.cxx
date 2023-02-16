@@ -37,7 +37,7 @@ namespace {
 
     fs::path
     url_safe_absolute(fs::path const& path) {
-        if (path.string().find("://")) {
+        if (path.string().find("://") != std::string::npos) {
             // Looks like an absolute URI.
             return path;
         }
@@ -180,9 +180,9 @@ namespace pkg_chk {
                     vars.push_back("SU_CMD");
                 }
                 std::map<std::string, std::string> value_of;
-                auto const pkgdir = PKGSRCDIR.get() / "pkgtools/pkg_chk"; // Any package will do.
-                if (fs::is_directory(pkgdir)) {
-                    value_of = extract_pkgmk_vars(opts, pkgdir, vars);
+                auto const pkgpath = PKGSRCDIR.get() / "pkgtools/pkg_chk"; // Any package will do.
+                if (fs::is_directory(pkgpath)) {
+                    value_of = extract_pkgmk_vars(opts, pkgpath, vars);
                 }
                 else if (MAKECONF.get() != "/dev/null") {
                     value_of = extract_mkconf_vars(opts, MAKECONF.get(), vars);
@@ -255,15 +255,15 @@ namespace pkg_chk {
             [this, &opts]() {
                 platform_env _penv;
 
-                auto const pkgdir = PKGSRCDIR.get() / "pkgtools/pkg_chk"; // Any package will do.
-                if (fs::is_directory(pkgdir)) {
+                auto const pkgpath = PKGSRCDIR.get() / "pkgtools/pkg_chk"; // Any package will do.
+                if (fs::is_directory(pkgpath)) {
                     std::vector<std::string> const vars = {
                         "OPSYS",
                         "OS_VERSION",
                         "MACHINE_ARCH"
                     };
                     std::map<std::string, std::string> value_of =
-                        extract_pkgmk_vars(opts, pkgdir, vars);
+                        extract_pkgmk_vars(opts, pkgpath, vars);
                     _penv.OPSYS        = value_of["OPSYS"       ];
                     _penv.OS_VERSION   = value_of["OS_VERSION"  ];
                     _penv.MACHINE_ARCH = value_of["MACHINE_ARCH"];
@@ -291,6 +291,23 @@ namespace pkg_chk {
         OPSYS        = std::async(std::launch::deferred, [penv]() { return penv.get().OPSYS;        }).share();
         OS_VERSION   = std::async(std::launch::deferred, [penv]() { return penv.get().OS_VERSION;   }).share();
         MACHINE_ARCH = std::async(std::launch::deferred, [penv]() { return penv.get().MACHINE_ARCH; }).share();
+
+        // The binary package summary is obtained by parsing a
+        // pkg_summary(5) file or by scanning PACKAGES.
+        bin_pkg_summary = std::async(
+            std::launch::deferred,
+            [this, &opts]() {
+                summary sum(opts, PACKAGES.get(), PKG_INFO.get(), PKG_SUFX.get());
+                if (opts.verbose) {
+                    verbose(opts) << "PKGDB entries: " << sum.size() << std::endl;
+                }
+                return sum;
+            }).share();
+        bin_pkg_map = std::async(
+            std::launch::deferred,
+            [this]() {
+                return pkgmap(bin_pkg_summary.get());
+            }).share();
 
         // Tags are collected from the platform, options, and Makefile
         // variables.

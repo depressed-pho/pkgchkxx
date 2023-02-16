@@ -1,7 +1,10 @@
 #include "config.h"
 
 #include <array>
+#include <cassert>
 #include <cerrno>
+#include <fcntl.h>
+#include <iostream>
 #include <string.h>
 #include <sys/wait.h>
 #include <system_error>
@@ -15,10 +18,18 @@ extern "C" {
 
 namespace {
     std::array<int, 2>
-    cpipe() {
+    cpipe(bool set_cloexec = false) {
         std::array<int, 2> fds;
         if (pipe(fds.data()) != 0) {
             throw std::system_error(errno, std::generic_category(), "pipe");
+        }
+        if (set_cloexec) {
+            if (fcntl(fds[0], F_SETFD, FD_CLOEXEC) == -1) {
+                throw std::system_error(errno, std::generic_category(), "fcntl");
+            }
+            if (fcntl(fds[1], F_SETFD, FD_CLOEXEC) == -1) {
+                throw std::system_error(errno, std::generic_category(), "fcntl");
+            }
         }
         return fds;
     }
@@ -51,18 +62,16 @@ namespace pkg_chk {
             envp.emplace_back(env_pair.first + "=" + env_pair.second);
         }
 
-        auto const stdin_fds  = cpipe();
-        auto const stdout_fds = cpipe();
+        auto const stdin_fds  = cpipe(true);
+        auto const stdout_fds = cpipe(true);
 
 #if defined(HAVE_VFORK)
         _pid = vfork();
 #else
         _pid = fork();
 #endif
-        if (_pid == 0) {
+        if (*_pid == 0) {
             dup2(stdin_fds[0], STDIN_FILENO);
-            close(stdin_fds[1]);
-            close(stdout_fds[0]);
             dup2(stdout_fds[1], STDOUT_FILENO);
 
             if (cwd) {
@@ -99,7 +108,7 @@ namespace pkg_chk {
             }
             _exit(1);
         }
-        else if (_pid > 0) {
+        else if (*_pid > 0) {
             close(stdin_fds[0]);
             close(stdout_fds[1]);
 
@@ -123,9 +132,11 @@ namespace pkg_chk {
 
     harness::status const&
     harness::wait() {
+        assert(_pid);
+
         if (!_status) {
             int cstatus;
-            if (waitpid(_pid, &cstatus, 0) == -1) {
+            if (waitpid(*_pid, &cstatus, 0) == -1) {
                 throw std::system_error(
                     errno, std::generic_category(), "waitpid");
             }
@@ -136,9 +147,12 @@ namespace pkg_chk {
                 _status.emplace(signaled {WTERMSIG(cstatus), WCOREDUMP(cstatus)});
             }
             else {
+                std::cerr << "The process " << *_pid << " terminated but it didn't exit nor receive a signal. "
+                          << "Then what the hell has happened to it???" << std::endl;
                 std::abort(); // Impossible
             }
         }
+
         return _status.value();
     }
 }

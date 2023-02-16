@@ -17,13 +17,13 @@ namespace pkg_chk {
         std::filesystem::path const& makeconf,
         std::vector<std::string> const& vars);
 
-    /** Extract a set of variables from a given pkgpath. 'vars' is a
-     * sequence of variables to extract. Returns a map from variable names
-     * to their value which is possibly empty.
+    /** Extract a set of variables from an absolute path to package
+     * directory. 'vars' is a sequence of variables to extract. Returns a
+     * map from variable names to their value which is possibly empty.
      */
     std::map<std::string, std::string>
     extract_pkgmk_vars(
         pkg_chk::options const& opts,
-        std::filesystem::path const& pkgpath,
+        std::filesystem::path const& pkgdir,
         std::vector<std::string> const& vars);
 }

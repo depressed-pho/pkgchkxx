@@ -87,7 +87,7 @@ namespace pkg_chk {
                 dry_run = true;
                 break;
             case 'p':
-                mode = mode::PRINT_PKGDIRS_TO_CHECK;
+                mode = mode::PRINT_PKGPATHS_TO_CHECK;
                 break;
             case 'P':
                 bin_pkg_path = optarg;
@@ -156,7 +156,7 @@ namespace pkg_chk {
             << "    -l       List binary packages including dependencies" << std::endl
             << "    -N       List installed packages for which a newer version is in TODO" << std::endl
             << "    -n       Display actions that would be taken, but do not perform them" << std::endl
-            << "    -p       Display the list of pkgdirs that match the current tags" << std::endl
+            << "    -p       Display the list of pkgpaths that match the current tags" << std::endl
             << "    -P dir   Set PACKAGES dir (overrides any other setting)" << std::endl
             << "    -q       Do not display actions or take any action; only list packages" << std::endl
             << "    -r       Recursively remove mismatches (use with care)" << std::endl

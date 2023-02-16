@@ -6,6 +6,7 @@
 #include <string>
 
 #include "options.hxx"
+#include "summary.hxx"
 #include "tag.hxx"
 
 namespace pkg_chk {
@@ -35,7 +36,9 @@ namespace pkg_chk {
         std::shared_future<std::filesystem::path> PKGCHK_UPDATE_CONF;
         std::shared_future<std::string>           SU_CMD;
 
-        std::shared_future<tagset> included_tags;
-        std::shared_future<tagset> excluded_tags;
+        std::shared_future<summary> bin_pkg_summary;
+        std::shared_future<pkgmap>  bin_pkg_map;
+        std::shared_future<tagset>  included_tags;
+        std::shared_future<tagset>  excluded_tags;
     };
 }

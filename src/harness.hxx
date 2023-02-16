@@ -7,6 +7,7 @@
 #include <ostream>
 #include <string>
 #include <sys/types.h>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -35,8 +36,24 @@ namespace pkg_chk {
             environ_modifier const& env_mod = nop_modifier,
             std::optional<std::string> const& cwd = std::nullopt);
 
+        harness(harness const&) = delete;
+
+        harness(harness&& other)
+            : _pid(std::move(other._pid))
+            , _stdin(std::move(other._stdin))
+            , _stdout(std::move(other._stdout))
+            , _status(std::move(other._status)) {
+
+            other._pid.reset();
+            other._stdin.reset();
+            other._stdout.reset();
+            other._status.reset();
+        }
+
         ~harness() noexcept(false) {
-            wait();
+            if (_pid) {
+                wait();
+            }
         }
 
         fdostream&
@@ -53,7 +70,7 @@ namespace pkg_chk {
         wait();
 
     private:
-        pid_t _pid;
+        std::optional<pid_t> _pid;
         std::optional<fdostream> _stdin;
         std::optional<fdistream> _stdout;
         std::optional<status> _status;

@@ -51,7 +51,7 @@ namespace pkg_chk {
     std::map<std::string, std::string>
     extract_pkgmk_vars(
         pkg_chk::options const& opts,
-        std::filesystem::path const& pkgpath,
+        std::filesystem::path const& pkgdir,
         std::vector<std::string> const& vars) {
 
         std::map<std::string, std::string> value_of;
@@ -64,7 +64,7 @@ namespace pkg_chk {
             std::vector<std::string> const argv = {
                 CFG_BMAKE, "-f", "-", "-f", "Makefile", "x"
             };
-            harness make(CFG_BMAKE, argv, harness::nop_modifier, pkgpath);
+            harness make(CFG_BMAKE, argv, harness::nop_modifier, pkgdir);
 
             make.cin()
                 << ".PHONY: x" << std::endl

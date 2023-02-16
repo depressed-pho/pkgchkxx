@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <cerrno>
 #include <unistd.h>
 
@@ -28,23 +27,16 @@ namespace pkg_chk {
             // An overflow has happened because we haven't allocated a
             // buffer yet.
             _write_buf = buffer_t();
-            setp(_write_buf->data(),
-                 _write_buf->data() + _write_buf->size());
         }
         else if (pptr() > pbase()) {
             // An overflow has happened either because the buffer became
             // full, or because it's being closed. Flush it now.
-            while (true) {
-                size_t const n_write = pptr() - pbase();
+            size_t const n_write = pptr() - pbase();
+            for (size_t n_remaining = n_write; n_remaining > 0; ) {
                 ssize_t const n_written = write(_fd, _write_buf->data(), n_write);
                 if (n_written > 0) {
-                    std::copy(
-                        _write_buf->begin() + n_written,
-                        _write_buf->begin() + n_write,
-                        _write_buf->begin());
-                    setp(_write_buf->data() + n_write - n_written,
-                         _write_buf->data() + _write_buf->size());
-                    break;
+                    n_remaining -= n_written;
+                    continue;
                 }
                 else if (n_written == -1 && errno == EINTR) {
                     continue;
@@ -54,8 +46,10 @@ namespace pkg_chk {
                 }
             }
         }
+        setp(_write_buf->data(),
+             _write_buf->data() + _write_buf->size());
 
-        if (traits_type::not_eof(ch)) {
+        if (!traits_type::eq_int_type(ch, traits_type::eof())) {
             char_type const c = traits_type::to_char_type(ch);
             *pptr() = c;
             pbump(1);
@@ -93,7 +87,10 @@ namespace pkg_chk {
 
     fdstreambuf::int_type
     fdstreambuf::pbackfail(int_type ch) {
-        if (traits_type::not_eof(ch) && gptr() != nullptr && gptr() > eback()) {
+        if (!traits_type::eq_int_type(ch, traits_type::eof()) &&
+            gptr() != nullptr &&
+            gptr() > eback()) {
+
             // There is no problem modifying the buffer.
             gptr()[-1] = traits_type::to_char_type(ch);
             return ch;

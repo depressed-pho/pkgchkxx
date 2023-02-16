@@ -68,6 +68,7 @@ namespace pkg_chk {
                     _finished.notify_one();
                 });
             _running_children.emplace(thr.get_id(), std::move(childp));
+            thr.detach();
         }
     }
 }

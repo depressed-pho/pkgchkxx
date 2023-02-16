@@ -91,4 +91,7 @@ namespace pkg_chk {
         f(l);
         std::exit(1);
     }
+
+    logger
+    fatal_later(pkg_chk::options const& opts);
 }
