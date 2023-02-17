@@ -58,10 +58,12 @@ namespace pkg_chk {
         for (auto it = str.begin(); it != str.end(); ) {
             if (is_ascii_digit(*it)) {
                 int n = 0;
+                int w = 0;
                 for (; it != str.end() && is_ascii_digit(*it); it++) {
                     n = n * 10 + (*it - '0');
+                    w++;
                 }
-                _comps.emplace_back(digits(n));
+                _comps.emplace_back(digits(n, w));
                 continue;
             }
             {

@@ -34,7 +34,9 @@ namespace pkg_chk {
         return out;
     }
 
-    config::pkg_def::pkg_def(std::string_view const& line) {
+    config::pkg_def::pkg_def(std::string_view const& line)
+        : path("dummy/dummy" /* because it isn't default-constructible */) {
+
         bool is_first = true;
         for (auto const word: words(line)) {
             if (is_first) {
@@ -44,6 +46,9 @@ namespace pkg_chk {
             else {
                 patterns_or.emplace_back(word);
             }
+        }
+        if (is_first) {
+            throw std::runtime_error("Invalid package definition: " + std::string(line));
         }
     }
 

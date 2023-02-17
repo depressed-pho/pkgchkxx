@@ -13,7 +13,7 @@ namespace pkg_chk {
     };
 
     struct pkgpath {
-        pkgpath() {}
+        pkgpath() = delete;
         pkgpath(std::string_view const& dir);
 
         friend bool

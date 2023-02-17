@@ -1,3 +1,5 @@
+#include "config.h"
+
 #include <algorithm>
 #include <cassert>
 #include <cerrno>
@@ -13,6 +15,7 @@
 
 #include "config_file.hxx"
 #include "environment.hxx"
+#include "harness.hxx"
 #include "message.hxx"
 #include "options.hxx"
 #include "pkgdb.hxx"
@@ -110,31 +113,78 @@ namespace {
 
     void
     list_bin_pkgs(options const& opts, environment const& env) {
-        pkgmap const& pm = env.bin_pkg_map.get();
+        std::string const& sufx = env.PKG_SUFX.get();
+        summary     const& sum  = env.bin_pkg_summary.get();
+        pkgmap      const& pm   = env.bin_pkg_map.get();
         config const conf(env.PKGCHK_CONF.get());
+
+        using pkgname_cref = std::reference_wrapper<pkgname const>;
+        auto to_list = std::make_unique<std::map<pkgname_cref, pkgvars const&>>();
+        std::set<pkgname_cref> seen;
+        harness tsort(CFG_TSORT, {CFG_TSORT});
+
         for (auto const& path:
                  conf.apply_tags(
                      env.included_tags.get(), env.excluded_tags.get())) {
-            // Examine the newest binary package that corresponds to this
-            // pkgpath.
-            if (auto pkgs = pm.find(path); pkgs != pm.end()) {
-                auto newest = pkgs->second.rbegin();
-                assert(newest != pkgs->second.rend());
+            if (auto pkgbases = pm.find(path); pkgbases != pm.end()) {
+                // For each PKGBASE that correspond to this PKGPATH, find
+                // the newest binary package and schedule it for listing.
+                for (auto const& base: pkgbases->second) {
+                    auto newest = base.second.rbegin();
+                    assert(newest != base.second.rend());
 
-                if (!is_binary_available(env, newest->first)) {
-                    fatal_later(opts)
-                        << newest->first << " - no binary package found" << std::endl;
-                }
-
-                verbose(opts) << path << ": " << newest->first << std::endl;
-                for (auto const& dep: newest->second.DEPENDS) {
-                    verbose(opts) << "    depends on " << dep << std::endl;
-                    // FIXME: implementation incomplete
+                    if (is_binary_available(env, newest->first)) {
+                        to_list->insert(*newest);
+                    }
+                    else {
+                        fatal_later(opts)
+                            << newest->first << " - no binary package found" << std::endl;
+                    }
                 }
             }
             else {
                 fatal_later(opts) << path << " - Unable to extract pkgname" << std::endl;
             }
+        }
+
+        while (!to_list->empty()) {
+            for (auto const& pair: *to_list) {
+                seen.insert(pair.first);
+            }
+
+            auto scheduled = std::make_unique<std::map<pkgname_cref, pkgvars const&>>();
+            for (auto const& pair: *to_list) {
+                pkgname const& name = pair.first;
+                pkgvars const& vars = pair.second;
+
+                verbose(opts) << vars.PKGPATH << ": " << name << std::endl;
+                for (auto const& dep_pattern: vars.DEPENDS) {
+                    verbose(opts) << "    depends on " << dep_pattern << ": ";
+                    if (auto const best = dep_pattern.best(sum); best != sum.end()) {
+                        pkgname const& dep = best->first;
+
+                        verbose(opts) << dep << std::endl;
+                        tsort.cin() << dep << sufx << ' ' << name << sufx << std::endl;
+                        if (seen.count(dep) == 0) {
+                            scheduled->insert(*best);
+                            seen.insert(dep);
+                        }
+                    }
+                    else {
+                        verbose(opts) << "(nothing matches)" << std::endl;
+                        fatal_later(opts) << name << ": missing dependency " << dep_pattern << std::endl;
+                    }
+                }
+
+                if (vars.DEPENDS.empty()) {
+                    tsort.cin() << name << sufx << ' ' << name << sufx << std::endl;
+                }
+            }
+            to_list.swap(scheduled);
+        }
+        tsort.cin().close();
+        for (std::string line; std::getline(tsort.cout(), line); ) {
+            std::cout << line << std::endl;
         }
     }
 }

@@ -25,6 +25,7 @@ AX_CXX_COMPILE_STDCXX([17], [noext], [mandatory])
 AX_COMPILER_FLAGS([], [], [yes])
 
 # Checks for programs.
+AC_PATH_PROG([TSORT], [tsort], [tsort])
 AC_PATH_PROG([UNAME], [uname], [uname])
 AC_PATH_PROG([XARGS], [xargs], [xargs])
 PKG_PROG_PKG_CONFIG # We have a run-time dependency on pkg-config to detect X11.

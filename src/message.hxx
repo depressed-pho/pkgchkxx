@@ -4,6 +4,7 @@
 #include <iostream>
 #include <optional>
 #include <string_view>
+#include <type_traits>
 
 #include "options.hxx"
 
@@ -85,10 +86,12 @@ namespace pkg_chk {
 
     template <typename Function>
     [[noreturn]] inline void
-    fatal(pkg_chk::options const& opts, Function const& f) {
+    fatal(pkg_chk::options const& opts, Function&& f) {
+        static_assert(std::is_invocable_v<Function&&, std::ostream&>);
+
         logger l(opts, true);
         l << "** ";
-        f(l);
+        f(static_cast<std::ostream&>(l));
         std::exit(1);
     }
 

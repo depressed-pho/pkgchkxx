@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cassert>
+#include <iomanip>
 #include <optional>
 #include <ostream>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -16,8 +18,9 @@ namespace pkg_chk {
 
     struct pkgversion: ordered<pkgversion> {
         struct digits {
-            digits(int num) noexcept
-                : _num(num) {};
+            digits(int num, int width = -1) noexcept
+                : _num(num)
+                , _width(width) {}
 
             operator int() const noexcept {
                 return _num;
@@ -25,11 +28,15 @@ namespace pkg_chk {
 
             friend std::ostream&
             operator<< (std::ostream& out, pkgversion::digits const& digits) {
+                if (digits._width >= 0) {
+                    out << std::setfill('0') << std::setw(digits._width);
+                }
                 return out << digits._num;
             }
 
         private:
             int _num;
+            int _width;
         };
 
         struct modifier {
@@ -123,6 +130,9 @@ namespace pkg_chk {
         using iterator       = std::vector<component>::iterator;
         using const_iterator = std::vector<component>::const_iterator;
 
+        /** Construct an empty pkgversion object representing negative
+         * infinity with respect to ordering.
+         */
         pkgversion() {}
 
         pkgversion(std::string const& str)
@@ -192,6 +202,13 @@ namespace pkg_chk {
         pkgname(Base&& base_, Version&& version_)
             : base(std::forward<Base>(base_))
             , version(std::forward<Version>(version_)) {}
+
+        std::string
+        string() const {
+            std::stringstream ss;
+            ss << *this;
+            return ss.str();
+        }
 
         friend bool
         operator== (pkgname const& a, pkgname const& b) noexcept {

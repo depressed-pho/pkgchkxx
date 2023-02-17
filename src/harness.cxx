@@ -49,11 +49,12 @@ namespace {
 }
 
 namespace pkg_chk {
-    harness::harness(
+    void
+    harness::harness::init(
         std::string const& cmd,
         std::vector<std::string> const& argv,
-        environ_modifier const& env_mod,
-        std::optional<std::string> const& cwd) {
+        std::optional<std::string> const& cwd,
+        std::function<void (std::map<std::string, std::string>&)> const& env_mod) {
 
         auto env_map = cenviron();
         env_mod(env_map);

@@ -7,6 +7,7 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <type_traits>
 #include <utility>
 
 namespace pkg_chk {
@@ -45,6 +46,7 @@ namespace pkg_chk {
         template <typename Function, typename... Args>
         void
         start_soon(Function&& f, Args&&... args) {
+            static_assert(std::is_invocable_v<Function&&, Args&&...>);
             lock_t lk(_mtx);
 
             _pending_children.emplace_back(
@@ -62,7 +64,10 @@ namespace pkg_chk {
         struct child {
             template <typename Function, typename... Args>
             child(Function&& f, Args&&... args)
-                : run(std::bind(std::forward(f), std::forward(args...))) {}
+                : run(std::bind(std::forward(f), std::forward(args...))) {
+
+                static_assert(std::is_invocable_v<Function&&, Args&&...>);
+            }
 
             std::function<void ()> run;
         };

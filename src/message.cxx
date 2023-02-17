@@ -62,6 +62,8 @@ namespace pkg_chk {
             delayed_fatality = true;
             std::atexit(exit_for_failure);
         }
-        return msg(opts);
+        logger l(opts, true);
+        l << "** ";
+        return l;
     }
 }

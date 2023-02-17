@@ -148,7 +148,8 @@ namespace pkg_chk {
 
     pkgmap::pkgmap(summary const& all_packages) {
         for (auto const& pair: all_packages) {
-            (*this)[pair.second.PKGPATH].emplace(pair.first, pair.second);
+            (*this)[pair.second.PKGPATH][pair.second.PKGNAME.base]
+                .emplace(pair.first, pair.second);
         }
     }
 }

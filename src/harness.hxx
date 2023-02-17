@@ -7,6 +7,7 @@
 #include <ostream>
 #include <string>
 #include <sys/types.h>
+#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -17,10 +18,6 @@ namespace pkg_chk {
     /* RAII way of spawning child processes.
      */
     struct harness {
-        using environ_modifier =
-            std::function<void (std::map<std::string, std::string>& env_map)>;
-        static inline environ_modifier const nop_modifier = [](auto&) {};
-
         struct exited {
             int status;
         };
@@ -33,8 +30,24 @@ namespace pkg_chk {
         harness(
             std::string const& cmd,
             std::vector<std::string> const& argv,
-            environ_modifier const& env_mod = nop_modifier,
-            std::optional<std::string> const& cwd = std::nullopt);
+            std::optional<std::string> const& cwd = std::nullopt) {
+
+            init(cmd, argv, cwd, [](auto&) {});
+        }
+
+        template <typename EnvModifier>
+        harness(
+            std::string const& cmd,
+            std::vector<std::string> const& argv,
+            std::optional<std::string> const& cwd,
+            EnvModifier&& env_mod) {
+
+            static_assert(
+                std::is_invocable_v<EnvModifier&&, std::map<std::string, std::string>&>);
+
+            init(cmd, argv, cwd,
+                 std::function<void (std::map<std::string, std::string>&)>(env_mod));
+        }
 
         harness(harness const&) = delete;
 
@@ -70,6 +83,12 @@ namespace pkg_chk {
         wait();
 
     private:
+        void
+        init(std::string const& cmd,
+             std::vector<std::string> const& argv,
+             std::optional<std::string> const& cwd,
+             std::function<void (std::map<std::string, std::string>&)> const& env_mod);
+
         std::optional<pid_t> _pid;
         std::optional<fdostream> _stdin;
         std::optional<fdistream> _stdout;

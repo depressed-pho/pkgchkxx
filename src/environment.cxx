@@ -155,7 +155,7 @@ namespace pkg_chk {
                 makefile_env _menv;
 
                 if (!fs::is_directory(PKGSRCDIR.get())) {
-                    fatal(opts, [this](logger& out) {
+                    fatal(opts, [this](auto& out) {
                                     out << "Unable to locate PKGSRCDIR ("
                                         << (PKGSRCDIR.get().empty() ? "not set" : PKGSRCDIR.get())
                                         << ")" << std::endl;
@@ -213,7 +213,7 @@ namespace pkg_chk {
                     verbose_var(opts, "PACKAGES", _menv.PACKAGES);
                 }
                 if (!fs::is_directory(_menv.PKG_DBDIR)) {
-                    fatal(opts, [&_menv](logger& out) {
+                    fatal(opts, [&_menv](auto& out) {
                                     out << "Unable to locate PKG_DBDIR ("
                                         << (_menv.PKG_DBDIR.empty() ? "not set" : _menv.PKG_DBDIR)
                                         << ")" << std::endl;
@@ -337,6 +337,7 @@ namespace pkg_chk {
                     harness pkg_config(
                         CFG_PKG_CONFIG,
                         {CFG_PKG_CONFIG, "--exists", "x11"},
+                        std::nullopt,
                         [](auto& env) {
                             std::string const path = CFG_PKG_CONFIG_PATH;
                             if (!path.empty()) {
