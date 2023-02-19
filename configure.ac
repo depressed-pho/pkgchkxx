@@ -17,6 +17,12 @@ AC_ARG_VAR([BMAKE], [path to bmake command])
 if test -z "$BMAKE"; then
     AC_PATH_PROG([BMAKE], [bmake], [bmake])
 fi
+
+AC_PATH_PROG([TSORT], [tsort], [tsort])
+if test -z "$TSORT"; then
+    AC_PATH_PROG([TSORT], [tsort], [tsort])
+fi
+
 AC_ARG_VAR([MAKECONF], [path to mk.conf])
 
 # Checks for compilers.
@@ -25,7 +31,6 @@ AX_CXX_COMPILE_STDCXX([17], [noext], [mandatory])
 AX_COMPILER_FLAGS([], [], [yes])
 
 # Checks for programs.
-AC_PATH_PROG([TSORT], [tsort], [tsort])
 AC_PATH_PROG([UNAME], [uname], [uname])
 AC_PATH_PROG([XARGS], [xargs], [xargs])
 PKG_PROG_PKG_CONFIG # We have a run-time dependency on pkg-config to detect X11.

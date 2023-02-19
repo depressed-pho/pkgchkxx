@@ -1,7 +1,9 @@
 #include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <future>
 #include <string>
+#include <system_error>
 #include <vector>
 
 #include "harness.hxx"
@@ -89,23 +91,27 @@ namespace {
             }).share();
 
         for (auto const& summary_file: SUMMARY_FILES) {
+            auto const path = PACKAGES / summary_file;
             std::error_code ec;
-            auto const summary_last_mod =
-                fs::last_write_time(PACKAGES / summary_file, ec);
+            auto const summary_last_mod = fs::last_write_time(path, ec);
             if (ec) {
                 continue;
             }
             // Is there any binary package that is newer than the summary
             // file? Ignore the summary if so.
             else if (summary_last_mod < newest_bin_pkg.get()) {
-                msg(opts) << "** Ignoring " << summary_file
+                msg(opts) << "** Ignoring " << path
                           << " as there are newer packages in " << PACKAGES << std::endl;
                 continue;
             }
             else {
-                verbose(opts) << "Using summary file: " << summary_file << std::endl;
-                throw "FIXME: summary loading not implemented yet";
-                // return;
+                verbose(opts) << "Using summary file: " << path << std::endl;
+                std::fstream in(path, std::ios_base::in);
+                if (!in) {
+                    throw std::system_error(
+                        errno, std::generic_category(), "Failed to open " + path.string());
+                }
+                return read_summary(in);
             }
         }
 

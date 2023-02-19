@@ -64,7 +64,8 @@ namespace pkg_chk {
     config::config(std::filesystem::path const& file) {
         std::ifstream in(file, std::ios_base::in);
         if (!in) {
-            throw std::system_error(errno, std::generic_category(), "Failed to open " + file.string());
+            throw std::system_error(
+                errno, std::generic_category(), "Failed to open " + file.string());
         }
         in.exceptions(std::ios_base::badbit);
 

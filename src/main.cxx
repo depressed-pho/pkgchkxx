@@ -118,6 +118,8 @@ namespace {
         pkgmap      const& pm   = env.bin_pkg_map.get();
         config const conf(env.PKGCHK_CONF.get());
 
+        // TODO: We don't take account of SUPERSEDES but how do we do it?
+
         using pkgname_cref = std::reference_wrapper<pkgname const>;
         auto to_list = std::make_unique<std::map<pkgname_cref, pkgvars const&>>();
         std::set<pkgname_cref> seen;
