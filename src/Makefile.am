@@ -5,6 +5,7 @@ pkg_chk_SOURCES = \
 	main.cxx \
 	environment.cxx environment.hxx \
 	fdstream.hxx fdstream.cxx \
+	gzipstream.cxx gzipstream.hxx \
 	harness.hxx harness.cxx \
 	message.cxx message.hxx \
 	nursery.cxx nursery.hxx \
@@ -20,7 +21,8 @@ pkg_chk_SOURCES = \
 	todo.hxx todo.cxx \
 	xargs_fold.hxx
 pkg_chk_CXXFLAGS = \
-	$(WARN_CXXFLAGS) \
+	$(AM_CXXFLAGS) \
+	$(ZLIB_CFLAGS) \
 	-DCFG_BMAKE='"$(BMAKE)"' \
 	-DCFG_MAKECONF='"$(MAKECONF)"' \
 	-DCFG_PKG_CONFIG='"$(PKG_CONFIG)"' \
@@ -30,6 +32,9 @@ pkg_chk_CXXFLAGS = \
 	-DCFG_TSORT='"$(TSORT)"' \
 	-DCFG_UNAME='"$(UNAME)"' \
 	-DCFG_XARGS='"$(XARGS)"'
+pkg_chk_LDFLAGS = \
+	$(AM_LDFLAGS) \
+	$(ZLIB_LIBS)
 
 AM_CFLAGS = $(WARN_CFLAGS)
 AM_CXXFLAGS = $(WARN_CXXFLAGS)

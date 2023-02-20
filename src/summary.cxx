@@ -6,6 +6,7 @@
 #include <system_error>
 #include <vector>
 
+#include "gzipstream.hxx"
 #include "harness.hxx"
 #include "message.hxx"
 #include "string_algo.hxx"
@@ -111,7 +112,17 @@ namespace {
                     throw std::system_error(
                         errno, std::generic_category(), "Failed to open " + path.string());
                 }
-                return read_summary(in);
+
+                if (path.extension() == ".bz2") {
+                    throw "FIXME: not implemented yet";
+                }
+                else if (path.extension() == ".gz") {
+                    gunzipistream gunzip(in);
+                    return read_summary(gunzip);
+                }
+                else {
+                    return read_summary(in);
+                }
             }
         }
 

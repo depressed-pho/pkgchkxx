@@ -38,6 +38,7 @@ PKG_PROG_PKG_CONFIG # We have a run-time dependency on pkg-config to detect X11.
 # Checks for libraries.
 AX_CXX_STD_FILESYSTEM
 AX_CXX_STD_THREAD
+PKG_CHECK_MODULES([ZLIB], [zlib], [], [AC_MSG_ERROR([zlib is missing])])
 
 # Checks for header files.
 AC_CHECK_HEADERS([unistd.h])
