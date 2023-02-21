@@ -6,12 +6,15 @@
 #include <system_error>
 #include <vector>
 
+#include "bzip2stream.hxx"
 #include "gzipstream.hxx"
 #include "harness.hxx"
 #include "message.hxx"
 #include "string_algo.hxx"
 #include "summary.hxx"
 #include "xargs_fold.hxx"
+
+//#include <iostream>//FIXME
 
 using namespace pkg_chk;
 using namespace std::literals;
@@ -33,6 +36,7 @@ namespace {
         std::optional<pkgname> PKGNAME;
         std::optional<pkgpath> PKGPATH;
         for (std::string line; std::getline(in, line); ) {
+            //std::cerr << "read_summary [" << line << "]" << std::endl;//FIXME
             if (line.empty()) {
                 if (PKGNAME && PKGPATH) {
                     DEPENDS.shrink_to_fit();
@@ -114,7 +118,8 @@ namespace {
                 }
 
                 if (path.extension() == ".bz2") {
-                    throw "FIXME: not implemented yet";
+                    bunzip2istream bunzip2(in);
+                    return read_summary(bunzip2);
                 }
                 else if (path.extension() == ".gz") {
                     gunzipistream gunzip(in);

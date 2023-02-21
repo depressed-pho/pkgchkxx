@@ -14,14 +14,12 @@ AM_SILENT_RULES([no])
 
 # Precious variables.
 AC_ARG_VAR([BMAKE], [path to bmake command])
-if test -z "$BMAKE"; then
-    AC_PATH_PROG([BMAKE], [bmake], [bmake])
-fi
+AS_IF([test -z "$BMAKE"],
+      [AC_PATH_PROG([BMAKE], [bmake], [bmake])])
 
 AC_PATH_PROG([TSORT], [tsort], [tsort])
-if test -z "$TSORT"; then
-    AC_PATH_PROG([TSORT], [tsort], [tsort])
-fi
+AS_IF([test -z "$TSORT"],
+      [AC_PATH_PROG([TSORT], [tsort], [tsort])])
 
 AC_ARG_VAR([MAKECONF], [path to mk.conf])
 
@@ -39,6 +37,7 @@ PKG_PROG_PKG_CONFIG # We have a run-time dependency on pkg-config to detect X11.
 AX_CXX_STD_FILESYSTEM
 AX_CXX_STD_THREAD
 PKG_CHECK_MODULES([ZLIB], [zlib], [], [AC_MSG_ERROR([zlib is missing])])
+AX_BZIP2
 
 # Checks for header files.
 AC_CHECK_HEADERS([unistd.h])
