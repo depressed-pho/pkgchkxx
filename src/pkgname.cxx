@@ -54,7 +54,9 @@ namespace {
 }
 
 namespace pkg_chk {
-    pkgversion::pkgversion(std::string_view const& str) {
+    pkgversion::pkgversion(std::string_view const& str)
+        : _rev(0) {
+
         for (auto it = str.begin(); it != str.end(); ) {
             if (is_ascii_digit(*it)) {
                 int n = 0;
@@ -80,14 +82,14 @@ namespace pkg_chk {
                     continue;
                 }
             }
-            if (ci_starts_with(it, str.end(), "nb"sv)) {
+            if (ci_starts_with(it, str.end(), "nb"sv) &&
+                std::all_of(it + 2, str.end(), is_ascii_digit)) {
+
                 it += 2;
-                int n = 0;
                 for (; it != str.end() && is_ascii_digit(*it); it++) {
-                    n = n * 10 + (*it - '0');
+                    _rev = _rev * 10 + (*it - '0');
                 }
-                _comps.emplace_back(revision(n));
-                continue;
+                break;
             }
             if (is_ascii_alpha(*it)) {
                 _comps.emplace_back(modifier(modifier::kind::DOT, ""s));
@@ -111,19 +113,16 @@ namespace pkg_chk {
              i < std::max(this->_comps.size(), other._comps.size());
              i++) {
 
-            int const a = i < this->_comps.size() ? std::visit(to_digit, this->_comps[i]) : 0;
-            int const b = i < other._comps.size() ? std::visit(to_digit, other._comps[i]) : 0;
-            if (a < b) {
-                return -1;
-            }
-            else if (a > b) {
-                return 1;
-            }
-            else {
-                continue;
+            int const a    = i < this->_comps.size() ? std::visit(to_digit, this->_comps[i]) : 0;
+            int const b    = i < other._comps.size() ? std::visit(to_digit, other._comps[i]) : 0;
+            int const diff = a - b;
+
+            if (diff != 0) {
+                return diff;
             }
         }
-        return 0;
+
+        return static_cast<int>(_rev) - static_cast<int>(other._rev);
     }
 
     pkgname::pkgname(std::string_view const& name) {

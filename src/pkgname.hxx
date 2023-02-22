@@ -78,24 +78,6 @@ namespace pkg_chk {
             std::string _str;
         };
 
-        /// "nb" suffix
-        struct revision {
-            revision(int rev) noexcept
-                : _rev(rev) {}
-
-            operator int() const noexcept {
-                return _rev;
-            }
-
-            friend std::ostream&
-            operator<< (std::ostream& out, pkgversion::revision const& rev) {
-                return out << "nb" << rev._rev;
-            }
-
-        private:
-            int _rev;
-        };
-
         struct alpha {
             alpha(char c) noexcept
                 : _c(c) {
@@ -123,42 +105,19 @@ namespace pkg_chk {
         using component = std::variant<
             digits,
             modifier,
-            revision,
             alpha
             >;
-
-        using iterator       = std::vector<component>::iterator;
-        using const_iterator = std::vector<component>::const_iterator;
 
         /** Construct an empty pkgversion object representing negative
          * infinity with respect to ordering.
          */
-        pkgversion() {}
+        pkgversion()
+            : _rev(0) {}
 
         pkgversion(std::string const& str)
             : pkgversion(static_cast<std::string_view>(str)) {}
 
         pkgversion(std::string_view const& str);
-
-        iterator
-        begin() {
-            return _comps.begin();
-        }
-
-        const_iterator
-        begin() const {
-            return _comps.begin();
-        }
-
-        iterator
-        end() {
-            return _comps.end();
-        }
-
-        const_iterator
-        end() const {
-            return _comps.end();
-        }
 
         bool
         operator== (pkgversion const& other) const noexcept {
@@ -182,8 +141,11 @@ namespace pkg_chk {
 
         friend std::ostream&
         operator<< (std::ostream& out, pkgversion const& version) {
-            for (auto const& comp: version) {
+            for (auto const& comp: version._comps) {
                 out << comp;
+            }
+            if (version._rev > 0) {
+                out << "nb" << version._rev;
             }
             return out;
         }
@@ -193,6 +155,7 @@ namespace pkg_chk {
         compare(pkgversion const& other) const noexcept;
 
         std::vector<component> _comps;
+        unsigned _rev; // "nb" suffix
     };
 
     struct pkgname: ordered<pkgname> {
