@@ -3,7 +3,7 @@ AC_DEFUN([AX_BZIP2], [
     AC_ARG_WITH(
         [bzip2-prefix],
         [AS_HELP_STRING([--with-bzip2-prefix], [path to libbz2 installation directory])])
-    AS_IF([test x"$with_bzip2_prefix" != x -a x"$with_bzip2_prefix" != x"no"],
+    AS_IF([test x"$with_bzip2_prefix" != x"" -a x"$with_bzip2_prefix" != x"no"],
           [BZIP2_CPPFLAGS="-I${with_bzip2_prefix}/include"
            BZIP2_LIBS="-L${with_bzip2_prefix}/lib"])
 

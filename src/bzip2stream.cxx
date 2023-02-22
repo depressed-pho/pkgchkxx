@@ -75,7 +75,7 @@ namespace pkg_chk {
                 else {
                     // The base streambuf can't provide us any data without
                     // blocking. Allow it to block.
-                    int_type const ch = _base->sgetc();
+                    int_type const ch = _base->sbumpc();
                     if (traits_type::eq_int_type(ch, traits_type::eof())) {
                         // But it got EOF.
                         _bunzip2_eof = true;

@@ -12,9 +12,8 @@
 #include "message.hxx"
 #include "string_algo.hxx"
 #include "summary.hxx"
+#include "wwwstream.hxx"
 #include "xargs_fold.hxx"
-
-//#include <iostream>//FIXME
 
 using namespace pkg_chk;
 using namespace std::literals;
@@ -36,7 +35,6 @@ namespace {
         std::optional<pkgname> PKGNAME;
         std::optional<pkgpath> PKGPATH;
         for (std::string line; std::getline(in, line); ) {
-            //std::cerr << "read_summary [" << line << "]" << std::endl;//FIXME
             if (line.empty()) {
                 if (PKGNAME && PKGPATH) {
                     DEPENDS.shrink_to_fit();
@@ -69,6 +67,27 @@ namespace {
             }
         }
         return sum;
+    }
+
+    template <typename Function>
+    auto
+    with_uncompress_filter(
+        std::filesystem::path const& summary_file,
+        std::istream&& maybe_compressed,
+        Function&& f) {
+
+        auto const&& ext = summary_file.extension();
+        if (ext == ".bz2") {
+            bunzip2istream in(maybe_compressed);
+            return f(in);
+        }
+        else if (ext == ".gz") {
+            gunzipistream in(maybe_compressed);
+            return f(in);
+        }
+        else {
+            return f(maybe_compressed);
+        }
     }
 
     summary
@@ -111,23 +130,17 @@ namespace {
             }
             else {
                 verbose(opts) << "Using summary file: " << path << std::endl;
-                std::fstream in(path, std::ios_base::in);
-                if (!in) {
+                std::fstream local_file(path, std::ios_base::in);
+                if (!local_file) {
                     throw std::system_error(
                         errno, std::generic_category(), "Failed to open " + path.string());
                 }
 
-                if (path.extension() == ".bz2") {
-                    bunzip2istream bunzip2(in);
-                    return read_summary(bunzip2);
-                }
-                else if (path.extension() == ".gz") {
-                    gunzipistream gunzip(in);
-                    return read_summary(gunzip);
-                }
-                else {
-                    return read_summary(in);
-                }
+                return with_uncompress_filter(
+                    path, std::move(local_file),
+                    [](auto&& in) {
+                        return read_summary(in);
+                    });
             }
         }
 
@@ -151,6 +164,29 @@ namespace {
             },
             read_summary);
     }
+
+    summary
+    read_remote_summary(options const& opts, std::filesystem::path const& PACKAGES) {
+        for (auto const& summary_file: SUMMARY_FILES) {
+            try {
+                auto const path = PACKAGES / summary_file;
+                return with_uncompress_filter(
+                    path,
+                    wwwistream(path),
+                    [](auto&& in) {
+                        return read_summary(in);
+                    });
+            }
+            catch (remote_file_unavailable const&) {
+                continue;
+            }
+        }
+
+        fatal(opts, [&](auto&& out) {
+                        out << "No summary files are available: "
+                            << PACKAGES.string() << std::endl;
+                    });
+    }
 }
 
 namespace pkg_chk {
@@ -161,7 +197,7 @@ namespace pkg_chk {
         std::string const& PKG_SUFX) {
 
         if (PACKAGES.string().find("://") != std::string::npos) {
-            throw "FIXME: URL fetching not implemented yet";
+            *this = read_remote_summary(opts, PACKAGES);
         }
         else {
             *this = read_local_summary(opts, PACKAGES, PKG_INFO, PKG_SUFX);

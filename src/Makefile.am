@@ -20,11 +20,13 @@ pkg_chk_SOURCES = \
 	summary.hxx summary.cxx \
 	tag.cxx tag.hxx \
 	todo.hxx todo.cxx \
+	wwwstream.cxx wwwstream.hxx \
 	xargs_fold.hxx
 pkg_chk_CXXFLAGS = \
 	$(AM_CXXFLAGS) \
-	$(ZLIB_CFLAGS) \
 	$(BZIP2_CPPFLAGS) \
+	$(LIBFETCH_CPPFLAGS) \
+	$(ZLIB_CFLAGS) \
 	-DCFG_BMAKE='"$(BMAKE)"' \
 	-DCFG_MAKECONF='"$(MAKECONF)"' \
 	-DCFG_PKG_CONFIG='"$(PKG_CONFIG)"' \
@@ -36,8 +38,9 @@ pkg_chk_CXXFLAGS = \
 	-DCFG_XARGS='"$(XARGS)"'
 pkg_chk_LDFLAGS = \
 	$(AM_LDFLAGS) \
-	$(ZLIB_LIBS) \
-	$(BZIP2_LIBS)
+	$(BZIP2_LIBS) \
+	$(LIBFETCH_LIBS) \
+	$(ZLIB_LIBS)
 
 AM_CFLAGS = $(WARN_CFLAGS)
 AM_CXXFLAGS = $(WARN_CXXFLAGS)
