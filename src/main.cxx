@@ -13,12 +13,12 @@
 #include <iostream>
 #include <regex>
 
+#include "check.hxx"
 #include "config_file.hxx"
 #include "environment.hxx"
 #include "harness.hxx"
 #include "message.hxx"
 #include "options.hxx"
-#include "pkgdb.hxx"
 #include "pkgpath.hxx"
 #include "todo.hxx"
 
@@ -33,11 +33,6 @@ namespace {
     void
     normalize_pkgname(pkgname& name) {
         name.base = std::regex_replace(name.base, RE_PYTHON_PREFIX, "py-");
-    }
-
-    bool
-    is_binary_available(environment const& env, pkgname const& name) {
-        return env.bin_pkg_summary.get().count(name) > 0;
     }
 
     void
@@ -61,14 +56,8 @@ namespace {
         out << "# Generated automatically at "
             << std::put_time(std::localtime(&now), "%c %Z") << std::endl;
 
-        std::deque<pkgpath> pkgpaths;
-        for (pkgpath const& path: installed_pkgpaths(env)) {
-            pkgpaths.push_back(path);
-        }
-        std::sort(pkgpaths.begin(), pkgpaths.end());
-
         config conf;
-        for (pkgpath const& path: pkgpaths) {
+        for (pkgpath const& path: env.installed_pkgpaths.get()) {
             conf.emplace_back(config::pkg_def(path, std::vector<tagpat>()));
         }
         out << conf;
@@ -84,9 +73,8 @@ namespace {
                 return todo_file(env.PKGSRCDIR.get() / "doc/TODO");
             });
 
-        installed_pkgnames pkgnames(env);
+        std::set<pkgname> const& pkgnames = env.installed_pkgnames.get();
         todo_file const todo(f_todo.get());
-
         for (pkgname name: pkgnames) {
             normalize_pkgname(name);
 
@@ -98,16 +86,6 @@ namespace {
                 }
                 std::cout << std::endl;
             }
-        }
-    }
-
-    void
-    print_pkgpaths_to_check(environment const& env) {
-        config const conf(env.PKGCHK_CONF.get());
-        for (auto const& path:
-                 conf.apply_tags(
-                     env.included_tags.get(), env.excluded_tags.get())) {
-            std::cout << path << std::endl;
         }
     }
 
@@ -130,17 +108,17 @@ namespace {
                      env.included_tags.get(), env.excluded_tags.get())) {
             if (auto pkgbases = pm.find(path); pkgbases != pm.end()) {
                 // For each PKGBASE that correspond to this PKGPATH, find
-                // the newest binary package and schedule it for listing.
+                // the latest binary package and schedule it for listing.
                 for (auto const& base: pkgbases->second) {
-                    auto newest = base.second.rbegin();
-                    assert(newest != base.second.rend());
+                    auto latest = base.second.rbegin();
+                    assert(latest != base.second.rend());
 
-                    if (is_binary_available(env, newest->first)) {
-                        to_list->insert(*newest);
+                    if (env.is_binary_available(latest->first)) {
+                        to_list->insert(*latest);
                     }
                     else {
                         fatal_later(opts)
-                            << newest->first << " - no binary package found" << std::endl;
+                            << latest->first << " - no binary package found" << std::endl;
                     }
                 }
             }
@@ -203,10 +181,9 @@ int main(int argc, char* argv[]) {
 
         environment env(opts);
         switch (opts.mode) {
-        case mode::UNKNOWN:
-            // This can't happen.
-            std::cerr << "panic: unknown operation mode" << std::endl;
-            std::abort();
+        case mode::ADD_DELETE_UPDATE:
+            add_delete_update(opts, env);
+            break;
 
         case mode::GENERATE_PKGCHK_CONF:
             generate_conf_from_installed(opts, env);
@@ -224,9 +201,9 @@ int main(int argc, char* argv[]) {
             lookup_todo(env);
             break;
 
-        case mode::PRINT_PKGPATHS_TO_CHECK:
-            print_pkgpaths_to_check(env);
-            break;
+        default:
+            std::cerr << "panic: unknown operation mode" << std::endl;
+            std::abort();
         }
         return 0;
     }

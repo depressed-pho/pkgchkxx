@@ -54,11 +54,13 @@ namespace pkg_chk {
             static_assert(std::is_invocable_v<Parse, std::istream&>);
             using result_type = std::invoke_result_t<Parse, std::istream&>;
             static_assert(std::is_default_constructible_v<result_type>);
-            // result_type must also support += forming a monoid.
+            // result_type must also form a commutative monoid under its
+            // default constructor and operator+=.
 
             xargs_nursery(std::vector<std::string> const& cmd,
                           Parse&& parse,
                           unsigned int concurrency) {
+                lock_t lk(_mtx);
 
                 std::vector<std::string> argv = {CFG_XARGS, "-0"};
                 argv.insert(argv.end(), cmd.begin(), cmd.end());
@@ -67,8 +69,8 @@ namespace pkg_chk {
                     auto xargs = std::make_shared<harness>(CFG_XARGS, argv);
                     _harnesses.push_back(xargs);
 
-                    auto parser = std::thread(
-                        [&, xargs, i]() {
+                    auto parser = std::make_unique<std::thread>(
+                        [this, &parse, xargs]() {
                             try {
                                 // Don't lock the mutex while parsing the
                                 // stdout of the commands. That would
@@ -76,21 +78,27 @@ namespace pkg_chk {
                                 // whole point of this entire machinery.
                                 auto result = parse(xargs->cout());
 
-                                lock_t lk(_mtx);
-                                _parsers.erase(std::this_thread::get_id());
+                                lock_t lk_(_mtx);
+                                _running_parsers.erase(std::this_thread::get_id());
                                 _result += std::move(result);
                             }
                             catch (...) {
-                                lock_t lk(_mtx);
-                                _parsers.erase(std::this_thread::get_id());
+                                lock_t lk_(_mtx);
+                                _running_parsers.erase(std::this_thread::get_id());
                                 if (!_ex) {
                                     _ex = std::current_exception();
                                 }
                             }
                             _finished.notify_one();
                         });
-                    _parsers.insert(parser.get_id());
-                    parser.detach();
+                    _running_parsers.insert(parser->get_id());
+                    _parsers.push_back(std::move(parser));
+                }
+            }
+
+            virtual ~xargs_nursery() {
+                for (auto& p: _parsers) {
+                    p->join();
                 }
             }
 
@@ -105,7 +113,7 @@ namespace pkg_chk {
             await() {
                 std::unique_lock<mutex_t> lk(_mtx);
 
-                while (!_parsers.empty()) {
+                while (!_running_parsers.empty()) {
                     _finished.wait(lk);
                 }
 
@@ -124,7 +132,8 @@ namespace pkg_chk {
 
             mutex_t _mtx;
             std::vector<std::shared_ptr<harness>> _harnesses;
-            std::set<std::thread::id> _parsers;
+            std::vector<std::unique_ptr<std::thread>> _parsers;
+            std::set<std::thread::id> _running_parsers;
             result_type _result;
             std::exception_ptr _ex;
             condvar_t _finished; // Signaled when a parser finishes running.

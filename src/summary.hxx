@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <istream>
 #include <map>
+#include <optional>
 #include <set>
 
 #include "options.hxx"
@@ -14,16 +15,21 @@ namespace pkg_chk {
     /** pkg_summary(5) variables. Things we don't use are omitted. */
     struct pkgvars {
         std::vector<pkgpattern> DEPENDS;
+        std::optional<std::filesystem::path> FILENAME;
         pkgname PKGNAME;
         pkgpath PKGPATH;
     };
 
     /** summary is a map from PKGNAME to its variables, obtained by parsing
-     * a pkg_summary(5) file or by scanning PACKAGES.
+     * a pkg_summary(5) file, querying pkgdb, or by scanning PACKAGES.
      */
     struct summary: public std::map<pkgname, pkgvars> {
         using std::map<pkgname, pkgvars>::map;
 
+        /** Obtain a package summary by querying pkgdb. */
+        summary(std::filesystem::path const& PKG_INFO);
+
+        /** Obtain a package summary by scanning binary packages. */
         summary(
             options const& opts,
             std::filesystem::path const& PACKAGES,

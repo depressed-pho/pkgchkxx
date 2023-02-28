@@ -20,6 +20,8 @@ using namespace std::literals;
 namespace fs = std::filesystem;
 
 namespace {
+    std::string const shell = "/bin/sh";
+
     std::string
     cgetenv(std::string const& name) {
         char const* const value = getenv(name.c_str());
@@ -121,7 +123,11 @@ namespace pkg_chk {
                         vars.push_back("LOCALBASE");
                     }
 
-                    auto value_of = extract_mkconf_vars(opts, MAKECONF.get(), vars);
+                    auto value_of = extract_mkconf_vars(MAKECONF.get(), vars).value();
+                    for (auto const& pair: value_of) {
+                        verbose_var(opts, pair.first, pair.second);
+                    }
+
                     vPKGSRCDIR = value_of["PKGSRCDIR"];
                     if (vLOCALBASE.empty()) {
                         vLOCALBASE = value_of["LOCALBASE"];
@@ -182,10 +188,13 @@ namespace pkg_chk {
                 std::map<std::string, std::string> value_of;
                 auto const pkgpath = PKGSRCDIR.get() / "pkgtools/pkg_chk"; // Any package will do.
                 if (fs::is_directory(pkgpath)) {
-                    value_of = extract_pkgmk_vars(opts, pkgpath, vars);
+                    value_of = extract_pkgmk_vars(pkgpath, vars).value();
                 }
                 else if (MAKECONF.get() != "/dev/null") {
-                    value_of = extract_mkconf_vars(opts, MAKECONF.get(), vars);
+                    value_of = extract_mkconf_vars(MAKECONF.get(), vars).value();
+                }
+                for (auto const& pair: value_of) {
+                    verbose_var(opts, pair.first, pair.second);
                 }
                 _menv.PACKAGES           =
                     opts.bin_pkg_path.empty()
@@ -262,8 +271,10 @@ namespace pkg_chk {
                         "OS_VERSION",
                         "MACHINE_ARCH"
                     };
-                    std::map<std::string, std::string> value_of =
-                        extract_pkgmk_vars(opts, pkgpath, vars);
+                    auto value_of = extract_pkgmk_vars(pkgpath, vars).value();
+                    for (auto const& pair: value_of) {
+                        verbose_var(opts, pair.first, pair.second);
+                    }
                     _penv.OPSYS        = value_of["OPSYS"       ];
                     _penv.OS_VERSION   = value_of["OS_VERSION"  ];
                     _penv.MACHINE_ARCH = value_of["MACHINE_ARCH"];
@@ -298,15 +309,71 @@ namespace pkg_chk {
             std::launch::deferred,
             [this, &opts]() {
                 summary sum(opts, PACKAGES.get(), PKG_INFO.get(), PKG_SUFX.get());
-                if (opts.verbose) {
-                    verbose(opts) << "PKGDB entries: " << sum.size() << std::endl;
-                }
+                verbose(opts) << "Binary packages: " << sum.size() << std::endl;
                 return sum;
             }).share();
         bin_pkg_map = std::async(
             std::launch::deferred,
             [this]() {
                 return pkgmap(bin_pkg_summary.get());
+            }).share();
+
+        installed_pkgnames = std::async(
+            std::launch::deferred,
+            [this, &opts]() {
+                verbose(opts) << "Enumerate PKGNAME from installed packages" << std::endl;
+
+                // Ideally we should first check if
+                // installed_pkgpaths_with_pkgnames has been evaluated, and
+                // spawn pkg_info(1) only if not. But std::shared_future
+                // doesn't have a method to check that.
+                harness pkg_info(shell, {shell, "-s", "--", "-e", "*"});
+                pkg_info.cin() << "exec " << PKG_INFO.get() << " \"$@\"" << std::endl;
+                pkg_info.cin().close();
+
+                std::set<pkgname> pkgnames;
+                for (std::string line; std::getline(pkg_info.cout(), line); ) {
+                    if (!line.empty()) {
+                        pkgnames.emplace(line);
+                    }
+                }
+                return pkgnames;
+            }).share();
+        installed_pkgpaths = std::async(
+            std::launch::deferred,
+            [this, &opts]() {
+                verbose(opts) << "Enumerate PKGPATH from installed packages" << std::endl;
+
+                // Ideally we should first check if
+                // installed_pkgpaths_with_pkgnames has been evaluated, and
+                // spawn pkg_info(1) only if not. But std::shared_future
+                // doesn't have a method to check that.
+                harness pkg_info(shell, {shell, "-s", "--", "-aQ", "PKGPATH"});
+                pkg_info.cin() << "exec " << PKG_INFO.get() << " \"$@\"" << std::endl;
+                pkg_info.cin().close();
+
+                std::set<pkgpath> pkgpaths;
+                for (std::string line; std::getline(pkg_info.cout(), line); ) {
+                    if (!line.empty()) {
+                        pkgpaths.emplace(line);
+                    }
+                }
+                return pkgpaths;
+            }).share();
+        installed_pkg_summary = std::async(
+            std::launch::deferred,
+            [this, &opts]() {
+                verbose(opts) << "Getting summary from installed packages" << std::endl;
+                return summary(PKG_INFO.get());
+            }).share();
+        installed_pkgpaths_with_pkgnames = std::async(
+            std::launch::deferred,
+            [this]() {
+                std::map<pkgpath, std::set<pkgname>> ret;
+                for (auto const& pair: installed_pkg_summary.get()) {
+                    ret[pair.second.PKGPATH].insert(pair.first);
+                }
+                return ret;
             }).share();
 
         // Tags are collected from the platform, options, and Makefile

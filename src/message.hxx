@@ -4,11 +4,16 @@
 #include <iostream>
 #include <optional>
 #include <string_view>
+#include <mutex>
 #include <type_traits>
 
 #include "options.hxx"
 
 namespace pkg_chk {
+    namespace detail {
+        inline std::mutex message_mutex;
+    }
+
     struct logger: public std::ostream {
         logger()
             : std::ostream(nullptr) {}
@@ -55,6 +60,33 @@ namespace pkg_chk {
         return logger(opts, false);
     }
 
+    template <typename Function>
+    void
+    atomic_msg(pkg_chk::options const& opts, Function&& f) {
+        static_assert(std::is_invocable_v<Function&&, std::ostream&>);
+
+        std::lock_guard<std::mutex> lk(detail::message_mutex);
+        auto l = msg(opts);
+        f(l);
+    }
+
+    inline logger
+    warn(pkg_chk::options const& opts) {
+        logger l(opts, false);
+        l << "WARNING: ";
+        return l;
+    }
+
+    template <typename Function>
+    void
+    atomic_warn(pkg_chk::options const& opts, Function&& f) {
+        static_assert(std::is_invocable_v<Function&&, std::ostream&>);
+
+        std::lock_guard<std::mutex> lk(detail::message_mutex);
+        auto l = warn(opts);
+        f(l);
+    }
+
     inline logger
     verbose(pkg_chk::options const& opts) {
         if (opts.verbose) {
@@ -65,12 +97,23 @@ namespace pkg_chk {
         }
     }
 
+    template <typename Function>
+    void
+    atomic_verbose(pkg_chk::options const& opts, Function&& f) {
+        static_assert(std::is_invocable_v<Function&&, std::ostream&>);
+
+        std::lock_guard<std::mutex> lk(detail::message_mutex);
+        auto l = verbose(opts);
+        f(l);
+    }
+
     inline void
     verbose_var(
         pkg_chk::options const& opts,
         std::string_view const& var,
         std::string_view const& value) {
 
+        std::lock_guard<std::mutex> lk(detail::message_mutex);
         verbose(opts)
             << "Variable: " << var << " = " << (value.empty() ? "(empty)" : value) << std::endl;
     }
@@ -89,6 +132,7 @@ namespace pkg_chk {
     fatal(pkg_chk::options const& opts, Function&& f) {
         static_assert(std::is_invocable_v<Function&&, std::ostream&>);
 
+        std::lock_guard<std::mutex> lk(detail::message_mutex);
         logger l(opts, true);
         l << "** ";
         f(static_cast<std::ostream&>(l));
@@ -97,4 +141,14 @@ namespace pkg_chk {
 
     logger
     fatal_later(pkg_chk::options const& opts);
+
+    template <typename Function>
+    void
+    atomic_fatal_later(pkg_chk::options const& opts, Function&& f) {
+        static_assert(std::is_invocable_v<Function&&, std::ostream&>);
+
+        std::lock_guard<std::mutex> lk(detail::message_mutex);
+        auto l = fatal_later(opts);
+        f(l);
+    }
 }

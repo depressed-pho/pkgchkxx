@@ -104,25 +104,33 @@ namespace pkg_chk {
 
     int
     pkgversion::compare(pkgversion const& other) const noexcept {
-        auto const to_digit =
-            [](auto const& comp) -> int {
-                return comp;
-            };
-
-        for (std::vector<component>::size_type i = 0;
-             i < std::max(this->_comps.size(), other._comps.size());
-             i++) {
-
-            int const a    = i < this->_comps.size() ? std::visit(to_digit, this->_comps[i]) : 0;
-            int const b    = i < other._comps.size() ? std::visit(to_digit, other._comps[i]) : 0;
-            int const diff = a - b;
-
-            if (diff != 0) {
-                return diff;
-            }
+        if (is_neg_inf()) {
+            return other.is_neg_inf() ? 0 : -1;
         }
+        else if (other.is_neg_inf()) {
+            return 1;
+        }
+        else {
+            auto const to_digit =
+                [](auto const& comp) -> int {
+                    return comp;
+                };
 
-        return static_cast<int>(_rev) - static_cast<int>(other._rev);
+            for (std::vector<component>::size_type i = 0;
+                 i < std::max(this->_comps.size(), other._comps.size());
+                 i++) {
+
+                int const a    = i < this->_comps.size() ? std::visit(to_digit, this->_comps[i]) : 0;
+                int const b    = i < other._comps.size() ? std::visit(to_digit, other._comps[i]) : 0;
+                int const diff = a - b;
+
+                if (diff != 0) {
+                    return diff;
+                }
+            }
+
+            return static_cast<int>(_rev) - static_cast<int>(other._rev);
+        }
     }
 
     pkgname::pkgname(std::string_view const& name) {

@@ -16,6 +16,10 @@ namespace pkg_chk {
         pkgpath() = delete;
         pkgpath(std::string_view const& dir);
 
+        operator std::filesystem::path () const {
+            return std::filesystem::path(category) / subdir;
+        }
+
         friend bool
         operator== (pkgpath const& a, pkgpath const& b) noexcept {
             return

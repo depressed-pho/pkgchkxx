@@ -20,6 +20,11 @@ namespace pkg_chk {
     struct environment {
         environment(pkg_chk::options const& opts);
 
+        bool
+        is_binary_available(pkgname const& name) const {
+            return bin_pkg_summary.get().count(name) > 0;
+        }
+
         std::shared_future<std::filesystem::path> PKG_PATH;
         std::shared_future<std::string>           MACHINE_ARCH;
         std::shared_future<std::filesystem::path> MAKECONF;
@@ -38,6 +43,15 @@ namespace pkg_chk {
 
         std::shared_future<summary> bin_pkg_summary;
         std::shared_future<pkgmap>  bin_pkg_map;
+
+        std::shared_future<std::set<pkgname>> installed_pkgnames; // Fastest to compute.
+        std::shared_future<std::set<pkgpath>> installed_pkgpaths; // Moderately slow.
+        std::shared_future<summary>        installed_pkg_summary; // Slowest to compute.
+        std::shared_future<
+            std::map<
+                pkgpath,
+                std::set<pkgname>>> installed_pkgpaths_with_pkgnames;
+
         std::shared_future<tagset>  included_tags;
         std::shared_future<tagset>  excluded_tags;
     };

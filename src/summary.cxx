@@ -32,6 +32,7 @@ namespace {
     read_summary(std::istream& in) {
         summary sum;
         std::vector<pkgpattern> DEPENDS;
+        std::optional<std::filesystem::path> FILENAME;
         std::optional<pkgname> PKGNAME;
         std::optional<pkgpath> PKGPATH;
         for (std::string line; std::getline(in, line); ) {
@@ -42,11 +43,13 @@ namespace {
                         PKGNAME.value(),
                         pkgvars {
                             std::move(DEPENDS),
+                            FILENAME,
                             PKGNAME.value(),
                             PKGPATH.value()
                         });
                 }
                 DEPENDS.clear();
+                FILENAME.reset();
                 PKGNAME.reset();
                 PKGPATH.reset();
             }
@@ -57,6 +60,9 @@ namespace {
 
                 if (variable == "DEPENDS") {
                     DEPENDS.emplace_back(value);
+                }
+                else if (variable == "FILENAME" && !value.empty()) {
+                    FILENAME.emplace(value);
                 }
                 else if (variable == "PKGNAME") {
                     PKGNAME.emplace(value);
@@ -79,10 +85,12 @@ namespace {
         auto const&& ext = summary_file.extension();
         if (ext == ".bz2") {
             bunzip2istream in(maybe_compressed);
+            in.exceptions(std::ios_base::badbit);
             return f(in);
         }
         else if (ext == ".gz") {
             gunzipistream in(maybe_compressed);
+            in.exceptions(std::ios_base::badbit);
             return f(in);
         }
         else {
@@ -97,9 +105,9 @@ namespace {
         std::filesystem::path const& PKG_INFO,
         std::string const& PKG_SUFX) {
 
-        // Lazily find the newest binary package, lazily because if no
+        // Lazily find the latest binary package, lazily because if no
         // summary files exist this information won't be used.
-        auto const newest_bin_pkg = std::async(
+        auto const latest_bin_pkg = std::async(
             std::launch::deferred,
             [&PACKAGES]() {
                 fs::file_time_type t;
@@ -123,7 +131,7 @@ namespace {
             }
             // Is there any binary package that is newer than the summary
             // file? Ignore the summary if so.
-            else if (summary_last_mod < newest_bin_pkg.get()) {
+            else if (summary_last_mod < latest_bin_pkg.get()) {
                 msg(opts) << "** Ignoring " << path
                           << " as there are newer packages in " << PACKAGES << std::endl;
                 continue;
@@ -162,7 +170,8 @@ namespace {
                     }
                 }
             },
-            read_summary);
+            read_summary,
+            opts.concurrency);
     }
 
     summary
@@ -170,9 +179,12 @@ namespace {
         for (auto const& summary_file: SUMMARY_FILES) {
             try {
                 auto const path = PACKAGES / summary_file;
+                wwwistream remote_file(path);
+                remote_file.exceptions(std::ios_base::badbit);
+
                 return with_uncompress_filter(
                     path,
-                    wwwistream(path),
+                    std::move(remote_file),
                     [](auto&& in) {
                         return read_summary(in);
                     });
@@ -190,6 +202,15 @@ namespace {
 }
 
 namespace pkg_chk {
+    summary::summary(std::filesystem::path const& PKG_INFO) {
+        harness pkg_info(shell, {shell, "-s", "--", "-X", "*"});
+
+        pkg_info.cin() << "exec " << PKG_INFO.string() << " \"$@\"" << std::endl;
+        pkg_info.cin().close();
+
+        *this = read_summary(pkg_info.cout());
+    }
+
     summary::summary(
         options const& opts,
         std::filesystem::path const& PACKAGES,
@@ -206,8 +227,7 @@ namespace pkg_chk {
 
     pkgmap::pkgmap(summary const& all_packages) {
         for (auto const& pair: all_packages) {
-            (*this)[pair.second.PKGPATH][pair.second.PKGNAME.base]
-                .emplace(pair.first, pair.second);
+            (*this)[pair.second.PKGPATH][pair.first.base].insert(pair);
         }
     }
 }

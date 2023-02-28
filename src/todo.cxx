@@ -4,7 +4,6 @@
 #include <regex>
 #include <string>
 
-#include "pkgdb.hxx"
 #include "todo.hxx"
 
 namespace {

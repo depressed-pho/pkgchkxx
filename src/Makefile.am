@@ -2,6 +2,7 @@ sbin_PROGRAMS = pkg_chk
 pkg_chk_SOURCES = \
 	bzip2stream.cxx bzip2stream.hxx \
 	config_file.hxx config_file.cxx \
+	check.hxx check.cxx \
 	makevars.cxx makevars.hxx \
 	main.cxx \
 	environment.cxx environment.hxx \
@@ -12,7 +13,6 @@ pkg_chk_SOURCES = \
 	nursery.cxx nursery.hxx \
 	options.cxx options.hxx \
 	ordered.hxx \
-	pkgdb.cxx pkgdb.hxx \
 	pkgpath.cxx pkgpath.hxx \
 	pkgname.cxx pkgname.hxx \
 	pkgpattern.cxx pkgpattern.hxx \

@@ -4,25 +4,33 @@
 
 #include "harness.hxx"
 #include "makevars.hxx"
-#include "message.hxx"
+
+namespace fs = std::filesystem;
 
 namespace pkg_chk {
-    std::map<std::string, std::string>
+    std::optional<
+        std::map<std::string, std::string>>
     extract_mkconf_vars(
-        pkg_chk::options const& opts,
         std::filesystem::path const& makeconf,
-        std::vector<std::string> const& vars) {
+        std::vector<std::string> const& vars,
+        std::map<std::string, std::string> const& assignments) {
+
+        if (!fs::exists(makeconf)) {
+            return std::nullopt;
+        }
 
         std::map<std::string, std::string> value_of;
-
         if (vars.empty()) {
             // No variables to extract.
             return value_of;
         }
         else {
-            std::vector<std::string> const argv = {
+            std::vector<std::string> argv = {
                 CFG_BMAKE, "-f", "-", "-f", makeconf, "x"
             };
+            for (auto const& pair: assignments) {
+                argv.push_back(pair.first + '=' + pair.second);
+            }
             harness make(CFG_BMAKE, argv);
 
             make.cin()
@@ -40,7 +48,6 @@ namespace pkg_chk {
                 std::getline(make.cout(), value, '\0');
 
                 value_of[vars[i]] = value;
-                verbose_var(opts, vars[i], value);
             }
             make.cout().close();
 
@@ -48,22 +55,29 @@ namespace pkg_chk {
         }
     }
 
-    std::map<std::string, std::string>
+    std::optional<
+        std::map<std::string, std::string>>
     extract_pkgmk_vars(
-        pkg_chk::options const& opts,
         std::filesystem::path const& pkgdir,
-        std::vector<std::string> const& vars) {
+        std::vector<std::string> const& vars,
+        std::map<std::string, std::string> const& assignments) {
+
+        if (!fs::exists(pkgdir / "Makefile")) {
+            return std::nullopt;
+        }
 
         std::map<std::string, std::string> value_of;
-
         if (vars.empty()) {
             // No variables to extract.
             return value_of;
         }
         else {
-            std::vector<std::string> const argv = {
+            std::vector<std::string> argv = {
                 CFG_BMAKE, "-f", "-", "-f", "Makefile", "x"
             };
+            for (auto const& pair: assignments) {
+                argv.push_back(pair.first + '=' + pair.second);
+            }
             harness make(CFG_BMAKE, argv, pkgdir);
 
             make.cin()
@@ -80,7 +94,6 @@ namespace pkg_chk {
                 std::getline(make.cout(), value, '\0');
 
                 value_of[vars[i]] = value;
-                verbose_var(opts, vars[i], value);
             }
             make.cout().close();
 

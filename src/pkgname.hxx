@@ -151,6 +151,11 @@ namespace pkg_chk {
         }
 
     private:
+        bool
+        is_neg_inf() const noexcept {
+            return _comps.empty();
+        }
+
         int
         compare(pkgversion const& other) const noexcept;
 

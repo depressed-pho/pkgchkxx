@@ -1,4 +1,7 @@
+#include <cstdlib>
 #include <iostream>
+#include <optional>
+#include <thread>
 #include <unistd.h>
 #include <vector>
 
@@ -13,29 +16,31 @@ extern "C" {
 
 namespace pkg_chk {
     options::options(int argc, char* const argv[])
-        : mode(mode::UNKNOWN)
-        , add_missing(false)
-        , include_build_version(false)
+        : add_missing(false)
+        , check_build_version(false)
         , use_binary_pkgs(false)
         , no_clean(false)
         , fetch(false)
+        , concurrency(std::max(1u, std::thread::hardware_concurrency()))
         , continue_on_errors(false)
         , dry_run(false)
+        , print_pkgpaths_to_check(false)
         , list_ver_diffs(false)
         , delete_mismatched(false)
         , build_from_source(false)
         , update(false)
         , verbose(false) {
 
+        std::optional<pkg_chk::mode> mode_;
         int ch;
-        while ((ch = getopt(argc, argv, "BC:D:L:P:U:abcdfghiklNnpqrsuv")) != -1) {
+        while ((ch = getopt(argc, argv, "BC:D:L:P:U:abcdfghijklNnpqrsuv")) != -1) {
             switch (ch) {
             case 'a':
-                mode        = mode::ADD_UPDATE;
+                mode_       = mode::ADD_DELETE_UPDATE;
                 add_missing = true;
                 break;
             case 'B':
-                include_build_version = true;
+                check_build_version = true;
                 break;
             case 'b':
                 use_binary_pkgs = true;
@@ -45,7 +50,7 @@ namespace pkg_chk {
                 break;
             case 'c':
                 std::cerr << argv[0] << ": option -c is deprecated. Use -a -q" << std::endl;
-                mode           = mode::ADD_UPDATE;
+                mode_          = mode::ADD_DELETE_UPDATE;
                 add_missing    = true;
                 list_ver_diffs = true;
                 break;
@@ -56,16 +61,25 @@ namespace pkg_chk {
                 fetch = true;
                 break;
             case 'g':
-                mode = mode::GENERATE_PKGCHK_CONF;
+                mode_ = mode::GENERATE_PKGCHK_CONF;
                 break;
             case 'h':
-                mode = mode::HELP;
+                mode_ = mode::HELP;
                 break;
             case 'i':
                 std::cerr << argv[0] << ": option -i is deprecated. Use -u -q" << std::endl;
-                mode           = mode::ADD_UPDATE;
+                mode_          = mode::ADD_DELETE_UPDATE;
                 update         = true;
                 list_ver_diffs = true;
+                break;
+            case 'j':
+                if (int const n = std::atoi(optarg); n > 0) {
+                    concurrency = n;
+                }
+                else {
+                    std::cerr << argv[0] << ": option -j takes a positive integer" << std::endl;
+                    throw bad_options();
+                }
                 break;
             case 'k':
                 continue_on_errors = true;
@@ -78,16 +92,16 @@ namespace pkg_chk {
                 logfile.exceptions(std::ios_base::badbit);
                 break;
             case 'l':
-                mode = mode::LIST_BIN_PKGS;
+                mode_ = mode::LIST_BIN_PKGS;
                 break;
             case 'N':
-                mode = mode::LOOKUP_TODO;
+                mode_ = mode::LOOKUP_TODO;
                 break;
             case 'n':
                 dry_run = true;
                 break;
             case 'p':
-                mode = mode::PRINT_PKGPATHS_TO_CHECK;
+                print_pkgpaths_to_check = true;
                 break;
             case 'P':
                 bin_pkg_path = optarg;
@@ -96,7 +110,7 @@ namespace pkg_chk {
                 list_ver_diffs = true;
                 break;
             case 'r':
-                mode              = mode::ADD_UPDATE;
+                mode_             = mode::ADD_DELETE_UPDATE;
                 delete_mismatched = true;
                 break;
             case 's':
@@ -106,7 +120,7 @@ namespace pkg_chk {
                 remove_tags = tagset(std::string_view(optarg));
                 break;
             case 'u':
-                mode   = mode::ADD_UPDATE;
+                mode_  = mode::ADD_DELETE_UPDATE;
                 update = true;
                 break;
             case 'v':
@@ -124,10 +138,13 @@ namespace pkg_chk {
             build_from_source = true;
         }
 
-        if (mode == mode::UNKNOWN) {
+        if (mode_) {
+            mode = *mode_;
+        }
+        else {
             std::cerr
                 << argv[0]
-                << ": must specify at least one of -a, -g, -l, -p, -r, -u, or -N" << std::endl;
+                << ": must specify at least one of -a, -g, -l, -r, -u, or -N" << std::endl;
             throw bad_options();
         }
 
@@ -151,6 +168,7 @@ namespace pkg_chk {
             << "    -f       Perform a 'make fetch' for all required packages" << std::endl
             << "    -g       Generate an initial pkgchk.conf file" << std::endl
             << "    -h       Print this help" << std::endl
+            << "    -j conc  Parallelize certain operations with a given concurrency" << std::endl
             << "    -k       Continue with further packages if errors are encountered" << std::endl
             << "    -L file  Redirect output from commands run into file (should be fullpath)" << std::endl
             << "    -l       List binary packages including dependencies" << std::endl
