@@ -1,6 +1,7 @@
 sbin_PROGRAMS = pkg_chk
 pkg_chk_SOURCES = \
 	bzip2stream.cxx bzip2stream.hxx \
+	build_version.hxx build_version.cxx \
 	config_file.hxx config_file.cxx \
 	check.hxx check.cxx \
 	makevars.cxx makevars.hxx \
@@ -19,6 +20,7 @@ pkg_chk_SOURCES = \
 	string_algo.hxx \
 	summary.hxx summary.cxx \
 	tag.cxx tag.hxx \
+	tempfile.cxx tempfile.hxx \
 	todo.hxx todo.cxx \
 	wwwstream.cxx wwwstream.hxx \
 	xargs_fold.hxx

@@ -5,6 +5,7 @@
 #include <cerrno>
 #include <fcntl.h>
 #include <iostream>
+#include <sstream>
 #include <string.h>
 #include <sys/wait.h>
 #include <system_error>
@@ -49,22 +50,29 @@ namespace {
 }
 
 namespace pkg_chk {
-    void
-    harness::harness::init(
+    harness::harness(
         std::string const& cmd,
         std::vector<std::string> const& argv,
-        std::optional<std::string> const& cwd,
-        std::function<void (std::map<std::string, std::string>&)> const& env_mod) {
+        std::optional<std::filesystem::path> const& cwd,
+        std::function<void (std::map<std::string, std::string>&)> const& env_mod,
+        fd_action stderr_action)
+        : _cmd(cmd)
+        , _argv(argv)
+        , _cwd(cwd)
+        , _env(cenviron()) {
 
-        auto env_map = cenviron();
-        env_mod(env_map);
+        env_mod(_env);
         std::vector<std::string> envp;
-        for (auto const& env_pair: env_map) {
+        for (auto const& env_pair: _env) {
             envp.emplace_back(env_pair.first + "=" + env_pair.second);
         }
 
+        auto const msg_fds    = cpipe(true);
         auto const stdin_fds  = cpipe(true);
         auto const stdout_fds = cpipe(true);
+        auto const stderr_fds = stderr_action == fd_action::pipe
+            ? std::make_optional(cpipe(true))
+            : std::nullopt;
 
 #if defined(HAVE_VFORK)
         _pid = vfork();
@@ -72,15 +80,30 @@ namespace pkg_chk {
         _pid = fork();
 #endif
         if (*_pid == 0) {
+            close(msg_fds[0]);
             dup2(stdin_fds[0], STDIN_FILENO);
             dup2(stdout_fds[1], STDOUT_FILENO);
+            switch (stderr_action) {
+            case fd_action::inherit:
+                break;
+            case fd_action::close:
+                close(STDERR_FILENO);
+                break;
+            case fd_action::pipe:
+                dup2((*stderr_fds)[1], STDERR_FILENO);
+                break;
+            default:
+                std::string const err = "Unknown fd_action\n";
+                write(msg_fds[1], err.c_str(), err.size());
+                _exit(1);
+            }
 
             if (cwd) {
                 // We can't use posix_spawn(3) because of this.
                 if (chdir(cwd->c_str()) != 0) {
                     std::string const err
-                        = "harness: Cannot chdir to " + *cwd + ": " + strerror(errno) + "\n";
-                    write(STDERR_FILENO, err.c_str(), err.size());
+                        = "Cannot chdir to " + cwd->string() + ": " + strerror(errno) + "\n";
+                    write(msg_fds[1], err.c_str(), err.size());
                     _exit(1);
                 }
             }
@@ -104,20 +127,44 @@ namespace pkg_chk {
                     const_cast<char* const*>(cargv.data()),
                     const_cast<char* const*>(cenvp.data())) != 0) {
                 std::string const err
-                    = "harness: Cannot exec " + cmd + ": " + strerror(errno) + "\n";
-                write(STDERR_FILENO, err.c_str(), err.size());
+                    = "Cannot exec " + cmd + ": " + strerror(errno) + "\n";
+                write(msg_fds[1], err.c_str(), err.size());
             }
             _exit(1);
         }
         else if (*_pid > 0) {
+            close(msg_fds[1]);
             close(stdin_fds[0]);
             close(stdout_fds[1]);
+            if (stderr_fds) {
+                close((*stderr_fds)[1]);
+            }
+
+            // The child will write an error message to this pipe if it
+            // fails to exec.
+            fdistream msg_in(msg_fds[0]);
+            std::string msg;
+            std::getline(msg_in, msg);
+            if (!msg.empty()) {
+                throw failed_to_spawn_process(
+                    std::move(msg),
+                    std::move(_cmd),
+                    std::move(_argv),
+                    std::move(_cwd),
+                    std::move(_env));
+            }
 
             _stdin.emplace(stdin_fds[1]);
             _stdout.emplace(stdout_fds[0]);
+            if (stderr_fds) {
+                _stderr.emplace((*stderr_fds)[0]);
+            }
 
             _stdin->exceptions(std::ios_base::badbit);
             _stdout->exceptions(std::ios_base::badbit);
+            if (_stderr) {
+                _stderr->exceptions(std::ios_base::badbit);
+            }
         }
         else {
             throw std::system_error(
@@ -156,4 +203,160 @@ namespace pkg_chk {
 
         return _status.value();
     }
+
+    harness::exited const&
+    harness::wait_exit() {
+        return std::visit(
+            [this](auto const& st) -> exited const& {
+                if constexpr (std::is_same_v<harness::exited const&, decltype(st)>) {
+                    return st;
+                }
+                else {
+                    throw process_died_of_signal(
+                        std::move(st),
+                        _pid.value(),
+                        std::move(_cmd),
+                        std::move(_argv),
+                        std::move(_cwd),
+                        std::move(_env));
+                }
+            },
+            wait());
+    }
+
+    void
+    harness::wait_success() {
+        if (exited const& st = wait_exit(); st.status != 0) {
+            throw process_exited_for_failure(
+                st,
+                _pid.value(),
+                std::move(_cmd),
+                std::move(_argv),
+                std::move(_cwd),
+                std::move(_env));
+        }
+    }
+
+    command_error::command_error(
+        std::string&& cmd_,
+        std::vector<std::string>&& argv_,
+        std::optional<std::filesystem::path>&& cwd_,
+        std::map<std::string, std::string>&& env_)
+        : std::runtime_error("")
+        , cmd(std::move(cmd_))
+        , argv(std::move(argv_))
+        , cwd(std::move(cwd_))
+        , env(std::move(env_))
+        , msg(
+            std::async(
+                std::launch::deferred,
+                [this]() {
+                    std::stringstream ss;
+                    ss << "Command arguments were:";
+                    for (auto const& arg: argv) {
+                        if (arg.find(' ') != std::string::npos) {
+                            // The argument contains a space. Quote it to
+                            // not confuse someone seeing this message.
+                            ss << " \"";
+                            for (auto c: arg) {
+                                if (c == '"') {
+                                    ss << "\\\"";
+                                }
+                                else {
+                                    ss << c;
+                                }
+                            }
+                            ss << '"';
+                        }
+                        else {
+                            ss << ' ' << arg;
+                        }
+                    }
+                    return ss.str();
+                }).share()) {}
+
+    failed_to_spawn_process::failed_to_spawn_process(
+        std::string&& msg_,
+        std::string&& cmd_,
+        std::vector<std::string>&& argv_,
+        std::optional<std::filesystem::path>&& cwd_,
+        std::map<std::string, std::string>&& env_)
+        : command_error(
+            std::move(cmd_),
+            std::move(argv_),
+            std::move(cwd_),
+            std::move(env_))
+        , msg(
+            std::async(
+                std::launch::deferred,
+                [this, msg_ = std::move(msg_)]() {
+                    std::stringstream ss;
+                    ss << "Failed to spawn command \"" << cmd << "\": " << msg_ << std::endl
+                       << command_error::what();
+                    return ss.str();
+                }).share()) {}
+
+    process_terminated_unexpectedly::process_terminated_unexpectedly(
+        pid_t pid_,
+        std::string&& cmd_,
+        std::vector<std::string>&& argv_,
+        std::optional<std::filesystem::path>&& cwd_,
+        std::map<std::string, std::string>&& env_)
+        : command_error(
+            std::move(cmd_),
+            std::move(argv_),
+            std::move(cwd_),
+            std::move(env_))
+        , pid(pid_) {}
+
+    process_died_of_signal::process_died_of_signal(
+        harness::signaled const& st_,
+        pid_t pid_,
+        std::string&& cmd_,
+        std::vector<std::string>&& argv_,
+        std::optional<std::filesystem::path>&& cwd_,
+        std::map<std::string, std::string>&& env_)
+        : process_terminated_unexpectedly(
+            pid_,
+            std::move(cmd_),
+            std::move(argv_),
+            std::move(cwd_),
+            std::move(env_))
+        , st(st_)
+        , msg(
+            std::async(
+                std::launch::deferred,
+                [this]() {
+                    std::stringstream ss;
+                    ss << "Command \"" << cmd << "\" (pid " << pid << ") died of signal "
+                       << strsignal(st.signal)
+                       << (st.coredumped ? " (core dumped). " : ". ")
+                       << process_terminated_unexpectedly::what();
+                    return ss.str();
+                }).share()) {}
+
+    process_exited_for_failure::process_exited_for_failure(
+        harness::exited const& st_,
+        pid_t pid_,
+        std::string&& cmd_,
+        std::vector<std::string>&& argv_,
+        std::optional<std::filesystem::path>&& cwd_,
+        std::map<std::string, std::string>&& env_)
+        : process_terminated_unexpectedly(
+            pid_,
+            std::move(cmd_),
+            std::move(argv_),
+            std::move(cwd_),
+            std::move(env_))
+        , st(st_)
+        , msg(
+            std::async(
+                std::launch::deferred,
+                [this]() {
+                    std::stringstream ss;
+                    ss << "Command \"" << cmd << "\" (pid " << pid << ") exited with status "
+                       << st.status << ". "
+                       << process_terminated_unexpectedly::what();
+                    return ss.str();
+                }).share()) {}
 }

@@ -27,13 +27,13 @@ namespace pkg_chk {
         using std::map<pkgname, pkgvars>::map;
 
         /** Obtain a package summary by querying pkgdb. */
-        summary(std::filesystem::path const& PKG_INFO);
+        summary(std::string const& PKG_INFO);
 
         /** Obtain a package summary by scanning binary packages. */
         summary(
             options const& opts,
             std::filesystem::path const& PACKAGES,
-            std::filesystem::path const& PKG_INFO,
+            std::string const& PKG_INFO,
             std::string const& PKG_SUFX);
 
         summary&

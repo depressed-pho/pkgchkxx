@@ -1,5 +1,6 @@
 #include <thread>
 
+#include "build_version.hxx"
 #include "check.hxx"
 #include "config_file.hxx"
 #include "makevars.hxx"
@@ -221,7 +222,47 @@ namespace {
                                 // installed. Good, but that's not enough
                                 // if -B is given.
                                 if (opts.check_build_version) {
-                                    throw std::runtime_error("FIXME: -B not implemented yet");
+                                    std::optional<build_version> latest_build_version;
+                                    if (opts.use_binary_pkgs && !opts.build_from_source) {
+                                        if (auto const file = env.binary_package_file_of(name); file) {
+                                            latest_build_version =
+                                                build_version::from_binary(env.PKG_INFO.get(), *file);
+                                        }
+                                    }
+                                    else {
+                                        latest_build_version =
+                                            build_version::from_source(env.PKGSRCDIR.get(), path);
+                                    }
+                                    std::optional<build_version> const installed_build_version =
+                                        build_version::from_installed(env.PKG_INFO.get(), *installed);
+
+                                    if (latest_build_version.has_value() &&
+                                        latest_build_version == installed_build_version) {
+
+                                        atomic_verbose(
+                                            opts,
+                                            [&](auto& out) {
+                                            out << path << " - " << name << " OK" << std::endl;
+                                        });
+                                    }
+                                    else {
+                                        atomic_msg(
+                                            opts,
+                                            [&](auto& out) {
+                                                out << path << " - " << name << " build_version mismatch" << std::endl;
+                                            });
+                                        atomic_verbose(
+                                            opts,
+                                            [&](auto& out) {
+                                                out << "--current--"                   << std::endl
+                                                    << latest_build_version.value()
+                                                    << "--installed--"                 << std::endl
+                                                    << installed_build_version.value()
+                                                    << "----"                          << std::endl
+                                                    << std::endl;
+                                            });
+                                        res.MISMATCH_TODO(*installed);
+                                    }
                                 }
                                 else {
                                     atomic_verbose(

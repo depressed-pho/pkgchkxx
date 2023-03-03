@@ -20,8 +20,6 @@ using namespace std::literals;
 namespace fs = std::filesystem;
 
 namespace {
-    std::string const shell = "/bin/sh";
-
     std::vector<std::string> const SUMMARY_FILES = {
         "pkg_summary.bz2",
         "pkg_summary.gz",
@@ -102,7 +100,7 @@ namespace {
     read_local_summary(
         options const& opts,
         std::filesystem::path const& PACKAGES,
-        std::filesystem::path const& PKG_INFO,
+        std::string const& PKG_INFO,
         std::string const& PKG_SUFX) {
 
         // Lazily find the latest binary package, lazily because if no
@@ -156,7 +154,7 @@ namespace {
                       << PACKAGES << " ..." << std::endl;
         return xargs_fold({
                 shell,
-                "-c", "exec " + PKG_INFO.string() + " -X \"$@\"",
+                "-c", "exec " + PKG_INFO + " -X \"$@\"",
                 shell // This will be $0 of the shell, and the rest of argv
                       // will be constructed by xargs.
             },
@@ -202,10 +200,10 @@ namespace {
 }
 
 namespace pkg_chk {
-    summary::summary(std::filesystem::path const& PKG_INFO) {
+    summary::summary(std::string const& PKG_INFO) {
         harness pkg_info(shell, {shell, "-s", "--", "-X", "*"});
 
-        pkg_info.cin() << "exec " << PKG_INFO.string() << " \"$@\"" << std::endl;
+        pkg_info.cin() << "exec " << PKG_INFO << " \"$@\"" << std::endl;
         pkg_info.cin().close();
 
         *this = read_summary(pkg_info.cout());
@@ -214,7 +212,7 @@ namespace pkg_chk {
     summary::summary(
         options const& opts,
         std::filesystem::path const& PACKAGES,
-        std::filesystem::path const& PKG_INFO,
+        std::string const& PKG_INFO,
         std::string const& PKG_SUFX) {
 
         if (PACKAGES.string().find("://") != std::string::npos) {

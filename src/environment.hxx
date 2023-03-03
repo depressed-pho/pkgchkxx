@@ -2,6 +2,7 @@
 
 #include <filesystem>
 #include <future>
+#include <optional>
 #include <set>
 #include <string>
 
@@ -24,6 +25,9 @@ namespace pkg_chk {
         is_binary_available(pkgname const& name) const {
             return bin_pkg_summary.get().count(name) > 0;
         }
+
+        std::optional<std::filesystem::path>
+        binary_package_file_of(pkgname const& name) const;
 
         std::shared_future<std::filesystem::path> PKG_PATH;
         std::shared_future<std::string>           MACHINE_ARCH;

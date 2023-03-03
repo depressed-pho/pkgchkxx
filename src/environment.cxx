@@ -20,8 +20,6 @@ using namespace std::literals;
 namespace fs = std::filesystem;
 
 namespace {
-    std::string const shell = "/bin/sh";
-
     std::string
     cgetenv(std::string const& name) {
         char const* const value = getenv(name.c_str());
@@ -418,8 +416,7 @@ namespace pkg_chk {
                         });
                     pkg_config.cin().close();
                     pkg_config.cout().close();
-                    harness::exited const* exited = std::get_if<harness::exited>(&pkg_config.wait());
-                    if (exited && exited->status == 0) {
+                    if (pkg_config.wait_exit().status == 0) {
                         _tenv.included_tags.emplace("x11");
                     }
                 }
@@ -437,5 +434,24 @@ namespace pkg_chk {
             }).share();
         included_tags = std::async(std::launch::deferred, [tenv]() { return tenv.get().included_tags; }).share();
         excluded_tags = std::async(std::launch::deferred, [tenv]() { return tenv.get().excluded_tags; }).share();
+    }
+
+    std::optional<std::filesystem::path>
+    environment::binary_package_file_of(pkgname const& name) const {
+        auto const& sum = bin_pkg_summary.get();
+
+        if (auto it = sum.find(name); it != sum.end()) {
+            if (it->second.FILENAME) {
+                return PACKAGES.get() / *(it->second.FILENAME);
+            }
+            else {
+                auto file = PACKAGES.get() / name.string();
+                file += PKG_SUFX.get();
+                return file;
+            }
+        }
+        else {
+            return {};
+        }
     }
 }
