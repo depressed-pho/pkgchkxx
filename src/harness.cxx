@@ -147,11 +147,12 @@ namespace pkg_chk {
             std::getline(msg_in, msg);
             if (!msg.empty()) {
                 throw failed_to_spawn_process(
-                    std::move(msg),
-                    std::move(_cmd),
-                    std::move(_argv),
-                    std::move(_cwd),
-                    std::move(_env));
+                    command_error(
+                        std::move(_cmd),
+                        std::move(_argv),
+                        std::move(_cwd),
+                        std::move(_env)),
+                    std::move(msg));
             }
 
             _stdin.emplace(stdin_fds[1]);
@@ -213,12 +214,14 @@ namespace pkg_chk {
                 }
                 else {
                     throw process_died_of_signal(
-                        std::move(st),
-                        _pid.value(),
-                        std::move(_cmd),
-                        std::move(_argv),
-                        std::move(_cwd),
-                        std::move(_env));
+                        process_terminated_unexpectedly(
+                            command_error(
+                                std::move(_cmd),
+                                std::move(_argv),
+                                std::move(_cwd),
+                                std::move(_env)),
+                            _pid.value()),
+                        st);
                 }
             },
             wait());
@@ -228,12 +231,14 @@ namespace pkg_chk {
     harness::wait_success() {
         if (exited const& st = wait_exit(); st.status != 0) {
             throw process_exited_for_failure(
-                st,
-                _pid.value(),
-                std::move(_cmd),
-                std::move(_argv),
-                std::move(_cwd),
-                std::move(_env));
+                process_terminated_unexpectedly(
+                    command_error(
+                        std::move(_cmd),
+                        std::move(_argv),
+                        std::move(_cwd),
+                        std::move(_env)),
+                    _pid.value()),
+                st);
         }
     }
 
@@ -276,16 +281,9 @@ namespace pkg_chk {
                 }).share()) {}
 
     failed_to_spawn_process::failed_to_spawn_process(
-        std::string&& msg_,
-        std::string&& cmd_,
-        std::vector<std::string>&& argv_,
-        std::optional<std::filesystem::path>&& cwd_,
-        std::map<std::string, std::string>&& env_)
-        : command_error(
-            std::move(cmd_),
-            std::move(argv_),
-            std::move(cwd_),
-            std::move(env_))
+        command_error&& ce,
+        std::string&& msg_)
+        : command_error(std::move(ce))
         , msg(
             std::async(
                 std::launch::deferred,
@@ -297,31 +295,15 @@ namespace pkg_chk {
                 }).share()) {}
 
     process_terminated_unexpectedly::process_terminated_unexpectedly(
-        pid_t pid_,
-        std::string&& cmd_,
-        std::vector<std::string>&& argv_,
-        std::optional<std::filesystem::path>&& cwd_,
-        std::map<std::string, std::string>&& env_)
-        : command_error(
-            std::move(cmd_),
-            std::move(argv_),
-            std::move(cwd_),
-            std::move(env_))
+        command_error&& ce,
+        pid_t pid_)
+        : command_error(std::move(ce))
         , pid(pid_) {}
 
     process_died_of_signal::process_died_of_signal(
-        harness::signaled const& st_,
-        pid_t pid_,
-        std::string&& cmd_,
-        std::vector<std::string>&& argv_,
-        std::optional<std::filesystem::path>&& cwd_,
-        std::map<std::string, std::string>&& env_)
-        : process_terminated_unexpectedly(
-            pid_,
-            std::move(cmd_),
-            std::move(argv_),
-            std::move(cwd_),
-            std::move(env_))
+        process_terminated_unexpectedly&& ptu,
+        harness::signaled const& st_)
+        : process_terminated_unexpectedly(std::move(ptu))
         , st(st_)
         , msg(
             std::async(
@@ -336,19 +318,9 @@ namespace pkg_chk {
                 }).share()) {}
 
     process_exited_for_failure::process_exited_for_failure(
-        harness::exited const& st_,
-        pid_t pid_,
-        std::string&& cmd_,
-        std::vector<std::string>&& argv_,
-        std::optional<std::filesystem::path>&& cwd_,
-        std::map<std::string, std::string>&& env_)
-        : process_terminated_unexpectedly(
-            pid_,
-            std::move(cmd_),
-            std::move(argv_),
-            std::move(cwd_),
-            std::move(env_))
-        , st(st_)
+        process_terminated_unexpectedly&& ptu,
+        harness::exited const& st_)
+        : process_terminated_unexpectedly(std::move(ptu))
         , msg(
             std::async(
                 std::launch::deferred,

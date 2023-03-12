@@ -1,3 +1,4 @@
+#include <cassert>
 #include <thread>
 
 #include "build_version.hxx"
@@ -69,8 +70,8 @@ namespace {
         }
 
         // We need to search non-default PKGNAMEs only when -u or -r is
-        // given, because MISSING_TODO isn't relevant to -a. We can do this
-        // unconditionally but that's just a waste of time.
+        // given, otherwise -a would install every single PKGNAME that the
+        // PKGPATH provides.
         std::set<pkgname> pkgnames = {
             pkgname(*default_pkgname)
         };
@@ -120,8 +121,47 @@ namespace {
     }
 
     std::set<pkgname>
-    latest_pkgnames_from_binary(environment const& env, pkgpath const& path) {
-        throw std::runtime_error("FIXME: -b not implemented yet");
+    latest_pkgnames_from_binary(options const& opts, environment const& env, pkgpath const& path) {
+        // We can enumerate every possible PKGNAME a PKGPATH can provide
+        // just by querying the binary package summary. However, we cannot
+        // know which one is the default without consulting the
+        // source. This is problematic when -a is given. The best
+        // workaround we can do is to sort the pkgbases and pick the last
+        // one, but this is of course not guaranteed to pick the correct
+        // package.
+        auto const& pm = env.bin_pkg_map.get();
+        if (auto pkgbases = pm.find(path); pkgbases != pm.end()) {
+            std::set<pkgname> pkgnames;
+            if (opts.add_missing) {
+                // Guess the default pkgbase. This may be inaccurate.
+                auto guessed_default = pkgbases->second.rbegin();
+                assert(guessed_default != pkgbases->second.rend());
+
+                auto latest = guessed_default->second.rbegin();
+                assert(latest != guessed_default->second.rend());
+
+                pkgnames.insert(latest->first);
+            }
+            if (opts.update || opts.delete_mismatched) {
+                // We need to enumerate only PKGBASEs that are already
+                // installed, otherwise -a would install every single
+                // PKGNAME that the PKGPATH provides.
+                auto const& installed_pkgbases = env.installed_pkgbases.get();
+                for (auto const& base: pkgbases->second) {
+                    if (installed_pkgbases.find(base.first) != installed_pkgbases.end()) {
+                        auto latest = base.second.rbegin();
+                        assert(latest != base.second.rend());
+
+                        pkgnames.insert(latest->first);
+                    }
+                }
+            }
+            return pkgnames;
+        }
+        else {
+            // No binary packages provided by the given pkgpath are found.
+            return {};
+        }
     }
 
     struct check_result {
@@ -205,7 +245,7 @@ namespace {
                     std::set<pkgname> const latest_pkgnames
                         = opts.build_from_source
                         ? latest_pkgnames_from_source(opts, env, path)
-                        : latest_pkgnames_from_binary(env, path);
+                        : latest_pkgnames_from_binary(opts, env, path);
 
                     if (latest_pkgnames.empty()) {
                         res.MISSING_DONE(path);
@@ -235,33 +275,41 @@ namespace {
                                     }
                                     std::optional<build_version> const installed_build_version =
                                         build_version::from_installed(env.PKG_INFO.get(), *installed);
+                                    assert(installed_build_version.has_value());
 
-                                    if (latest_build_version.has_value() &&
-                                        latest_build_version == installed_build_version) {
-
-                                        atomic_verbose(
-                                            opts,
-                                            [&](auto& out) {
-                                            out << path << " - " << name << " OK" << std::endl;
-                                        });
+                                    if (latest_build_version.has_value()) {
+                                        if (latest_build_version == installed_build_version) {
+                                            atomic_verbose(
+                                                opts,
+                                                [&](auto& out) {
+                                                    out << path << " - " << name << " OK" << std::endl;
+                                                });
+                                        }
+                                        else {
+                                            atomic_msg(
+                                                opts,
+                                                [&](auto& out) {
+                                                    out << path << " - " << name << " build_version mismatch" << std::endl;
+                                                });
+                                            atomic_verbose(
+                                                opts,
+                                                [&](auto& out) {
+                                                    out << "--current--"                   << std::endl
+                                                        << latest_build_version.value()
+                                                        << "--installed--"                 << std::endl
+                                                        << installed_build_version.value()
+                                                        << "----"                          << std::endl
+                                                        << std::endl;
+                                                });
+                                            res.MISMATCH_TODO(*installed);
+                                        }
                                     }
                                     else {
                                         atomic_msg(
                                             opts,
                                             [&](auto& out) {
-                                                out << path << " - " << name << " build_version mismatch" << std::endl;
+                                                out << path << " - " << name << " build_version missing" << std::endl;
                                             });
-                                        atomic_verbose(
-                                            opts,
-                                            [&](auto& out) {
-                                                out << "--current--"                   << std::endl
-                                                    << latest_build_version.value()
-                                                    << "--installed--"                 << std::endl
-                                                    << installed_build_version.value()
-                                                    << "----"                          << std::endl
-                                                    << std::endl;
-                                            });
-                                        res.MISMATCH_TODO(*installed);
                                     }
                                 }
                                 else {

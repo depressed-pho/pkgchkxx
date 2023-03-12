@@ -137,11 +137,8 @@ namespace pkg_chk {
 
     struct failed_to_spawn_process: command_error {
         failed_to_spawn_process(
-            std::string&& msg_,
-            std::string&& cmd_,
-            std::vector<std::string>&& argv_,
-            std::optional<std::filesystem::path>&& cwd_,
-            std::map<std::string, std::string>&& env_);
+            command_error&& ce,
+            std::string&& msg_);
 
         virtual char const*
         what() const noexcept {
@@ -154,23 +151,16 @@ namespace pkg_chk {
 
     struct process_terminated_unexpectedly: command_error {
         process_terminated_unexpectedly(
-            pid_t pid_,
-            std::string&& cmd_,
-            std::vector<std::string>&& argv_,
-            std::optional<std::filesystem::path>&& cwd_,
-            std::map<std::string, std::string>&& env_);
+            command_error&& ce,
+            pid_t pid_);
 
         pid_t pid;
     };
 
     struct process_died_of_signal: public process_terminated_unexpectedly {
         process_died_of_signal(
-            harness::signaled const& st_,
-            pid_t pid_,
-            std::string&& cmd_,
-            std::vector<std::string>&& argv_,
-            std::optional<std::filesystem::path>&& cwd_,
-            std::map<std::string, std::string>&& env_);
+            process_terminated_unexpectedly&& ptu,
+            harness::signaled const& st_);
 
         virtual char const*
         what() const noexcept {
@@ -185,12 +175,8 @@ namespace pkg_chk {
 
     struct process_exited_for_failure: public process_terminated_unexpectedly {
         process_exited_for_failure(
-            harness::exited const& st_,
-            pid_t pid_,
-            std::string&& cmd_,
-            std::vector<std::string>&& argv_,
-            std::optional<std::filesystem::path>&& cwd_,
-            std::map<std::string, std::string>&& env_);
+            process_terminated_unexpectedly&& ptu,
+            harness::exited const& st_);
 
         virtual char const*
         what() const noexcept {

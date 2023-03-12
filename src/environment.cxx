@@ -364,6 +364,15 @@ namespace pkg_chk {
                 verbose(opts) << "Getting summary from installed packages" << std::endl;
                 return summary(PKG_INFO.get());
             }).share();
+        installed_pkgbases = std::async(
+            std::launch::deferred,
+            [this, &opts]() {
+                std::set<pkgbase> ret;
+                for (auto const& name: installed_pkgnames.get()) {
+                    ret.insert(name.base);
+                }
+                return ret;
+            }).share();
         installed_pkgpaths_with_pkgnames = std::async(
             std::launch::deferred,
             [this]() {

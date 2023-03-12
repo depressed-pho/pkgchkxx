@@ -51,10 +51,11 @@ namespace pkg_chk {
         std::shared_future<std::set<pkgname>> installed_pkgnames; // Fastest to compute.
         std::shared_future<std::set<pkgpath>> installed_pkgpaths; // Moderately slow.
         std::shared_future<summary>        installed_pkg_summary; // Slowest to compute.
+        std::shared_future<std::set<pkgbase>> installed_pkgbases; // Derived from installed_pkgnames.
         std::shared_future<
             std::map<
                 pkgpath,
-                std::set<pkgname>>> installed_pkgpaths_with_pkgnames;
+                std::set<pkgname>>> installed_pkgpaths_with_pkgnames; // Derived from installed_pkg_summary.
 
         std::shared_future<tagset>  included_tags;
         std::shared_future<tagset>  excluded_tags;
