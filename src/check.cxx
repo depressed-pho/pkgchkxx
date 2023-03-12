@@ -6,33 +6,13 @@
 #include "config_file.hxx"
 #include "makevars.hxx"
 #include "message.hxx"
+#include "mutex_guard.hxx"
 #include "nursery.hxx"
 
 namespace fs = std::filesystem;
 using namespace pkg_chk;
 
 namespace {
-    std::set<pkgpath>
-    pkgpaths_to_check(options const& opts, environment const& env) {
-        std::set<pkgpath> pkgpaths;
-        if (opts.delete_mismatched || opts.update) {
-            pkgpaths = env.installed_pkgpaths.get();
-        }
-        if (opts.add_missing) {
-            env.PKGCHK_CONF.get(); // Force the evaluation of PKGCHK_CONF,
-                                   // or verbose messages would interleave.
-            verbose(opts) << "Append to PKGDIRLIST based on config "
-                          << env.PKGCHK_CONF.get() << std::endl;
-            config const conf(env.PKGCHK_CONF.get());
-            for (auto const& path:
-                     conf.apply_tags(
-                         env.included_tags.get(), env.excluded_tags.get())) {
-                pkgpaths.insert(path);
-            }
-        }
-        return pkgpaths;
-    }
-
     std::set<pkgname>
     latest_pkgnames_from_source(options const& opts, environment const& env, pkgpath const& path) {
         // There are simply no means to enumerate every possible PKGNAME a
@@ -163,67 +143,9 @@ namespace {
             return {};
         }
     }
+}
 
-    struct check_result {
-        check_result() {}
-
-        check_result(check_result const& res)
-            : _MISSING_DONE(res._MISSING_DONE)
-            , _MISSING_TODO(res._MISSING_TODO)
-            , _MISMATCH_TODO(res._MISMATCH_TODO) {}
-
-        check_result(check_result&& res)
-            : _MISSING_DONE(std::move(res._MISSING_DONE))
-            , _MISSING_TODO(std::move(res._MISSING_TODO))
-            , _MISMATCH_TODO(std::move(res._MISMATCH_TODO)) {}
-
-        std::set<pkgpath> const&
-        MISSING_DONE() const {
-            return _MISSING_DONE;
-        }
-
-        template <typename Pkgpath>
-        void
-        MISSING_DONE(Pkgpath&& path) {
-            lock_t lk(_mtx);
-            _MISSING_DONE.insert(path);
-        }
-
-        std::map<pkgname, pkgpath> const&
-        MISSING_TODO() const {
-            return _MISSING_TODO;
-        }
-
-        template <typename Pkgname, typename Pkgpath>
-        void
-        MISSING_TODO(Pkgname&& name, Pkgpath&& path) {
-            lock_t lk(_mtx);
-            _MISSING_TODO.insert_or_assign(name, path);
-        }
-
-        std::set<pkgname> const&
-        MISMATCH_TODO() const {
-            return _MISMATCH_TODO;
-        }
-
-        template <typename Pkgname>
-        void
-        MISMATCH_TODO(Pkgname&& name) {
-            lock_t lk(_mtx);
-            _MISMATCH_TODO.insert(name);
-        }
-
-    private:
-        using mutex_t = std::mutex;
-        using lock_t  = std::lock_guard<mutex_t>;
-
-        mutable mutex_t _mtx;
-
-        std::set<pkgpath> _MISSING_DONE;
-        std::map<pkgname, pkgpath> _MISSING_TODO;
-        std::set<pkgname> _MISMATCH_TODO;
-    };
-
+namespace pkg_chk {
     // This is the slowest part of pkg_chk. For each package we need to
     // extract variables from package Makefiles unless we are using binary
     // packages. Luckily for us each check is independent of each other so
@@ -234,7 +156,7 @@ namespace {
         environment const& env,
         std::set<pkgpath> const& pkgpaths) {
 
-        check_result res;
+        guarded<check_result> res;
         nursery n;
         for (pkgpath const& path: pkgpaths) {
             n.start_soon(
@@ -248,7 +170,7 @@ namespace {
                         : latest_pkgnames_from_binary(opts, env, path);
 
                     if (latest_pkgnames.empty()) {
-                        res.MISSING_DONE(path);
+                        res.lock()->MISSING_DONE.insert(path);
                         return;
                     }
 
@@ -301,7 +223,7 @@ namespace {
                                                         << "----"                          << std::endl
                                                         << std::endl;
                                                 });
-                                            res.MISMATCH_TODO(*installed);
+                                            res.lock()->MISMATCH_TODO.insert(*installed);
                                         }
                                     }
                                     else {
@@ -329,7 +251,7 @@ namespace {
                                             << (env.is_binary_available(name) ? " (has binary package)" : "")
                                             << std::endl;
                                     });
-                                res.MISMATCH_TODO(*installed);
+                                res.lock()->MISMATCH_TODO.insert(*installed);
                             }
                             else {
                                 // We have a newer version installed
@@ -342,7 +264,7 @@ namespace {
                                                 << (env.is_binary_available(name) ? " (has binary package)" : "")
                                                 << std::endl;
                                         });
-                                    res.MISMATCH_TODO(*installed);
+                                    res.lock()->MISMATCH_TODO.insert(*installed);
                                 }
                                 else {
                                     atomic_msg(
@@ -363,34 +285,11 @@ namespace {
                                         << (env.is_binary_available(name) ? " (has binary package)" : "")
                                         << std::endl;
                                 });
-                            res.MISSING_TODO(name, path);
+                            res.lock()->MISSING_TODO.insert_or_assign(name, path);
                         }
                     }
                 });
         }
-        return std::move(res);
-    }
-}
-
-namespace pkg_chk {
-    void
-    add_delete_update(options const& opts, environment const& env) {
-        std::set<pkgpath> const pkgpaths = pkgpaths_to_check(opts, env);
-        if (opts.print_pkgpaths_to_check) {
-            for (pkgpath const& path: pkgpaths) {
-                std::cout << path << std::endl;
-            }
-            return;
-        }
-
-        check_result const res = check_installed_packages(opts, env, pkgpaths);
-
-        if (!res.MISSING_DONE().empty()) {
-            msg(opts) << "Missing:";
-            for (pkgpath const& path: res.MISSING_DONE()) {
-                msg(opts) << ' ' << path;
-            }
-            msg(opts) << std::endl;
-        }
+        return std::move(*res.lock());
     }
 }

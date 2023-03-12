@@ -35,6 +35,48 @@ namespace {
         name.base = std::regex_replace(name.base, RE_PYTHON_PREFIX, "py-");
     }
 
+    std::set<pkgpath>
+    pkgpaths_to_check(options const& opts, environment const& env) {
+        std::set<pkgpath> pkgpaths;
+        if (opts.delete_mismatched || opts.update) {
+            pkgpaths = env.installed_pkgpaths.get();
+        }
+        if (opts.add_missing) {
+            env.PKGCHK_CONF.get(); // Force the evaluation of PKGCHK_CONF,
+                                   // or verbose messages would interleave.
+            verbose(opts) << "Append to PKGDIRLIST based on config "
+                          << env.PKGCHK_CONF.get() << std::endl;
+            config const conf(env.PKGCHK_CONF.get());
+            for (auto const& path:
+                     conf.apply_tags(
+                         env.included_tags.get(), env.excluded_tags.get())) {
+                pkgpaths.insert(path);
+            }
+        }
+        return pkgpaths;
+    }
+
+    void
+    add_delete_update(options const& opts, environment const& env) {
+        std::set<pkgpath> const pkgpaths = pkgpaths_to_check(opts, env);
+        if (opts.print_pkgpaths_to_check) {
+            for (pkgpath const& path: pkgpaths) {
+                std::cout << path << std::endl;
+            }
+            return;
+        }
+
+        check_result const res = check_installed_packages(opts, env, pkgpaths);
+
+        if (!res.MISSING_DONE.empty()) {
+            msg(opts) << "Missing:";
+            for (pkgpath const& path: res.MISSING_DONE) {
+                msg(opts) << ' ' << path;
+            }
+            msg(opts) << std::endl;
+        }
+    }
+
     void
     generate_conf_from_installed(options const& opts, environment const& env) {
         fs::path const& file = env.PKGCHK_CONF.get();

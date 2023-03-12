@@ -11,6 +11,7 @@ pkg_chk_SOURCES = \
 	gzipstream.cxx gzipstream.hxx \
 	harness.hxx harness.cxx \
 	message.cxx message.hxx \
+	mutex_guard.hxx \
 	nursery.cxx nursery.hxx \
 	options.cxx options.hxx \
 	ordered.hxx \
