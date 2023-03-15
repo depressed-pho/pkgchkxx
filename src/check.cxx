@@ -149,7 +149,7 @@ namespace pkg_chk {
     // This is the slowest part of pkg_chk. For each package we need to
     // extract variables from package Makefiles unless we are using binary
     // packages. Luckily for us each check is independent of each other so
-    // we can parallelize them.
+    // we can parallelise them.
     check_result
     check_installed_packages(
         options const& opts,

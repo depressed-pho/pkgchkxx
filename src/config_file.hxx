@@ -53,7 +53,8 @@ namespace pkg_chk {
         /** Obtain a set of pkgpaths in the config file, filtered by
          * applying tags. */
         std::set<pkgpath>
-        apply_tags(tagset const& included_tags, tagset const& excluded_tags) const;
+        pkgpaths(tagset const& included_tags = {},
+                 tagset const& excluded_tags = {}) const;
 
         template <typename... Args>
         definition&

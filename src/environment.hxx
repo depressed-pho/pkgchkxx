@@ -36,7 +36,10 @@ namespace pkg_chk {
         std::shared_future<std::string>           OS_VERSION;
         std::shared_future<std::filesystem::path> PKGSRCDIR;
         std::shared_future<std::filesystem::path> PACKAGES;
+        std::shared_future<std::string>           PKG_ADD;
+        std::shared_future<std::string>           PKG_ADMIN;
         std::shared_future<std::filesystem::path> PKG_DBDIR;
+        std::shared_future<std::string>           PKG_DELETE;
         std::shared_future<std::string>           PKG_INFO;
         std::shared_future<std::string>           PKG_SUFX;
         std::shared_future<std::filesystem::path> PKGCHK_CONF;

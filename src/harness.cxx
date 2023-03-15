@@ -5,7 +5,6 @@
 #include <cerrno>
 #include <fcntl.h>
 #include <iostream>
-#include <sstream>
 #include <string.h>
 #include <sys/wait.h>
 #include <system_error>
@@ -256,28 +255,7 @@ namespace pkg_chk {
             std::async(
                 std::launch::deferred,
                 [this]() {
-                    std::stringstream ss;
-                    ss << "Command arguments were:";
-                    for (auto const& arg: argv) {
-                        if (arg.find(' ') != std::string::npos) {
-                            // The argument contains a space. Quote it to
-                            // not confuse someone seeing this message.
-                            ss << " \"";
-                            for (auto c: arg) {
-                                if (c == '"') {
-                                    ss << "\\\"";
-                                }
-                                else {
-                                    ss << c;
-                                }
-                            }
-                            ss << '"';
-                        }
-                        else {
-                            ss << ' ' << arg;
-                        }
-                    }
-                    return ss.str();
+                    return "Command arguments were: " + stringify_argv(argv);
                 }).share()) {}
 
     failed_to_spawn_process::failed_to_spawn_process(

@@ -148,6 +148,14 @@ namespace pkg_chk {
             throw bad_options();
         }
 
+        if (fetch && !build_from_source) {
+            std::cerr
+                << argv[0]
+                << ": -f is an option to pre-fetch source distributions to build packages,"
+                << " which does not make sense if one doesn't intend to build them" << std::endl;
+            throw bad_options();
+        }
+
         if (argc > optind) {
             std::cerr
                 << argv[0]

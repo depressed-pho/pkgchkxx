@@ -7,6 +7,7 @@
 #include <map>
 #include <optional>
 #include <ostream>
+#include <sstream>
 #include <string>
 #include <sys/types.h>
 #include <type_traits>
@@ -18,6 +19,39 @@
 
 namespace pkg_chk {
     static inline std::string const shell = "/bin/sh";
+
+    template <typename Argv>
+    inline std::string
+    stringify_argv(Argv const& argv) {
+        std::stringstream ss;
+        bool is_first = true;
+        for (auto const& arg: argv) {
+            if (is_first) {
+                is_first = false;
+            }
+            else {
+                ss << ' ';
+            }
+            if (arg.find(' ') != std::string::npos) {
+                // The argument contains a space. Quote it to
+                // not confuse someone seeing this message.
+                ss << '"';
+                for (auto c: arg) {
+                    if (c == '"') {
+                        ss << "\\\"";
+                    }
+                    else {
+                        ss << c;
+                    }
+                }
+                ss << '"';
+            }
+            else {
+                ss << arg;
+            }
+        }
+        return ss.str();
+    }
 
     /* RAII way of spawning child processes.
      */

@@ -48,7 +48,10 @@ namespace {
 
     struct makefile_env {
         fs::path        PACKAGES;
+        std::string     PKG_ADD;
+        std::string     PKG_ADMIN;
         fs::path        PKG_DBDIR;
+        std::string     PKG_DELETE;
         std::string     PKG_INFO;
         std::string     PKG_SUFX;
         fs::path        PKG_SYSCONFDIR;
@@ -167,7 +170,10 @@ namespace pkg_chk {
                 }
                 std::vector<std::string> vars = {
                     "PACKAGES",
+                    "PKG_ADD",
+                    "PKG_ADMIN",
                     "PKG_DBDIR",
+                    "PKG_DELETE",
                     "PKG_INFO",
                     "PKG_SUFX",
                     "PKGCHK_NOTAGS",
@@ -198,10 +204,13 @@ namespace pkg_chk {
                     opts.bin_pkg_path.empty()
                     ? fs::path(value_of["PACKAGES"])
                     : url_safe_absolute(opts.bin_pkg_path);
-                _menv.PKG_DBDIR          = value_of["PKG_DBDIR"         ];
-                _menv.PKG_INFO           = value_of["PKG_INFO"          ];
-                _menv.PKG_SUFX           = value_of["PKG_SUFX"          ];
-                _menv.PKG_SYSCONFDIR     = value_of["PKG_SYSCONFDIR"    ];
+                _menv.PKG_ADD            = value_of["PKG_ADD"   ].empty() ? CFG_PKG_ADD    : value_of["PKG_ADD"   ];
+                _menv.PKG_ADMIN          = value_of["PKG_ADMIN" ].empty() ? CFG_PKG_ADMIN  : value_of["PKG_ADMIN" ];
+                _menv.PKG_DBDIR          = value_of["PKG_DBDIR" ];
+                _menv.PKG_DELETE         = value_of["PKG_DELETE"].empty() ? CFG_PKG_DELETE : value_of["PKG_DELETE"];
+                _menv.PKG_INFO           = value_of["PKG_INFO"  ].empty() ? CFG_PKG_INFO   : value_of["PKG_INFO"  ];
+                _menv.PKG_SUFX           = value_of["PKG_SUFX"      ];
+                _menv.PKG_SYSCONFDIR     = value_of["PKG_SYSCONFDIR"];
                 _menv.PKGCHK_CONF        =
                     opts.pkgchk_conf_path.empty()
                     ? fs::path(value_of["PKGCHK_CONF"])
@@ -245,7 +254,10 @@ namespace pkg_chk {
                 return _menv;
             }).share();
         PACKAGES           = std::async(std::launch::deferred, [menv]() { return menv.get().PACKAGES;           }).share();
+        PKG_ADD            = std::async(std::launch::deferred, [menv]() { return menv.get().PKG_ADD;            }).share();
+        PKG_ADMIN          = std::async(std::launch::deferred, [menv]() { return menv.get().PKG_ADMIN;          }).share();
         PKG_DBDIR          = std::async(std::launch::deferred, [menv]() { return menv.get().PKG_DBDIR;          }).share();
+        PKG_DELETE         = std::async(std::launch::deferred, [menv]() { return menv.get().PKG_DELETE;         }).share();
         PKG_INFO           = std::async(std::launch::deferred, [menv]() { return menv.get().PKG_INFO;           }).share();
         PKG_SUFX           = std::async(std::launch::deferred, [menv]() { return menv.get().PKG_SUFX;           }).share();
         PKGCHK_CONF        = std::async(std::launch::deferred, [menv]() { return menv.get().PKGCHK_CONF;        }).share();

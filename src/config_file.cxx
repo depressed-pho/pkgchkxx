@@ -92,7 +92,7 @@ namespace pkg_chk {
     }
 
     std::set<pkgpath>
-    config::apply_tags(tagset const& included_tags, tagset const& excluded_tags) const {
+    config::pkgpaths(tagset const& included_tags, tagset const& excluded_tags) const {
         std::set<pkgpath> pkgpaths;
 
         tagset current_tags; // included_tags - excluded_tags

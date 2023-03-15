@@ -13,14 +13,12 @@ AM_MAINTAINER_MODE([disable])
 AM_SILENT_RULES([no])
 
 # Precious variables.
-AC_ARG_VAR([BMAKE], [path to bmake command])
-AS_IF([test -z "$BMAKE"],
-      [AC_PATH_PROG([BMAKE], [bmake], [bmake])])
-
-AC_PATH_PROG([TSORT], [tsort], [tsort])
-AS_IF([test -z "$TSORT"],
-      [AC_PATH_PROG([TSORT], [tsort], [tsort])])
-
+AX_COMMAND([bmake])
+AX_COMMAND([pkg_add])
+AX_COMMAND([pkg_admin])
+AX_COMMAND([pkg_delete])
+AX_COMMAND([pkg_info])
+AX_COMMAND([tsort])
 AC_ARG_VAR([MAKECONF], [path to mk.conf])
 
 # Checks for compilers.

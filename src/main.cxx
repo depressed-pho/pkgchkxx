@@ -35,6 +35,90 @@ namespace {
         name.base = std::regex_replace(name.base, RE_PYTHON_PREFIX, "py-");
     }
 
+    bool
+    run_cmd(
+        options const& opts,
+        environment const& env,
+        std::string const& cmd,
+        std::vector<std::string> const& args,
+        bool fail_ok,
+        std::optional<std::filesystem::path> const& cwd = std::nullopt) {
+
+        if (opts.list_ver_diffs) {
+            return true;
+        }
+
+        std::time_t const now = std::time(nullptr);
+        msg(opts) << std::put_time(std::localtime(&now), "%R")
+                  << cmd;
+        for (auto const& arg: args) {
+            msg(opts) << ' ' << arg;
+        }
+        if (cwd) {
+            msg(opts) << " [CWD: " << cwd->string() << ']';
+        }
+        msg(opts) << std::endl;
+
+        if (!opts.dry_run) {
+            std::vector<std::string> argv = {shell, "-s", "--"};
+            argv.insert(argv.end(), args.begin(), args.end());
+            harness prog(shell, argv, cwd);
+            prog.cin() << "exec " << cmd << " \"$@\"" << std::endl;
+            prog.cin().close();
+
+            for (std::string line; std::getline(prog.cout(), line); ) {
+                msg(opts) << line << std::endl;
+            }
+
+            if (prog.wait_exit().status != 0) {
+                auto const& show_error =
+                    [&](auto&& out) {
+                        out << '\'' << cmd << ' ' << stringify_argv(args) << "' failed" << std::endl;
+                    };
+                if (fail_ok) {
+                    msg(opts) << "** ";
+                    show_error(msg(opts));
+                    return false;
+                }
+                else {
+                    fatal(opts, show_error);
+                }
+            }
+        }
+        return true;
+    }
+
+    bool
+    run_cmd_su(
+        options const& opts,
+        environment const& env,
+        std::string const& cmd,
+        std::vector<std::string> const& args,
+        bool fail_ok,
+        std::optional<std::filesystem::path> const& cwd = std::nullopt) {
+
+        if (!env.SU_CMD.get().empty()) {
+            return run_cmd(opts, env, env.SU_CMD.get(), {cmd + ' ' + stringify_argv(args)}, fail_ok, cwd);
+        }
+        else {
+            return run_cmd(opts, env, cmd, args, fail_ok, cwd);
+        }
+    }
+
+    void
+    delete_pkgs(options const& opts, environment const& env, std::set<pkgname> const& pkgnames) {
+        for (pkgname const& name: pkgnames) {
+            // Beware this check may produce false positives and negatives
+            // if the package has been installed or deleted after caching
+            // the list of installed packages. We just can't do pkg_delete
+            // unconditionally because it always complains about
+            // non-installed packages.
+            if (env.installed_pkgnames.get().count(name)) {
+                run_cmd_su(opts, env, env.PKG_DELETE.get(), {"-r", name.string()}, true);
+            }
+        }
+    }
+
     std::set<pkgpath>
     pkgpaths_to_check(options const& opts, environment const& env) {
         std::set<pkgpath> pkgpaths;
@@ -48,12 +132,67 @@ namespace {
                           << env.PKGCHK_CONF.get() << std::endl;
             config const conf(env.PKGCHK_CONF.get());
             for (auto const& path:
-                     conf.apply_tags(
+                     conf.pkgpaths(
                          env.included_tags.get(), env.excluded_tags.get())) {
                 pkgpaths.insert(path);
             }
         }
         return pkgpaths;
+    }
+
+    void
+    delete_and_recheck(
+        options const& opts,
+        environment const& env,
+        std::set<pkgpath> const& pkgpaths,
+        check_result& res) {
+
+        std::set<pkgpath> update_conf;
+        if (opts.update) {
+            // Save current installed set to PKGCHK_UPDATE_CONF so that
+            // restarting failed update would not cause installed packages
+            // to end up missing.
+            fs::path const& update_conf_file = env.PKGCHK_UPDATE_CONF.get();
+            if (fs::exists(update_conf_file)) {
+                msg(opts) << "Merging in previous " << update_conf_file << std::endl;
+                update_conf = config(update_conf_file).pkgpaths();
+            }
+
+            for (pkgpath const& path: env.installed_pkgpaths.get()) {
+                update_conf.insert(path);
+            }
+
+            if (!opts.dry_run && !opts.list_ver_diffs) {
+                std::ofstream out(update_conf_file, std::ios_base::out | std::ios_base::trunc);
+                if (!out) {
+                    throw std::system_error(errno, std::generic_category(), "Failed to open " + update_conf_file.string());
+                }
+                out.exceptions(std::ios_base::badbit);
+                for (pkgpath const& path: update_conf) {
+                    out << path << std::endl;
+                }
+            }
+        }
+        if (opts.delete_mismatched || opts.update) {
+            if (!res.MISMATCH_TODO.empty()) {
+                delete_pkgs(opts, env, res.MISMATCH_TODO);
+                msg(opts) << "Rechecking packages after deletions" << std::endl;
+            }
+            std::set<pkgpath> recheck_paths = pkgpaths;
+            if (opts.update) {
+                recheck_paths.insert(update_conf.begin(), update_conf.end());
+            }
+            if (opts.add_missing || opts.update) {
+                res = check_installed_packages(opts, env, recheck_paths);
+            }
+        }
+    }
+
+    bool
+    try_fetch(options const& opts, environment const& env, pkgname const& name, pkgpath const& path) {
+        std::stringstream ss;
+        ss << CFG_BMAKE << " -C " << (env.PKGSRCDIR.get() / path) << " fetch-list | " << shell;
+        return run_cmd(opts, env, ss.str(), {}, true);
     }
 
     void
@@ -66,7 +205,27 @@ namespace {
             return;
         }
 
-        check_result const res = check_installed_packages(opts, env, pkgpaths);
+        check_result res = check_installed_packages(opts, env, pkgpaths);
+        if (!res.MISMATCH_TODO.empty() ||
+            (opts.update && fs::exists(env.PKGCHK_UPDATE_CONF.get()))) {
+
+            delete_and_recheck(opts, env, pkgpaths, res);
+        }
+
+        std::set<pkgname> FAILED_DONE;
+        if (opts.fetch && !res.MISSING_DONE.empty()) {
+            // The script generated by "make fetch-list" recurse into
+            // dependencies, which means we can't run it parallelly without
+            // the risk of race condition.
+            msg(opts) << "Fetching distfiles" << std::endl;
+            for (auto const& missing: res.MISSING_TODO) {
+                // Packages previously marked as MISMATCH_TODO are now
+                // moved to MISSING_TODO.
+                if (!try_fetch(opts, env, missing.first, missing.second)) {
+                    FAILED_DONE.insert(missing.first);
+                }
+            }
+        }
 
         if (!res.MISSING_DONE.empty()) {
             msg(opts) << "Missing:";
@@ -146,7 +305,7 @@ namespace {
         harness tsort(CFG_TSORT, {CFG_TSORT});
 
         for (auto const& path:
-                 conf.apply_tags(
+                 conf.pkgpaths(
                      env.included_tags.get(), env.excluded_tags.get())) {
             if (auto pkgbases = pm.find(path); pkgbases != pm.end()) {
                 // For each PKGBASE that correspond to this PKGPATH, find
