@@ -91,7 +91,9 @@ namespace pkg_chk {
                 fs::path vMAKECONF = cgetenv("MAKECONF");
                 if (vMAKECONF.empty()) {
                     std::initializer_list<fs::path> const candidates = {
+#if defined(CFG_MAKECONF)
                         CFG_MAKECONF,
+#endif
                         CFG_PREFIX "/etc/mk.conf",
                         "/etc/mk.conf"
                     };
@@ -425,14 +427,14 @@ namespace pkg_chk {
                         {CFG_PKG_CONFIG, "--exists", "x11"},
                         std::nullopt,
                         [](auto& env) {
-                            std::string const path = CFG_PKG_CONFIG_PATH;
-                            if (!path.empty()) {
-                                env["PKG_CONFIG_PATH"] = path;
-                            }
-
                             std::string const libdir = CFG_PKG_CONFIG_LIBDIR;
                             if (!libdir.empty()) {
                                 env["PKG_CONFIG_LIBDIR"] = libdir;
+                            }
+
+                            std::string const path = CFG_PKG_CONFIG_PATH;
+                            if (!path.empty()) {
+                                env["PKG_CONFIG_PATH"] = path;
                             }
                         });
                     pkg_config.cin().close();
