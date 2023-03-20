@@ -42,10 +42,10 @@ namespace pkg_chk {
 
         protected:
             virtual int_type
-            overflow(int_type ch = traits_type::eof());
+            overflow(int_type ch = traits_type::eof()) override;
 
             virtual std::streamsize
-            xsputn(const char_type* s, std::streamsize count);
+            xsputn(const char_type* s, std::streamsize count) override;
 
         private:
             pkg_chk::options const& _opts;

@@ -156,7 +156,7 @@ namespace pkg_chk {
             std::map<std::string, std::string>&& env_);
 
         virtual char const*
-        what() const noexcept {
+        what() const noexcept override {
             return msg.get().c_str();
         }
 
@@ -175,7 +175,7 @@ namespace pkg_chk {
             std::string&& msg_);
 
         virtual char const*
-        what() const noexcept {
+        what() const noexcept override {
             return msg.get().c_str();
         }
 
@@ -197,7 +197,7 @@ namespace pkg_chk {
             harness::signaled const& st_);
 
         virtual char const*
-        what() const noexcept {
+        what() const noexcept override {
             return msg.get().c_str();
         }
 
@@ -213,7 +213,7 @@ namespace pkg_chk {
             harness::exited const& st_);
 
         virtual char const*
-        what() const noexcept {
+        what() const noexcept override {
             return msg.get().c_str();
         }
 

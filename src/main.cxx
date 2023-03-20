@@ -38,7 +38,7 @@ namespace {
     bool
     run_cmd(
         options const& opts,
-        environment const& env,
+        environment const& env [[maybe_unused]],
         std::string const& cmd,
         std::vector<std::string> const& args,
         bool fail_ok,
@@ -193,7 +193,7 @@ namespace {
     }
 
     bool
-    try_fetch(options const& opts, environment const& env, pkgname const& name, pkgpath const& path) {
+    try_fetch(options const& opts, environment const& env, pkgpath const& path) {
         std::stringstream ss;
         ss << CFG_BMAKE << " -C " << (env.PKGSRCDIR.get() / path) << " fetch-list | " << shell;
         return run_cmd(opts, env, ss.str(), {}, true);
@@ -256,7 +256,7 @@ namespace {
             for (auto const& missing: res.MISSING_TODO) {
                 // Packages previously marked as MISMATCH_TODO have been
                 // moved to MISSING_TODO at this point.
-                if (!try_fetch(opts, env, missing.first, missing.second)) {
+                if (!try_fetch(opts, env, missing.second)) {
                     FAILED_DONE.insert(missing.first);
                 }
             }

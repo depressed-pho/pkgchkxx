@@ -299,6 +299,7 @@ namespace pkg_chk {
         process_terminated_unexpectedly&& ptu,
         harness::exited const& st_)
         : process_terminated_unexpectedly(std::move(ptu))
+        , st(st_)
         , msg(
             std::async(
                 std::launch::deferred,

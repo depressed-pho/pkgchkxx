@@ -30,7 +30,17 @@ AS_IF([test -n "$MAKECONF"],
 # Checks for compilers.
 AC_PROG_CXX
 AX_CXX_COMPILE_STDCXX([17], [noext], [mandatory])
-AX_COMPILER_FLAGS([], [], [yes])
+
+AC_LANG_PUSH([C++])
+AX_APPEND_COMPILE_FLAGS([ dnl
+    -Wall dnl
+    -Wextra dnl
+    -Wsuggest-attribute=noreturn dnl
+    -Wsuggest-attribute=format dnl
+    -Wsuggest-override dnl
+    -Werror=return-type dnl
+])
+AC_LANG_POP([C++])
 
 # Checks for programs.
 AC_PATH_PROG([UNAME], [uname], [uname])
