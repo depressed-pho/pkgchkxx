@@ -7,7 +7,8 @@
 #include <variant>
 #include <vector>
 
-#include "pkgpath.hxx"
+#include <pkgxx/pkgpath.hxx>
+
 #include "tag.hxx"
 
 namespace pkg_chk {
@@ -35,7 +36,7 @@ namespace pkg_chk {
             friend std::ostream&
             operator<< (std::ostream& out, config::pkg_def const& def);
 
-            pkgpath path;
+            pkgxx::pkgpath path;
             std::vector<tagpat> patterns_or;
         };
 
@@ -52,7 +53,7 @@ namespace pkg_chk {
 
         /** Obtain a set of pkgpaths in the config file, filtered by
          * applying tags. */
-        std::set<pkgpath>
+        std::set<pkgxx::pkgpath>
         pkgpaths(tagset const& included_tags = {},
                  tagset const& excluded_tags = {}) const;
 

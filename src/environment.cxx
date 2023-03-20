@@ -1,5 +1,3 @@
-#include "config.h"
-
 #include <cerrno>
 #include <filesystem>
 #include <initializer_list>
@@ -11,9 +9,11 @@
 #include <unistd.h>
 #include <vector>
 
+#include <pkgxx/harness.hxx>
+#include <pkgxx/makevars.hxx>
+
+#include "config.h"
 #include "environment.hxx"
-#include "harness.hxx"
-#include "makevars.hxx"
 #include "message.hxx"
 
 using namespace std::literals;
@@ -126,7 +126,7 @@ namespace pkg_chk {
                         vars.push_back("LOCALBASE");
                     }
 
-                    auto value_of = extract_mkconf_vars(MAKECONF.get(), vars).value();
+                    auto value_of = pkgxx::extract_mkconf_vars(MAKECONF.get(), vars).value();
                     for (auto const& pair: value_of) {
                         verbose_var(opts, pair.first, pair.second);
                     }
@@ -194,10 +194,10 @@ namespace pkg_chk {
                 std::map<std::string, std::string> value_of;
                 auto const pkgpath = PKGSRCDIR.get() / "pkgtools/pkg_chk"; // Any package will do.
                 if (fs::is_directory(pkgpath)) {
-                    value_of = extract_pkgmk_vars(pkgpath, vars).value();
+                    value_of = pkgxx::extract_pkgmk_vars(pkgpath, vars).value();
                 }
                 else if (MAKECONF.get() != "/dev/null") {
-                    value_of = extract_mkconf_vars(MAKECONF.get(), vars).value();
+                    value_of = pkgxx::extract_mkconf_vars(MAKECONF.get(), vars).value();
                 }
                 for (auto const& pair: value_of) {
                     verbose_var(opts, pair.first, pair.second);
@@ -283,7 +283,7 @@ namespace pkg_chk {
                         "OS_VERSION",
                         "MACHINE_ARCH"
                     };
-                    auto value_of = extract_pkgmk_vars(pkgpath, vars).value();
+                    auto value_of = pkgxx::extract_pkgmk_vars(pkgpath, vars).value();
                     for (auto const& pair: value_of) {
                         verbose_var(opts, pair.first, pair.second);
                     }
@@ -298,9 +298,9 @@ namespace pkg_chk {
                     // (struct utsname)#machine isn't exactly what "uname
                     // -p" shows, but sysctl(7) hw.machine_arch isn't
                     // portable. We have to bite the bullet and spawn
-                    // uname(1). Note that "uname -p" isn't a POSIX
-                    // standard either.
-                    harness uname(CFG_UNAME, {CFG_UNAME, "-p"});
+                    // uname(1). Note that "uname -p" is a widely supported
+                    // option but it isn't a POSIX standard either.
+                    pkgxx::harness uname(CFG_UNAME, {CFG_UNAME, "-p"});
                     uname.cin().close();
                     std::getline(uname.cout(), _penv.MACHINE_ARCH);
 
@@ -320,14 +320,16 @@ namespace pkg_chk {
         bin_pkg_summary = std::async(
             std::launch::deferred,
             [this, &opts]() {
-                summary sum(opts, PACKAGES.get(), PKG_INFO.get(), PKG_SUFX.get());
+                auto m = msg(opts);
+                auto v = verbose(opts);
+                pkgxx::summary sum(m, v, opts.concurrency, PACKAGES.get(), PKG_INFO.get(), PKG_SUFX.get());
                 verbose(opts) << "Binary packages: " << sum.size() << std::endl;
                 return sum;
             }).share();
         bin_pkg_map = std::async(
             std::launch::deferred,
             [this]() {
-                return pkgmap(bin_pkg_summary.get());
+                return pkgxx::pkgmap(bin_pkg_summary.get());
             }).share();
 
         installed_pkgnames = std::async(
@@ -339,11 +341,11 @@ namespace pkg_chk {
                 // installed_pkgpaths_with_pkgnames has been evaluated, and
                 // spawn pkg_info(1) only if not. But std::shared_future
                 // doesn't have a method to check that.
-                harness pkg_info(shell, {shell, "-s", "--", "-e", "*"});
+                pkgxx::harness pkg_info(pkgxx::shell, {pkgxx::shell, "-s", "--", "-e", "*"});
                 pkg_info.cin() << "exec " << PKG_INFO.get() << " \"$@\"" << std::endl;
                 pkg_info.cin().close();
 
-                std::set<pkgname> pkgnames;
+                std::set<pkgxx::pkgname> pkgnames;
                 for (std::string line; std::getline(pkg_info.cout(), line); ) {
                     if (!line.empty()) {
                         pkgnames.emplace(line);
@@ -360,11 +362,11 @@ namespace pkg_chk {
                 // installed_pkgpaths_with_pkgnames has been evaluated, and
                 // spawn pkg_info(1) only if not. But std::shared_future
                 // doesn't have a method to check that.
-                harness pkg_info(shell, {shell, "-s", "--", "-aQ", "PKGPATH"});
+                pkgxx::harness pkg_info(pkgxx::shell, {pkgxx::shell, "-s", "--", "-aQ", "PKGPATH"});
                 pkg_info.cin() << "exec " << PKG_INFO.get() << " \"$@\"" << std::endl;
                 pkg_info.cin().close();
 
-                std::set<pkgpath> pkgpaths;
+                std::set<pkgxx::pkgpath> pkgpaths;
                 for (std::string line; std::getline(pkg_info.cout(), line); ) {
                     if (!line.empty()) {
                         pkgpaths.emplace(line);
@@ -376,12 +378,12 @@ namespace pkg_chk {
             std::launch::deferred,
             [this, &opts]() {
                 verbose(opts) << "Getting summary from installed packages" << std::endl;
-                return summary(PKG_INFO.get());
+                return pkgxx::summary(PKG_INFO.get());
             }).share();
         installed_pkgbases = std::async(
             std::launch::deferred,
             [this, &opts]() {
-                std::set<pkgbase> ret;
+                std::set<pkgxx::pkgbase> ret;
                 for (auto const& name: installed_pkgnames.get()) {
                     ret.insert(name.base);
                 }
@@ -390,7 +392,7 @@ namespace pkg_chk {
         installed_pkgpaths_with_pkgnames = std::async(
             std::launch::deferred,
             [this]() {
-                std::map<pkgpath, std::set<pkgname>> ret;
+                std::map<pkgxx::pkgpath, std::set<pkgxx::pkgname>> ret;
                 for (auto const& pair: installed_pkg_summary.get()) {
                     ret[pair.second.PKGPATH].insert(pair.first);
                 }
@@ -422,7 +424,7 @@ namespace pkg_chk {
                     _tenv.included_tags.insert(
                         PKGCHK_TAGS.get().begin(), PKGCHK_TAGS.get().end());
 
-                    harness pkg_config(
+                    pkgxx::harness pkg_config(
                         CFG_PKG_CONFIG,
                         {CFG_PKG_CONFIG, "--exists", "x11"},
                         std::nullopt,
@@ -460,7 +462,7 @@ namespace pkg_chk {
     }
 
     std::optional<std::filesystem::path>
-    environment::binary_package_file_of(pkgname const& name) const {
+    environment::binary_package_file_of(pkgxx::pkgname const& name) const {
         auto const& sum = bin_pkg_summary.get();
 
         if (auto it = sum.find(name); it != sum.end()) {

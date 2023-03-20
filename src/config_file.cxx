@@ -7,8 +7,9 @@
 #include <string_view>
 #include <type_traits>
 
+#include <pkgxx/string_algo.hxx>
+
 #include "config_file.hxx"
-#include "string_algo.hxx"
 
 namespace fs = std::filesystem;
 
@@ -17,10 +18,10 @@ namespace pkg_chk {
         auto const equal = line.find('=');
         assert(equal != std::string_view::npos);
 
-        group = trim(line.substr(0, equal));
+        group = pkgxx::trim(line.substr(0, equal));
         auto const pats =
             equal + 1 <= line.size() ? line.substr(equal + 1) : std::string_view();
-        for (auto const& pat: words(pats)) {
+        for (auto const& pat: pkgxx::words(pats)) {
             patterns_or.emplace_back(pat);
         }
     }
@@ -38,7 +39,7 @@ namespace pkg_chk {
         : path("dummy/dummy" /* because it isn't default-constructible */) {
 
         bool is_first = true;
-        for (auto const word: words(line)) {
+        for (auto const word: pkgxx::words(line)) {
             if (is_first) {
                 path     = word;
                 is_first = false;
@@ -91,9 +92,9 @@ namespace pkg_chk {
         }
     }
 
-    std::set<pkgpath>
+    std::set<pkgxx::pkgpath>
     config::pkgpaths(tagset const& included_tags, tagset const& excluded_tags) const {
-        std::set<pkgpath> pkgpaths;
+        std::set<pkgxx::pkgpath> pkgpaths;
 
         tagset current_tags; // included_tags - excluded_tags
         std::set_difference(

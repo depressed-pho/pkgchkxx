@@ -5,7 +5,7 @@ AC_PREREQ([2.71])
 AC_INIT([pkgchkxx], [0.1], [pkgsrc-users@NetBSD.org])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([src/main.cxx])
-AC_CONFIG_HEADERS([config.h])
+AC_CONFIG_HEADERS([lib/pkgxx/config.h])
 
 LT_PREREQ([2.4.7])
 LT_INIT
@@ -85,6 +85,8 @@ AC_FUNC_FORK
 
 AC_CONFIG_FILES([
     Makefile
+    lib/Makefile
+    lib/pkgxx/Makefile
     src/Makefile
 ])
 AC_OUTPUT

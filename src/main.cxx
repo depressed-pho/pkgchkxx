@@ -1,5 +1,3 @@
-#include "config.h"
-
 #include <algorithm>
 #include <cassert>
 #include <cerrno>
@@ -13,14 +11,16 @@
 #include <iostream>
 #include <regex>
 
+#include <pkgxx/config.h>
+#include <pkgxx/harness.hxx>
+#include <pkgxx/pkgpath.hxx>
+#include <pkgxx/todo.hxx>
+
 #include "check.hxx"
 #include "config_file.hxx"
 #include "environment.hxx"
-#include "harness.hxx"
 #include "message.hxx"
 #include "options.hxx"
-#include "pkgpath.hxx"
-#include "todo.hxx"
 
 using namespace pkg_chk;
 namespace fs = std::filesystem;
@@ -31,7 +31,7 @@ namespace {
         std::regex::optimize);
 
     void
-    normalize_pkgname(pkgname& name) {
+    normalize_pkgname(pkgxx::pkgname& name) {
         name.base = std::regex_replace(name.base, RE_PYTHON_PREFIX, "py-");
     }
 
@@ -61,9 +61,9 @@ namespace {
         msg(opts) << std::endl;
 
         if (!opts.dry_run) {
-            std::vector<std::string> argv = {shell, "-s", "--"};
+            std::vector<std::string> argv = {pkgxx::shell, "-s", "--"};
             argv.insert(argv.end(), args.begin(), args.end());
-            harness prog(shell, argv, cwd, env_mod);
+            pkgxx::harness prog(pkgxx::shell, argv, cwd, env_mod);
             prog.cin() << "exec " << cmd << " \"$@\"" << std::endl;
             prog.cin().close();
 
@@ -74,7 +74,7 @@ namespace {
             if (prog.wait_exit().status != 0) {
                 auto const& show_error =
                     [&](auto&& out) {
-                        out << '\'' << cmd << ' ' << stringify_argv(args) << "' failed" << std::endl;
+                        out << '\'' << cmd << ' ' << pkgxx::stringify_argv(args) << "' failed" << std::endl;
                     };
                 if (fail_ok) {
                     msg(opts) << "** ";
@@ -100,32 +100,32 @@ namespace {
         std::function<void (std::map<std::string, std::string>&)> const& env_mod = [](auto&) {}) {
 
         if (!env.SU_CMD.get().empty()) {
-            return run_cmd(opts, env, env.SU_CMD.get(), {cmd + ' ' + stringify_argv(args)}, fail_ok, cwd, env_mod);
+            return run_cmd(opts, env, env.SU_CMD.get(), {cmd + ' ' + pkgxx::stringify_argv(args)}, fail_ok, cwd, env_mod);
         }
         else {
             return run_cmd(opts, env, cmd, args, fail_ok, cwd, env_mod);
         }
     }
 
-    bool is_pkg_installed(std::string const& PKG_INFO, pkgname const& name) {
-        harness pkg_info(shell, {shell, "-s", "--", "-q", "-e", name.string()});
+    bool is_pkg_installed(std::string const& PKG_INFO, pkgxx::pkgname const& name) {
+        pkgxx::harness pkg_info(pkgxx::shell, {pkgxx::shell, "-s", "--", "-q", "-e", name.string()});
         pkg_info.cin() << "exec " << PKG_INFO << " \"$@\"" << std::endl;
         pkg_info.cin().close();
         return pkg_info.wait_exit().status == 0;
     }
 
     void
-    delete_pkgs(options const& opts, environment const& env, std::set<pkgname> const& pkgnames) {
-        for (pkgname const& name: pkgnames) {
+    delete_pkgs(options const& opts, environment const& env, std::set<pkgxx::pkgname> const& pkgnames) {
+        for (pkgxx::pkgname const& name: pkgnames) {
             if (is_pkg_installed(env.PKG_INFO.get(), name)) {
                 run_cmd_su(opts, env, env.PKG_DELETE.get(), {"-r", name.string()}, true);
             }
         }
     }
 
-    std::set<pkgpath>
+    std::set<pkgxx::pkgpath>
     pkgpaths_to_check(options const& opts, environment const& env) {
-        std::set<pkgpath> pkgpaths;
+        std::set<pkgxx::pkgpath> pkgpaths;
         if (opts.delete_mismatched || opts.update) {
             pkgpaths = env.installed_pkgpaths.get();
         }
@@ -148,10 +148,10 @@ namespace {
     delete_and_recheck(
         options const& opts,
         environment const& env,
-        std::set<pkgpath> const& pkgpaths,
+        std::set<pkgxx::pkgpath> const& pkgpaths,
         check_result& res) {
 
-        std::set<pkgpath> update_conf;
+        std::set<pkgxx::pkgpath> update_conf;
         if (opts.update) {
             // Save current installed set to PKGCHK_UPDATE_CONF so that
             // restarting failed update would not cause installed packages
@@ -162,7 +162,7 @@ namespace {
                 update_conf = config(update_conf_file).pkgpaths();
             }
 
-            for (pkgpath const& path: env.installed_pkgpaths.get()) {
+            for (pkgxx::pkgpath const& path: env.installed_pkgpaths.get()) {
                 update_conf.insert(path);
             }
 
@@ -172,7 +172,7 @@ namespace {
                     throw std::system_error(errno, std::generic_category(), "Failed to open " + update_conf_file.string());
                 }
                 out.exceptions(std::ios_base::badbit);
-                for (pkgpath const& path: update_conf) {
+                for (pkgxx::pkgpath const& path: update_conf) {
                     out << path << std::endl;
                 }
             }
@@ -182,7 +182,7 @@ namespace {
                 delete_pkgs(opts, env, res.MISMATCH_TODO);
                 msg(opts) << "Rechecking packages after deletions" << std::endl;
             }
-            std::set<pkgpath> recheck_paths = pkgpaths;
+            std::set<pkgxx::pkgpath> recheck_paths = pkgpaths;
             if (opts.update) {
                 recheck_paths.insert(update_conf.begin(), update_conf.end());
             }
@@ -193,14 +193,14 @@ namespace {
     }
 
     bool
-    try_fetch(options const& opts, environment const& env, pkgpath const& path) {
+    try_fetch(options const& opts, environment const& env, pkgxx::pkgpath const& path) {
         std::stringstream ss;
-        ss << CFG_BMAKE << " -C " << (env.PKGSRCDIR.get() / path) << " fetch-list | " << shell;
+        ss << CFG_BMAKE << " -C " << (env.PKGSRCDIR.get() / path) << " fetch-list | " << pkgxx::shell;
         return run_cmd(opts, env, ss.str(), {}, true);
     }
 
     bool
-    try_install(options const& opts, environment const& env, pkgname const& name, pkgpath const& path) {
+    try_install(options const& opts, environment const& env, pkgxx::pkgname const& name, pkgxx::pkgpath const& path) {
         if (is_pkg_installed(env.PKG_INFO.get(), name)) {
             msg(opts) << name << " was installed in a previous stage" << std::endl;
             return run_cmd_su(
@@ -232,9 +232,9 @@ namespace {
 
     void
     add_delete_update(options const& opts, environment const& env) {
-        std::set<pkgpath> const pkgpaths = pkgpaths_to_check(opts, env);
+        std::set<pkgxx::pkgpath> const pkgpaths = pkgpaths_to_check(opts, env);
         if (opts.print_pkgpaths_to_check) {
-            for (pkgpath const& path: pkgpaths) {
+            for (pkgxx::pkgpath const& path: pkgpaths) {
                 std::cout << path << std::endl;
             }
             return;
@@ -247,7 +247,7 @@ namespace {
             delete_and_recheck(opts, env, pkgpaths, res);
         }
 
-        std::set<pkgname> FAILED_DONE;
+        std::set<pkgxx::pkgname> FAILED_DONE;
         if (opts.fetch && !res.MISSING_TODO.empty()) {
             // The script generated by "make fetch-list" recurse into
             // dependencies, which means we can't run it parallelly without
@@ -262,7 +262,7 @@ namespace {
             }
         }
 
-        std::set<pkgname> INSTALL_DONE;
+        std::set<pkgxx::pkgname> INSTALL_DONE;
         if ((opts.add_missing || opts.update) && !res.MISSING_TODO.empty()) {
             msg(opts) << "Installing packages" << std::endl;
             for (auto const& missing: res.MISSING_TODO) {
@@ -283,14 +283,14 @@ namespace {
 
         if (!res.MISSING_DONE.empty()) {
             msg(opts) << "Missing:";
-            for (pkgpath const& path: res.MISSING_DONE) {
+            for (pkgxx::pkgpath const& path: res.MISSING_DONE) {
                 msg(opts) << ' ' << path;
             }
             msg(opts) << std::endl;
         }
         if (!INSTALL_DONE.empty()) {
             msg(opts) << "Installed:";
-            for (pkgname const& name: INSTALL_DONE) {
+            for (pkgxx::pkgname const& name: INSTALL_DONE) {
                 msg(opts) << ' ' << name;
             }
             msg(opts) << std::endl;
@@ -299,7 +299,7 @@ namespace {
             fatal(opts,
                   [&](auto& out) {
                       out << "Failed:";
-                      for (pkgname const& name: FAILED_DONE) {
+                      for (pkgxx::pkgname const& name: FAILED_DONE) {
                           msg(opts) << ' ' << name;
                       }
                       msg(opts) << std::endl;
@@ -329,7 +329,7 @@ namespace {
             << std::put_time(std::localtime(&now), "%c %Z") << std::endl;
 
         config conf;
-        for (pkgpath const& path: env.installed_pkgpaths.get()) {
+        for (pkgxx::pkgpath const& path: env.installed_pkgpaths.get()) {
             conf.emplace_back(config::pkg_def(path, std::vector<tagpat>()));
         }
         out << conf;
@@ -342,12 +342,12 @@ namespace {
         auto f_todo = std::async(
             std::launch::async,
             [env]() {
-                return todo_file(env.PKGSRCDIR.get() / "doc/TODO");
+                return pkgxx::todo_file(env.PKGSRCDIR.get() / "doc/TODO");
             });
 
-        std::set<pkgname> const& pkgnames = env.installed_pkgnames.get();
-        todo_file const todo(f_todo.get());
-        for (pkgname name: pkgnames) {
+        std::set<pkgxx::pkgname> const& pkgnames = env.installed_pkgnames.get();
+        pkgxx::todo_file const todo(f_todo.get());
+        for (pkgxx::pkgname name: pkgnames) {
             normalize_pkgname(name);
 
             auto const it = todo.find(name.base);
@@ -363,17 +363,17 @@ namespace {
 
     void
     list_bin_pkgs(options const& opts, environment const& env) {
-        std::string const& sufx = env.PKG_SUFX.get();
-        summary     const& sum  = env.bin_pkg_summary.get();
-        pkgmap      const& pm   = env.bin_pkg_map.get();
+        std::string    const& sufx = env.PKG_SUFX.get();
+        pkgxx::summary const& sum  = env.bin_pkg_summary.get();
+        pkgxx::pkgmap  const& pm   = env.bin_pkg_map.get();
         config const conf(env.PKGCHK_CONF.get());
 
         // TODO: We don't take account of SUPERSEDES but how do we do it?
 
-        using pkgname_cref = std::reference_wrapper<pkgname const>;
-        auto to_list = std::make_unique<std::map<pkgname_cref, pkgvars const&>>();
+        using pkgname_cref = std::reference_wrapper<pkgxx::pkgname const>;
+        auto to_list = std::make_unique<std::map<pkgname_cref, pkgxx::pkgvars const&>>();
         std::set<pkgname_cref> seen;
-        harness tsort(CFG_TSORT, {CFG_TSORT});
+        pkgxx::harness tsort(CFG_TSORT, {CFG_TSORT});
 
         for (auto const& path:
                  conf.pkgpaths(
@@ -404,16 +404,16 @@ namespace {
                 seen.insert(pair.first);
             }
 
-            auto scheduled = std::make_unique<std::map<pkgname_cref, pkgvars const&>>();
+            auto scheduled = std::make_unique<std::map<pkgname_cref, pkgxx::pkgvars const&>>();
             for (auto const& pair: *to_list) {
-                pkgname const& name = pair.first;
-                pkgvars const& vars = pair.second;
+                pkgxx::pkgname const& name = pair.first;
+                pkgxx::pkgvars const& vars = pair.second;
 
                 verbose(opts) << vars.PKGPATH << ": " << name << std::endl;
                 for (auto const& dep_pattern: vars.DEPENDS) {
                     verbose(opts) << "    depends on " << dep_pattern << ": ";
                     if (auto const best = dep_pattern.best(sum); best != sum.end()) {
-                        pkgname const& dep = best->first;
+                        pkgxx::pkgname const& dep = best->first;
 
                         verbose(opts) << dep << std::endl;
                         tsort.cin() << dep << sufx << ' ' << name << sufx << std::endl;

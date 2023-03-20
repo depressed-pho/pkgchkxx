@@ -1,20 +1,25 @@
 #include <cassert>
 #include <thread>
 
-#include "build_version.hxx"
+#include <pkgxx/build_version.hxx>
+#include <pkgxx/makevars.hxx>
+#include <pkgxx/mutex_guard.hxx>
+#include <pkgxx/nursery.hxx>
+
 #include "check.hxx"
 #include "config_file.hxx"
-#include "makevars.hxx"
 #include "message.hxx"
-#include "mutex_guard.hxx"
-#include "nursery.hxx"
 
 namespace fs = std::filesystem;
-using namespace pkg_chk;
 
 namespace {
-    std::set<pkgname>
-    latest_pkgnames_from_source(options const& opts, environment const& env, pkgpath const& path) {
+    using namespace pkg_chk;
+
+    std::set<pkgxx::pkgname>
+    latest_pkgnames_from_source(
+        options const& opts,
+        environment const& env,
+        pkgxx::pkgpath const& path) {
         // There are simply no means to enumerate every possible PKGNAME a
         // PKGPATH can provide. So we first extract the default PKGNAME
         // from it, then retrieve other PKGNAMEs according to installed
@@ -40,7 +45,7 @@ namespace {
         }
 
         auto const default_pkgname =
-            extract_pkgmk_var<pkgname>(env.PKGSRCDIR.get() / path, "PKGNAME");
+            pkgxx::extract_pkgmk_var<pkgxx::pkgname>(env.PKGSRCDIR.get() / path, "PKGNAME");
         if (!default_pkgname) {
             fatal(
                 opts,
@@ -52,8 +57,8 @@ namespace {
         // We need to search non-default PKGNAMEs only when -u or -r is
         // given, otherwise -a would install every single PKGNAME that the
         // PKGPATH provides.
-        std::set<pkgname> pkgnames = {
-            pkgname(*default_pkgname)
+        std::set<pkgxx::pkgname> pkgnames = {
+            pkgxx::pkgname(*default_pkgname)
         };
         if (opts.update || opts.delete_mismatched) {
             auto const& pm = env.installed_pkgpaths_with_pkgnames.get();
@@ -70,7 +75,7 @@ namespace {
                         // PKGPATH, and we must treat it like a removed
                         // package in that case.
                         auto const alternative_pkgname =
-                            extract_pkgmk_var<pkgname>(
+                            pkgxx::extract_pkgmk_var<pkgxx::pkgname>(
                                 env.PKGSRCDIR.get() / path,
                                 "PKGNAME",
                                 {{"PKGNAME_REQD", installed_pkgname.base + "-[0-9]*"}}).value();
@@ -100,8 +105,11 @@ namespace {
         return pkgnames;
     }
 
-    std::set<pkgname>
-    latest_pkgnames_from_binary(options const& opts, environment const& env, pkgpath const& path) {
+    std::set<pkgxx::pkgname>
+    latest_pkgnames_from_binary(
+        options const& opts,
+        environment const& env,
+        pkgxx::pkgpath const& path) {
         // We can enumerate every possible PKGNAME a PKGPATH can provide
         // just by querying the binary package summary. However, we cannot
         // know which one is the default without consulting the
@@ -111,7 +119,7 @@ namespace {
         // package.
         auto const& pm = env.bin_pkg_map.get();
         if (auto pkgbases = pm.find(path); pkgbases != pm.end()) {
-            std::set<pkgname> pkgnames;
+            std::set<pkgxx::pkgname> pkgnames;
             if (opts.add_missing) {
                 // Guess the default pkgbase. This may be inaccurate.
                 auto guessed_default = pkgbases->second.rbegin();
@@ -154,17 +162,17 @@ namespace pkg_chk {
     check_installed_packages(
         options const& opts,
         environment const& env,
-        std::set<pkgpath> const& pkgpaths) {
+        std::set<pkgxx::pkgpath> const& pkgpaths) {
 
-        guarded<check_result> res;
-        nursery n;
-        for (pkgpath const& path: pkgpaths) {
+        pkgxx::guarded<check_result> res;
+        pkgxx::nursery n;
+        for (pkgxx::pkgpath const& path: pkgpaths) {
             n.start_soon(
                 [&]() {
                     // Find the set of latest PKGNAMEs provided by this
                     // PKGPATH. Most PKGPATHs have just one corresponding
                     // PKGNAME but some (py-*) have more.
-                    std::set<pkgname> const latest_pkgnames
+                    std::set<pkgxx::pkgname> const latest_pkgnames
                         = opts.build_from_source
                         ? latest_pkgnames_from_source(opts, env, path)
                         : latest_pkgnames_from_binary(opts, env, path);
@@ -175,8 +183,9 @@ namespace pkg_chk {
                     }
 
                     auto const& installed_pkgnames = env.installed_pkgnames.get();
-                    for (pkgname const& name: latest_pkgnames) {
-                        if (auto installed = installed_pkgnames.lower_bound(pkgname(name.base, pkgversion()));
+                    for (pkgxx::pkgname const& name: latest_pkgnames) {
+                        if (auto installed = installed_pkgnames.lower_bound(
+                                pkgxx::pkgname(name.base, pkgxx::pkgversion()));
                             installed != installed_pkgnames.end() && installed->base == name.base) {
 
                             if (installed->version == name.version) {
@@ -184,19 +193,19 @@ namespace pkg_chk {
                                 // installed. Good, but that's not enough
                                 // if -B is given.
                                 if (opts.check_build_version) {
-                                    std::optional<build_version> latest_build_version;
+                                    std::optional<pkgxx::build_version> latest_build_version;
                                     if (opts.use_binary_pkgs && !opts.build_from_source) {
                                         if (auto const file = env.binary_package_file_of(name); file) {
                                             latest_build_version =
-                                                build_version::from_binary(env.PKG_INFO.get(), *file);
+                                                pkgxx::build_version::from_binary(env.PKG_INFO.get(), *file);
                                         }
                                     }
                                     else {
                                         latest_build_version =
-                                            build_version::from_source(env.PKGSRCDIR.get(), path);
+                                            pkgxx::build_version::from_source(env.PKGSRCDIR.get(), path);
                                     }
-                                    std::optional<build_version> const installed_build_version =
-                                        build_version::from_installed(env.PKG_INFO.get(), *installed);
+                                    auto const installed_build_version =
+                                        pkgxx::build_version::from_installed(env.PKG_INFO.get(), *installed);
                                     assert(installed_build_version.has_value());
 
                                     if (latest_build_version.has_value()) {

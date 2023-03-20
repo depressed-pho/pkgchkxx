@@ -1,12 +1,15 @@
 *~
 *.cache
 *.core
+*.la
+*.lo
 *.log
 *.scan
 *.o
 ktrace.out
 
 .deps
+.libs
 Makefile
 Makefile.in
 aclocal.m4

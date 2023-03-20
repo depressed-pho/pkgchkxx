@@ -1,4 +1,5 @@
-#include "string_algo.hxx"
+#include <pkgxx/string_algo.hxx>
+
 #include "tag.hxx"
 
 namespace pkg_chk {
@@ -43,7 +44,7 @@ namespace pkg_chk {
             negative = false;
             tags     = pattern;
         }
-        for (const auto& t: words(tags, "+")) {
+        for (const auto& t: pkgxx::words(tags, "+")) {
             tags_and.emplace_back(t);
         }
     }
