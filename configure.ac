@@ -35,10 +35,16 @@ AC_LANG_PUSH([C++])
 AX_APPEND_COMPILE_FLAGS([ dnl
     -Wall dnl
     -Wextra dnl
-    -Wsuggest-attribute=noreturn dnl
+    -Wconversion dnl
+    -Wsuggest-attribute=cold dnl
+    -Wsuggest-attribute=const dnl
     -Wsuggest-attribute=format dnl
+    -Wsuggest-attribute=noreturn dnl
+    -Wsuggest-attribute=pure dnl
     -Wsuggest-override dnl
     -Werror=return-type dnl
+    -Wnull-dereference dnl
+    -Wuninitialized dnl
 ])
 AC_LANG_POP([C++])
 

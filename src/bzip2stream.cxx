@@ -70,7 +70,7 @@ namespace pkg_chk {
 
                 if (auto avail = _base->in_avail(); avail > 0) {
                     auto const n_read = _base->sgetn(_bunzip2_in->data(), _bunzip2_in->size());
-                    _bunzip2.avail_in = n_read;
+                    _bunzip2.avail_in = static_cast<unsigned>(n_read);
                 }
                 else {
                     // The base streambuf can't provide us any data without
@@ -88,7 +88,7 @@ namespace pkg_chk {
             }
 
             _bunzip2.next_out  = _bunzip2_out->data();
-            _bunzip2.avail_out = _bunzip2_out->size();
+            _bunzip2.avail_out = static_cast<unsigned>(_bunzip2_out->size());
             auto const res = BZ2_bzDecompress(&_bunzip2);
             switch (res) {
             case BZ_OK:

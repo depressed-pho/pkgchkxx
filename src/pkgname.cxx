@@ -18,7 +18,7 @@ namespace {
 
     inline char
     ascii_tolower(char c) noexcept {
-        return (c >= 'A' && c <= 'Z') ? c - 'A' + 'a' : c;
+        return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
     }
 
     template <typename Iter>

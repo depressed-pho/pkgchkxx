@@ -38,7 +38,7 @@ namespace pkg_chk {
 
                 if (auto avail = _base->in_avail(); avail > 0) {
                     auto const n_read = _base->sgetn(_inflate_in->data(), _inflate_in->size());
-                    _inflate.avail_in = n_read;
+                    _inflate.avail_in = static_cast<uInt>(n_read);
                 }
                 else {
                     // The base streambuf can't provide us any data without
@@ -56,7 +56,7 @@ namespace pkg_chk {
             }
 
             _inflate.next_out  = reinterpret_cast<Bytef*>(_inflate_out->data());
-            _inflate.avail_out = _inflate_out->size();
+            _inflate.avail_out = static_cast<uInt>(_inflate_out->size());
             switch (inflate(&_inflate, Z_SYNC_FLUSH)) {
             case Z_OK:
                 if (_inflate.avail_out < _inflate_out->size()) {
