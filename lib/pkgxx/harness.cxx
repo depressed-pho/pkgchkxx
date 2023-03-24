@@ -62,8 +62,8 @@ namespace pkgxx {
 
         env_mod(_env);
         std::vector<std::string> envp;
-        for (auto const& env_pair: _env) {
-            envp.emplace_back(env_pair.first + "=" + env_pair.second);
+        for (auto const& [name, value]: _env) {
+            envp.emplace_back(name + "=" + value);
         }
 
         auto const msg_fds    = cpipe(true);

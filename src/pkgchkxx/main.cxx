@@ -10,6 +10,7 @@
 #include <iomanip>
 #include <iostream>
 #include <regex>
+#include <tuple>
 
 #include <pkgxx/config.h>
 #include <pkgxx/harness.hxx>
@@ -253,11 +254,11 @@ namespace {
             // dependencies, which means we can't run it parallelly without
             // the risk of race condition.
             msg(opts) << "Fetching distfiles" << std::endl;
-            for (auto const& missing: res.MISSING_TODO) {
+            for (auto const& [name, path]: res.MISSING_TODO) {
                 // Packages previously marked as MISMATCH_TODO have been
                 // moved to MISSING_TODO at this point.
-                if (!try_fetch(opts, env, missing.second)) {
-                    FAILED_DONE.insert(missing.first);
+                if (!try_fetch(opts, env, path)) {
+                    FAILED_DONE.insert(name);
                 }
             }
         }
@@ -265,12 +266,12 @@ namespace {
         std::set<pkgxx::pkgname> INSTALL_DONE;
         if ((opts.add_missing || opts.update) && !res.MISSING_TODO.empty()) {
             msg(opts) << "Installing packages" << std::endl;
-            for (auto const& missing: res.MISSING_TODO) {
-                if (try_install(opts, env, missing.first, missing.second)) {
-                    INSTALL_DONE.insert(missing.first);
+            for (auto const& [name, path]: res.MISSING_TODO) {
+                if (try_install(opts, env, name, path)) {
+                    INSTALL_DONE.insert(name);
                 }
                 else {
-                    FAILED_DONE.insert(missing.first);
+                    FAILED_DONE.insert(name);
                 }
             }
         }
@@ -381,9 +382,9 @@ namespace {
             if (auto pkgbases = pm.find(path); pkgbases != pm.end()) {
                 // For each PKGBASE that correspond to this PKGPATH, find
                 // the latest binary package and schedule it for listing.
-                for (auto const& base: pkgbases->second) {
-                    auto latest = base.second.rbegin();
-                    assert(latest != base.second.rend());
+                for (auto const& [_base, sum]: pkgbases->second) {
+                    auto latest = sum.rbegin();
+                    assert(latest != sum.rend());
 
                     if (env.is_binary_available(latest->first)) {
                         to_list->insert(*latest);
@@ -400,15 +401,12 @@ namespace {
         }
 
         while (!to_list->empty()) {
-            for (auto const& pair: *to_list) {
-                seen.insert(pair.first);
+            for (auto const& [name, _vars]: *to_list) {
+                seen.insert(name);
             }
 
             auto scheduled = std::make_unique<std::map<pkgname_cref, pkgxx::pkgvars const&>>();
-            for (auto const& pair: *to_list) {
-                pkgxx::pkgname const& name = pair.first;
-                pkgxx::pkgvars const& vars = pair.second;
-
+            for (auto const& [name, vars]: *to_list) {
                 verbose(opts) << vars.PKGPATH << ": " << name << std::endl;
                 for (auto const& dep_pattern: vars.DEPENDS) {
                     verbose(opts) << "    depends on " << dep_pattern << ": ";

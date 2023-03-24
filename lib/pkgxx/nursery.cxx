@@ -31,11 +31,11 @@ namespace pkgxx {
                 // task_finished(), which locks our mutex, we must unlock
                 // it to avoid deadlock.
                 lk.unlock();
-                for (auto& w: _workers) {
-                    w.second->async_terminate();
+                for (auto& [_id, w]: _workers) {
+                    w->async_terminate();
                 }
-                for (auto& w: _workers) {
-                    w.second->join();
+                for (auto& [_id, w]: _workers) {
+                    w->join();
                 }
                 // No need to worry about this lock() being skipped when
                 // join() throws.

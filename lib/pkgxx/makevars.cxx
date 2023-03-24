@@ -29,8 +29,8 @@ namespace pkgxx {
             std::vector<std::string> argv = {
                 CFG_BMAKE, "-f", "-", "-f", makeconf, "x"
             };
-            for (auto const& pair: assignments) {
-                argv.push_back(pair.first + '=' + pair.second);
+            for (auto const& [var, value]: assignments) {
+                argv.push_back(var + '=' + value);
             }
             harness make(CFG_BMAKE, argv);
 
@@ -76,8 +76,8 @@ namespace pkgxx {
             std::vector<std::string> argv = {
                 CFG_BMAKE, "-f", "-", "-f", "Makefile", "x"
             };
-            for (auto const& pair: assignments) {
-                argv.push_back(pair.first + '=' + pair.second);
+            for (auto const& [var, value]: assignments) {
+                argv.push_back(var + '=' + value);
             }
             harness make(CFG_BMAKE, argv, pkgdir);
 

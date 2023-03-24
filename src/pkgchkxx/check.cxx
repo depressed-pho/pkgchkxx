@@ -135,10 +135,10 @@ namespace {
                 // installed, otherwise -a would install every single
                 // PKGNAME that the PKGPATH provides.
                 auto const& installed_pkgbases = env.installed_pkgbases.get();
-                for (auto const& base: pkgbases->second) {
-                    if (installed_pkgbases.find(base.first) != installed_pkgbases.end()) {
-                        auto latest = base.second.rbegin();
-                        assert(latest != base.second.rend());
+                for (auto const& [base, sum]: pkgbases->second) {
+                    if (installed_pkgbases.find(base) != installed_pkgbases.end()) {
+                        auto latest = sum.rbegin();
+                        assert(latest != sum.rend());
 
                         pkgnames.insert(latest->first);
                     }

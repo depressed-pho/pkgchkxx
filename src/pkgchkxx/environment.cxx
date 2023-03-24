@@ -127,8 +127,8 @@ namespace pkg_chk {
                     }
 
                     auto value_of = pkgxx::extract_mkconf_vars(MAKECONF.get(), vars).value();
-                    for (auto const& pair: value_of) {
-                        verbose_var(opts, pair.first, pair.second);
+                    for (auto const& [var, value]: value_of) {
+                        verbose_var(opts, var, value);
                     }
 
                     vPKGSRCDIR = value_of["PKGSRCDIR"];
@@ -199,8 +199,8 @@ namespace pkg_chk {
                 else if (MAKECONF.get() != "/dev/null") {
                     value_of = pkgxx::extract_mkconf_vars(MAKECONF.get(), vars).value();
                 }
-                for (auto const& pair: value_of) {
-                    verbose_var(opts, pair.first, pair.second);
+                for (auto const& [var, value]: value_of) {
+                    verbose_var(opts, var, value);
                 }
                 _menv.PACKAGES           =
                     opts.bin_pkg_path.empty()
@@ -284,8 +284,8 @@ namespace pkg_chk {
                         "MACHINE_ARCH"
                     };
                     auto value_of = pkgxx::extract_pkgmk_vars(pkgpath, vars).value();
-                    for (auto const& pair: value_of) {
-                        verbose_var(opts, pair.first, pair.second);
+                    for (auto const& [var, value]: value_of) {
+                        verbose_var(opts, var, value);
                     }
                     _penv.OPSYS        = value_of["OPSYS"       ];
                     _penv.OS_VERSION   = value_of["OS_VERSION"  ];
@@ -393,8 +393,8 @@ namespace pkg_chk {
             std::launch::deferred,
             [this]() {
                 std::map<pkgxx::pkgpath, std::set<pkgxx::pkgname>> ret;
-                for (auto const& pair: installed_pkg_summary.get()) {
-                    ret[pair.second.PKGPATH].insert(pair.first);
+                for (auto const& [name, vars]: installed_pkg_summary.get()) {
+                    ret[vars.PKGPATH].insert(name);
                 }
                 return ret;
             }).share();

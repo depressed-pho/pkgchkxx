@@ -118,8 +118,8 @@ namespace pkgxx {
 
     std::ostream&
     operator<< (std::ostream& out, build_version const& bv) {
-        for (auto const& pair: bv) {
-            out << pair.first.string() << ": " << pair.second << std::endl;
+        for (auto const& [file, tag]: bv) {
+            out << file.string() << ": " << tag << std::endl;
         }
         return out;
     }
