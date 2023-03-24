@@ -4,7 +4,7 @@
 AC_PREREQ([2.71])
 AC_INIT([pkgchkxx], [0.1], [pkgsrc-users@NetBSD.org])
 AC_CONFIG_MACRO_DIR([m4])
-AC_CONFIG_SRCDIR([src/main.cxx])
+AC_CONFIG_SRCDIR([lib/pkgxx/pkgname.hxx])
 AC_CONFIG_HEADERS([lib/pkgxx/config.h])
 
 LT_PREREQ([2.4.7])
@@ -60,6 +60,8 @@ AC_DEFINE_UNQUOTED([CFG_PKG_CONFIG], ["$PKG_CONFIG"], [Define to the path to pkg
 AC_DEFINE_UNQUOTED([CFG_PKG_CONFIG_LIBDIR], ["$PKG_CONFIG_LIBDIR"], [Define to the list of primary directories where `.pc' files are looked up.])
 AC_DEFINE_UNQUOTED([CFG_PKG_CONFIG_PATH], ["$PKG_CONFIG_PATH"], [Define to the list of secondary directories where `.pc' files are looked up.])
 
+AX_DOXYGEN
+
 # Checks for libraries.
 AX_CXX_STD_FILESYSTEM
 AX_CXX_STD_THREAD
@@ -85,8 +87,11 @@ AC_FUNC_FORK
 
 AC_CONFIG_FILES([
     Makefile
+    doc/Makefile
+    doc/Doxyfile
     lib/Makefile
     lib/pkgxx/Makefile
     src/Makefile
+    src/pkgchkxx/Makefile
 ])
 AC_OUTPUT

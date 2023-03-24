@@ -8,17 +8,24 @@
 #include <bzlib.h>
 
 namespace pkgxx {
-    /** Currently only supports reading operations. */
+    /** A stream buffer that works with bzip2-compressed data. Currently
+     * only supports reading operations.
+     */
     struct bunzip2streambuf: public std::streambuf {
+        /** Construct a stream buffer that reads bzip2-compressed data from
+         * another stream buffer.
+         */
         bunzip2streambuf(std::streambuf* base);
         virtual ~bunzip2streambuf();
 
     protected:
+#if !defined(DOXYGEN)
         virtual int_type
         underflow() override;
 
         virtual int_type
         pbackfail(int_type ch = traits_type::eof()) override;
+#endif
 
     private:
         static constexpr int const buf_size = 1024;
@@ -33,9 +40,11 @@ namespace pkgxx {
         std::optional<buffer_t> _bunzip2_out;
     };
 
+    /** An input stream that reads bzip2-compressed data.
+     */
     struct bunzip2istream: public std::istream {
         /** Construct an input stream that reads bzip2-compressed data from
-         * an underlying istream.
+         * another input stream.
          */
         bunzip2istream(std::istream& base)
             : std::istream(nullptr) {
@@ -46,6 +55,8 @@ namespace pkgxx {
             }
         }
 
+        /** Construct an instance of \ref bunzip2istream by moving a buffer
+         * out of another instance. */
         bunzip2istream(bunzip2istream&& other)
             : std::istream(std::move(other))
             , _buf(std::move(other._buf)) {

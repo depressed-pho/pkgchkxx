@@ -8,18 +8,23 @@
 #include <zlib.h>
 
 namespace pkgxx {
-    /** Currently only supports reading operations.
+    /** A stream buffer that works with gzipped data. Currently only
+     * supports reading operations.
      */
     struct gunzipstreambuf: public std::streambuf {
+        /** Construct a stream buffer reading gzipped data from another
+         * stream buffer. */
         gunzipstreambuf(std::streambuf* base);
         virtual ~gunzipstreambuf();
 
     protected:
+#if !defined(DOXYGEN)
         virtual int_type
         underflow() override;
 
         virtual int_type
         pbackfail(int_type ch = traits_type::eof()) override;
+#endif
 
     private:
         static constexpr int const buf_size = 1024;
@@ -34,9 +39,11 @@ namespace pkgxx {
         std::optional<buffer_t> _inflate_out;
     };
 
+    /** An input stream that reads gzipped data.
+     */
     struct gunzipistream: public std::istream {
         /** Construct an input stream that reads gzip-compressed data from
-         * an underlying istream.
+         * an another istream.
          */
         gunzipistream(std::istream& base)
             : std::istream(nullptr) {
@@ -47,6 +54,8 @@ namespace pkgxx {
             }
         }
 
+        /** Construct an instance of \ref gunzipistream by moving a buffer
+         * out of another instance. */
         gunzipistream(gunzipistream&& other)
             : std::istream(std::move(other))
             , _buf(std::move(other._buf)) {

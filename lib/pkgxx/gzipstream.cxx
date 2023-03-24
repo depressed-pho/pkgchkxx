@@ -20,6 +20,7 @@ namespace pkgxx {
         inflateEnd(&_inflate);
     }
 
+#if !defined(DOXYGEN)
     gunzipstreambuf::int_type
     gunzipstreambuf::underflow() {
         if (eback() == nullptr) {
@@ -99,7 +100,9 @@ namespace pkgxx {
 
         return traits_type::eof();
     }
+#endif
 
+#if !defined(DOXYGEN)
     gunzipstreambuf::int_type
     gunzipstreambuf::pbackfail(int_type ch) {
         if (!traits_type::eq_int_type(ch, traits_type::eof()) &&
@@ -116,4 +119,5 @@ namespace pkgxx {
             return traits_type::eof();
         }
     }
+#endif
 }

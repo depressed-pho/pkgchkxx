@@ -20,14 +20,17 @@ namespace pkgxx {
 
     /** Currently only supports reading operations. */
     struct wwwstreambuf: public std::streambuf {
+        /// Construct a stream buffer that reads data from a URL.
         wwwstreambuf(std::string const& url);
 
     protected:
+#if !defined(DOXYGEN)
         virtual int_type
         underflow() override;
 
         virtual int_type
         pbackfail(int_type ch = traits_type::eof()) override;
+#endif
 
     private:
         struct fetchIO_deleter {
@@ -44,9 +47,10 @@ namespace pkgxx {
         std::optional<buffer_t> _read_buf;
     };
 
-    /* A subclass of std::istream that fetches a resource with URL.
+    /** An input stream that fetches a resource with URL.
      */
     struct wwwistream: public std::istream {
+        /// Construct an input stream that reads data from a URL.
         wwwistream(std::string const& url)
             : std::istream(nullptr)
             , _buf(std::make_unique<wwwstreambuf>(url)) {
@@ -54,6 +58,8 @@ namespace pkgxx {
             rdbuf(_buf.get());
         }
 
+        /// Construct an instance of \ref wwwistream by moving a buffer out
+        /// of another instance.
         wwwistream(wwwistream&& other)
             : std::istream(std::move(other))
             , _buf(std::move(other._buf)) {

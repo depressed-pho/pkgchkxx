@@ -241,6 +241,7 @@ namespace pkgxx {
         }
     }
 
+#if !defined(DOXYGEN)
     command_error::command_error(
         std::string&& cmd_,
         std::vector<std::string>&& argv_,
@@ -257,7 +258,9 @@ namespace pkgxx {
                 [this]() {
                     return "Command arguments were: " + stringify_argv(argv);
                 }).share()) {}
+#endif
 
+#if !defined(DOXYGEN)
     failed_to_spawn_process::failed_to_spawn_process(
         command_error&& ce,
         std::string&& msg_)
@@ -271,13 +274,17 @@ namespace pkgxx {
                        << command_error::what();
                     return ss.str();
                 }).share()) {}
+#endif
 
+#if !defined(DOXYGEN)
     process_terminated_unexpectedly::process_terminated_unexpectedly(
         command_error&& ce,
         pid_t pid_)
         : command_error(std::move(ce))
         , pid(pid_) {}
+#endif
 
+#if !defined(DOXYGEN)
     process_died_of_signal::process_died_of_signal(
         process_terminated_unexpectedly&& ptu,
         harness::signaled const& st_)
@@ -294,7 +301,9 @@ namespace pkgxx {
                        << process_terminated_unexpectedly::what();
                     return ss.str();
                 }).share()) {}
+#endif
 
+#if !defined(DOXYGEN)
     process_exited_for_failure::process_exited_for_failure(
         process_terminated_unexpectedly&& ptu,
         harness::exited const& st_)
@@ -310,4 +319,5 @@ namespace pkgxx {
                        << process_terminated_unexpectedly::what();
                     return ss.str();
                 }).share()) {}
+#endif
 }

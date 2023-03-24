@@ -27,6 +27,8 @@ ltmain.sh
 m4/libtool.m4
 m4/lt*.m4
 missing
-stamp-h1
+stamp-*
 
-src/pkg_chk
+doc/Doxyfile
+doc/_output
+src/pkgchkxx/pkgchkxx

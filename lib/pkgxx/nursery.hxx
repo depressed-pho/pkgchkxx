@@ -14,17 +14,17 @@
 #include <utility>
 
 namespace pkgxx {
-    /* An implementation of structured concurrency:
+    /** An implementation of structured concurrency:
      * https://vorpus.org/blog/notes-on-structured-concurrency-or-go-statement-considered-harmful/
      */
     struct nursery {
-        /* Create a nursery with a given maximum concurrency. It is
+        /** Create a nursery with a given maximum concurrency. It is
          * typically the number of available CPUs.
          */
         nursery(unsigned concurrency
                     = std::max(1u, std::thread::hardware_concurrency()));
 
-        /* Block until all the registered child tasks finish.
+        /** Block until all the registered child tasks finish.
          *
          * This is a memory barrier. Whatever memory values children tasks
          * could see before terminating can also be seen by the thread
@@ -32,24 +32,24 @@ namespace pkgxx {
          */
         ~nursery() noexcept(false);
 
-        /* Register a child task to a nursery. The supplied function will
-         * run in a separate thread. It is guaranteed to be started before
-         * the destructor of nursery returns.
+        /** Register a child task to a \ref nursery. The supplied function
+         * will run in a separate thread. It is guaranteed to be started
+         * before the destructor of nursery returns.
          *
-         * nursery does not spawn a separate thread for each child
-         * task. Instead it creates a pool of threads and reuse them.
+         * \ref nursery does not spawn a separate thread for each child
+         * task. Instead it creates a pool of threads and reuses them.
          *
          * If a child task throws an exception, it will be caught by the
-         * nursery and rethrown from either its destructor or the next call
-         * of start_soon(). No attempts will be made to kill any running
-         * children in this case, that is, the rethrowing will not happen
-         * until every ongoing task stops running by either finishing or
-         * throwing an exception. If more than one child throws an
-         * exception, only the first one will be rethrown and others will
-         * be discarded.
+         * \ref nursery and rethrown from either its destructor or the next
+         * call of \ref start_soon(). No attempts will be made to kill any
+         * running children in this case, that is, the rethrowing will not
+         * happen until every ongoing task stops running by either
+         * finishing or throwing an exception. If more than one child
+         * throws an exception, only the first one will be rethrown and
+         * others will be discarded.
          *
-         * You may create a nested nursery in the task, but the concurrency
-         * isn't coordinated with the parent nursery.
+         * You may create a nested \ref nursery in the task, but the
+         * concurrency isn't coordinated with the parent \ref nursery.
          *
          * This is a memory barrier. Whatever memory values the thread
          * calling this function can also be seen by the child task.

@@ -21,6 +21,7 @@ namespace pkgxx {
         return this;
     }
 
+#if !defined(DOXYGEN)
     fdstreambuf::int_type
     fdstreambuf::overflow(int_type ch) {
         if (pbase() == nullptr) {
@@ -57,7 +58,9 @@ namespace pkgxx {
 
         return ch;
     }
+#endif
 
+#if !defined(DOXYGEN)
     fdstreambuf::int_type
     fdstreambuf::underflow() {
         if (eback() == nullptr) {
@@ -84,7 +87,9 @@ namespace pkgxx {
 
         return traits_type::to_int_type(*gptr());
     }
+#endif
 
+#if !defined(DOXYGEN)
     fdstreambuf::int_type
     fdstreambuf::pbackfail(int_type ch) {
         if (!traits_type::eq_int_type(ch, traits_type::eof()) &&
@@ -101,4 +106,5 @@ namespace pkgxx {
             return traits_type::eof();
         }
     }
+#endif
 }

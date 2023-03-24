@@ -27,34 +27,45 @@ namespace pkgxx {
         }
     }
 
+    /** A class that represents a package name pattern.
+     */
     struct pkgpattern {
-        /// csh-style alternatives: foo{bar,{baz,qux}}
-        struct alternatives {
+        /// csh-style alternatives, e.g. \c foo{bar,{baz,qux}}
+        class alternatives {
+        public:
             alternatives() {}
+
+            /// Parse a string representation of alternatives.
             alternatives(std::string_view const& patstr);
 
-            using value_type     = pkgpattern;
-            using iterator       = std::vector<pkgpattern>::const_iterator;
+            /// The const iterator that iterates through alternative
+            /// patterns.
             using const_iterator = std::vector<pkgpattern>::const_iterator;
 
+            /// Return an iterator to the beginning of alternatives.
             const_iterator
             begin() const {
                 return _expanded.begin();
             }
 
+            /// Return an iterator to the end of alternatives.
             const_iterator
             end() const {
                 return _expanded.end();
             }
 
+            /// Obtain a string representation of alternatives.
             operator std::string const& () const noexcept {
                 return _original;
             }
 
+            /// \sa pkgpattern::for_each
             template <typename Set, typename Function>
             void
             for_each(Set&& s, Function&& f) const;
 
+            /// Print a string representation of alternatives to an output
+            /// stream.
             friend std::ostream&
             operator<< (std::ostream& out, alternatives const& alts);
 
@@ -63,137 +74,165 @@ namespace pkgxx {
             std::vector<pkgpattern> _expanded;
         };
 
-        /// Version constraints: foo>=1.1<2
+        /// Version constraints, e.g. \c foo>=1.1<2
         struct version_range {
-            /// <=
+            /// \c <=
             struct le: public pkgversion {
+                /// \sa pkgpattern::for_each
                 template <typename Set, typename Function>
                 void
                 for_each(Set&& s, Function&& f, pkgbase const& base) const;
 
+                /// Print a version constraint to an output stream.
                 friend std::ostream&
                 operator<< (std::ostream& out, le const& ver) {
                     return out << "<=" << static_cast<pkgversion const&>(ver);
                 }
             };
-            /// <
+            /// \c <
             struct lt: public pkgversion {
+                /// \sa pkgpattern::for_each
                 template <typename Set, typename Function>
                 void
                 for_each(Set&& s, Function&& f, pkgbase const& base) const;
 
+                /// Print a version constraint to an output stream.
                 friend std::ostream&
                 operator<< (std::ostream& out, lt const& ver) {
                     return out << '<' << static_cast<pkgversion const&>(ver);
                 }
             };
-            /// >=
+            /// \c >=
             struct ge {
+                /// \sa pkgpattern::for_each
                 template <typename Set, typename Function>
                 void
                 for_each(Set&& s, Function&& f, pkgbase const& base) const;
 
+                /// Print a version constraint to an output stream.
                 friend std::ostream&
                 operator<< (std::ostream& out, ge const& ver);
 
-                pkgversion min; /// >=1.1
+                pkgversion min; ///< \c >=1.1
                 std::optional<
                     std::variant<
-                        le,     /// >=1.1<=2
-                        lt      /// >=1.1<2
-                        >> sup; /// Actually a maximum if it's le.
+                        le,     // >=1.1<=2
+                        lt      // >=1.1<2
+                        >> sup; ///< Actually a maximum if it's \ref le.
             };
-            /// >
+            /// \c >
             struct gt {
+                /// \sa pkgpattern::for_each
                 template <typename Set, typename Function>
                 void
                 for_each(Set&& s, Function&& f, pkgbase const& base) const;
 
+                /// Print a version constraint to an output stream.
                 friend std::ostream&
                 operator<< (std::ostream& out, gt const& ver);
 
-                pkgversion inf; /// >1.1
+                pkgversion inf; ///< \c >1.1
                 std::optional<
                     std::variant<
-                        le,     /// >1.1<=2
-                        lt      /// >1.1<2
-                        >> sup; /// Actually a maximum if it's le.
+                        le,     // >1.1<=2
+                        lt      // >1.1<2
+                        >> sup; ///< Actually a maximum if it's \ref le.
             };
-            /// ==
+            /// \c ==
             struct eq: public pkgversion {
+                /// \sa pkgpattern::for_each
                 template <typename Set, typename Function>
                 void
                 for_each(Set&& s, Function&& f, pkgbase const& base) const;
 
+                /// Print a version constraint to an output stream.
                 friend std::ostream&
                 operator<< (std::ostream& out, eq const& ver) {
                     return out << "==" << static_cast<pkgversion const&>(ver);
                 }
             };
-            /// !=
+            /// \c !=
             struct ne: public pkgversion {
+                /// \sa pkgpattern::for_each
                 template <typename Set, typename Function>
                 void
                 for_each(Set&& s, Function&& f, pkgbase const& base) const;
 
+                /// Print a version constraint to an output stream.
                 friend std::ostream&
                 operator<< (std::ostream& out, ne const& ver) {
                     return out << "!=" << static_cast<pkgversion const&>(ver);
                 }
             };
+            /// Possible variants of version constraints.
             using constraint = std::variant<le, lt, ge, gt, eq, ne>;
 
+            /// Parse a string representation of version constraints.
             version_range(std::string_view const& patstr);
 
+            /// \sa pkgpattern::for_each
             template <typename Set, typename Function>
             void
             for_each(Set&& s, Function&& f) const;
 
+            /// Print the version constraints to an output stream.
             friend std::ostream&
             operator<< (std::ostream& out, version_range const& ver);
 
-            pkgbase base;
-            constraint cst;
+            pkgbase base;   ///< The base name of package, e.g. \c foo
+            constraint cst; ///< The version constraints, e.g. \c >=1.1<2
         };
 
         /// Glob pattern: foo-[0-9]*
         struct glob: std::string {
+            /// \sa pkgpattern::for_each
             template <typename Set, typename Function>
             void
             for_each(Set&& s, Function&& f) const;
         };
 
+        /// Possible variants of package name patterns.
         using pattern_type = std::variant<
             alternatives,
             version_range,
             glob
             >;
 
+        /// Parse a package name pattern string.
         pkgpattern(std::string_view const& patstr);
 
-        /** Apply a function "f" to each package matching to the pattern in
-         * a set "s". The set is expected to be std::set<pkgname> or
-         * std::map<pkgname, (anything)>. The function will be called with
-         * one argument, namely Set::value_type& (or const& if "s" is
-         * const).
+        /** Apply a function \c f to each package matching to the pattern
+         * in a set \c s. The set is expected to either be \c
+         * std::set<pkgname> or <tt>std::map<pkgname, (anything)></tt>. The
+         * function will be called with one argument, namely \c
+         * Set::value_type& (or \c const& if \c s is \c const).
          */
         template <typename Set, typename Function>
         void
         for_each(Set&& s, Function&& f) const;
 
-        /** Return Set::iterator (or Set::const_iterator if "s" is const)
-         * for the best matching package that is found in a set "s". The
-         * set is expected to be std::set<pkgname> or std::map<pkgname,
-         * (anything)>. If no packages match the method returns m.end().
+        /** Return \c Set::iterator (or \c Set::const_iterator if \c s is
+         * \c const) for the best matching package that is found in a set
+         * \c s. The set is expected to either be \c std::set<pkgname> or
+         * <tt>std::map<pkgname, (anything)></tt>. If no packages match the
+         * method returns <tt>s.end()</tt>.
          */
         template <typename Set>
         auto
         best(Set&& s) const;
 
+        /// Turn an instance of \ref pkgpattern into a variant type.
+        operator pattern_type () const {
+            return _pat;
+        }
+
+        /// Print a string representation of \ref pkgpattern to an output
+        /// stream.
         friend std::ostream&
         operator<< (std::ostream& out, pkgpattern const& pat);
 
-        pattern_type pattern;
+    private:
+        pattern_type _pat;
     };
 
     //
@@ -359,7 +398,7 @@ namespace pkgxx {
             [&](auto const& pat) {
                 pat.for_each(s, f);
             },
-            pattern);
+            _pat);
     }
 
     template <typename Set>

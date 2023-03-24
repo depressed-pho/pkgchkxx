@@ -466,8 +466,8 @@ namespace pkg_chk {
         auto const& sum = bin_pkg_summary.get();
 
         if (auto it = sum.find(name); it != sum.end()) {
-            if (it->second.FILENAME) {
-                return PACKAGES.get() / *(it->second.FILENAME);
+            if (it->second.FILE_NAME) {
+                return PACKAGES.get() / *(it->second.FILE_NAME);
             }
             else {
                 auto file = PACKAGES.get() / name.string();

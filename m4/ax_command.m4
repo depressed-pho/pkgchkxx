@@ -6,6 +6,7 @@ AC_DEFUN([AX_COMMAND], [
     AC_ARG_VAR(VARIABLE, [path to ]COMMAND[ command])
     AS_IF([test -z "$]VARIABLE["],
           [AC_PATH_PROG(VARIABLE, COMMAND, COMMAND)])
+    AC_SUBST(VARIABLE)
     AC_DEFINE_UNQUOTED([CFG_]VARIABLE, ["$]VARIABLE["], [Define to the path to ]COMMAND[ command.])
 
     m4_popdef([COMMAND])

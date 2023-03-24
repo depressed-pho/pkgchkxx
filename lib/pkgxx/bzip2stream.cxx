@@ -52,6 +52,7 @@ namespace pkgxx {
         BZ2_bzDecompressEnd(&_bunzip2);
     }
 
+#if !defined(DOXYGEN)
     bunzip2streambuf::int_type
     bunzip2streambuf::underflow() {
         if (eback() == nullptr) {
@@ -131,7 +132,9 @@ namespace pkgxx {
 
         return traits_type::eof();
     }
+#endif
 
+#if !defined(DOXYGEN)
     bunzip2streambuf::int_type
     bunzip2streambuf::pbackfail(int_type ch) {
         if (!traits_type::eq_int_type(ch, traits_type::eof()) &&
@@ -148,4 +151,5 @@ namespace pkgxx {
             return traits_type::eof();
         }
     }
+#endif
 }

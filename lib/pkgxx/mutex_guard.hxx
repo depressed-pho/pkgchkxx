@@ -11,17 +11,24 @@ namespace pkgxx {
     template <typename T>
     class guarded {
     public:
+        /** A smart-pointer-like object containing a reference to some type
+         * \c T. The mutex is locked when the value of \ref mutex_guard is
+         * obtained, and it's unlocked when the value goes out of scope.
+         */
         class mutex_guard {
-        public:
+            friend class guarded;
             mutex_guard(guarded<T>& cell)
                 : _cell(&cell)
                 , _lk(cell._mtx) {}
 
+        public:
+            /** Obtain a mutable reference to the guarded value. */
             T&
             operator* () const {
                 return _cell->_val;
             }
 
+            /** Obtain a mutable pointer to the guarded value. */
             T*
             operator-> () const {
                 return &(_cell->_val);

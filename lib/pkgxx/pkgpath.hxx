@@ -12,14 +12,21 @@ namespace pkgxx {
         using std::runtime_error::runtime_error;
     };
 
+    /** A class that represents a PKGPATH; a pair of package category and a
+     * sub-directory.
+     */
     struct pkgpath {
         pkgpath() = delete;
+
+        /** Parse a PKGPATH string. */
         pkgpath(std::string_view const& dir);
 
+        /** Convert a PKGPATH into a relative \c path object. */
         operator std::filesystem::path () const {
             return std::filesystem::path(category) / subdir;
         }
 
+        /// \ref pkgpath equality.
         friend bool
         operator== (pkgpath const& a, pkgpath const& b) noexcept {
             return
@@ -27,6 +34,7 @@ namespace pkgxx {
                 a.subdir   == b.subdir;
         }
 
+        /// \ref pkgpath ordering.
         friend bool
         operator< (pkgpath const& a, pkgpath const& b) noexcept {
             if (a.category < b.category) {
@@ -39,13 +47,14 @@ namespace pkgxx {
             }
         }
 
+        /// Print the string representation of PKGPATH to an output stream.
         friend std::ostream&
         operator<< (std::ostream& out, pkgpath const& dir) {
             out << dir.category << '/' << dir.subdir;
             return out;
         }
 
-        std::string category;
-        std::string subdir;
+        std::string category; ///< Package category
+        std::string subdir;   ///< Package subdirectory
     };
 }

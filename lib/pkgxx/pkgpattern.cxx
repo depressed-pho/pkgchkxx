@@ -242,13 +242,13 @@ namespace pkgxx {
 
     pkgpattern::pkgpattern(std::string_view const& patstr) {
         if (patstr.find('{') != std::string_view::npos) {
-            pattern = alternatives(patstr);
+            _pat = alternatives(patstr);
         }
         else if (patstr.find_first_of("<>!=") != std::string_view::npos) {
-            pattern = version_range(patstr);
+            _pat = version_range(patstr);
         }
         else {
-            pattern = glob { std::string(patstr) };
+            _pat = glob { std::string(patstr) };
         }
     }
 
@@ -258,7 +258,7 @@ namespace pkgxx {
             [&](auto const& p) {
                 out << p;
             },
-            pat.pattern);
+            static_cast<pkgpattern::pattern_type const&>(pat));
         return out;
     }
 }

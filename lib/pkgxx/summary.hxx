@@ -12,11 +12,25 @@
 #include <pkgxx/pkgname.hxx>
 
 namespace pkgxx {
-    /** pkg_summary(5) variables. Things we don't use are omitted. */
+    /** \c pkg_summary(5) variables. Things we don't use are omitted for
+     * now. */
     struct pkgvars {
+        /** A set of patterns of packages the package depends on. The sole
+         * reason why this isn't a \c std::set or a \c std::unordered_set
+         * is that neither equality nor ordering can be meaningfully
+         * defined for \ref pkgpattern.
+         */
         std::vector<pkgpattern> DEPENDS;
-        std::optional<std::filesystem::path> FILENAME;
+
+        /** The name of the binary package file. If not given, \c
+         * PKGNAME.tgz can be assumed.
+         */
+        std::optional<std::filesystem::path> FILE_NAME;
+
+        /** The name of the package. */
         pkgname PKGNAME;
+
+        /** The path of the package directory within pkgsrc. */
         pkgpath PKGPATH;
     };
 
@@ -38,22 +52,27 @@ namespace pkgxx {
             std::string const& PKG_INFO,
             std::string const& PKG_SUFX);
 
+        /// Merge two summaries into one. The summary \c other will be
+        /// destroyed in the process.
         summary&
         operator+= (summary&& other) {
-            merge(other);
+            merge(std::move(other));
             return *this;
         }
     };
 
-    /** pkgmap is a map from PKGPATH to a subset of summary that contains
-     * only packages that correspond to that PKGPATH. The subset is further
-     * grouped by their PKGBASEs. This is because some PKGPATHs (like py-*)
-     * have more than a single PKGBASE, and we need to treat them as
+    /** A map from PKGPATH to a subset of summary that contains only
+     * packages that correspond to that PKGPATH. The subset is further
+     * grouped by their PKGBASEs. This is because some PKGPATHs (like \c
+     * py-*) have more than a single PKGBASE, and we need to treat them as
      * separate packages.
      */
     struct pkgmap: public std::map<pkgpath, std::map<pkgbase, summary>> {
         using std::map<pkgpath, std::map<pkgbase, summary>>::map;
 
+        /** Construct a \ref pkgmap from a summary of all the packages in
+         * interest.
+         */
         pkgmap(summary const& all_packages);
     };
 }

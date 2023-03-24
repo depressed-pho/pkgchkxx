@@ -7,15 +7,20 @@
 #include <pkgxx/ordered.hxx>
 
 namespace pkgxx {
+    /** An iterator that iterates through words in a string. */
     struct word_iterator: equality_comparable<word_iterator> {
-        using iterator_category = std::forward_iterator_tag;
-        using value_type        = std::string_view;
-        using pointer           = value_type*;
-        using reference         = value_type&;
+        using iterator_category = std::forward_iterator_tag; ///< The category of the iterator.
+        using value_type        = std::string_view;          ///< The value of the iterator.
+        using pointer           = value_type*;               ///< The pointer type of the iterator.
+        using reference         = value_type&;               ///< The reference type of the iterator.
 
+        /// Construct an invalid word iterator that acts as \c .end()
         word_iterator()
             : _source(nullptr) {}
 
+        /// Construct a word iterator pointing at the first word in a given
+        /// string. This class acts as a reference wrapper to the string.
+        /// That is, the constructor does not copy it.
         word_iterator(std::string_view const& source,
                       std::string      const& seps   = " \t")
             : _source(&source)
@@ -25,6 +30,7 @@ namespace pkgxx {
             update_current();
         }
 
+        /// Iterator equality.
         bool
         operator== (word_iterator const& other) const noexcept {
             if (_current.has_value()) {
@@ -35,17 +41,20 @@ namespace pkgxx {
             }
         }
 
+        /// Iterator dereference.
         reference
         operator* () {
             return _current.value();
         }
 
+        /// Iterator dereference.
         pointer
         operator-> () {
             _current.value();
             return _current.operator->();
         }
 
+        /// Iterator incrementation.
         word_iterator&
         operator++ () {
             _pos += _current.value().size();
@@ -54,6 +63,7 @@ namespace pkgxx {
             return *this;
         }
 
+        /// Iterator incrementation.
         word_iterator
         operator++ (int) {
             word_iterator it = *this;
@@ -86,19 +96,24 @@ namespace pkgxx {
 
     /// Split a string into words like shells do.
     struct words {
-        using iterator       = word_iterator const;
-        using const_iterator = iterator;
+        /// The const iterator that iterates through words in a string.
+        using const_iterator = word_iterator const;
 
+        /// Construct an instance of \ref words. This class acts as a
+        /// reference wrapper to the string given to the constructor. That
+        /// is, the constructor does not copy the given string.
         words(std::string_view const& str,
               std::string      const& seps = " \t")
             : _str(str)
             , _seps(seps) {}
 
+        /// Return an iterator to the first word.
         const_iterator
         begin() const noexcept {
             return word_iterator(_str, _seps);
         }
 
+        /// Return an iterator past the last word.
         const_iterator
         end() const noexcept {
             return word_iterator();
