@@ -13,6 +13,7 @@
 #include <tuple>
 
 #include <pkgxx/config.h>
+#include <pkgxx/graph.hxx>
 #include <pkgxx/harness.hxx>
 #include <pkgxx/pkgpath.hxx>
 #include <pkgxx/todo.hxx>
@@ -373,8 +374,7 @@ namespace {
 
         using pkgname_cref = std::reference_wrapper<pkgxx::pkgname const>;
         auto to_list = std::make_unique<std::map<pkgname_cref, pkgxx::pkgvars const&>>();
-        std::set<pkgname_cref> seen;
-        pkgxx::harness tsort(CFG_TSORT, {CFG_TSORT});
+        pkgxx::graph<pkgxx::pkgname> topology;
 
         for (auto const& path:
                  conf.pkgpaths(
@@ -402,7 +402,7 @@ namespace {
 
         while (!to_list->empty()) {
             for (auto const& [name, _vars]: *to_list) {
-                seen.insert(name);
+                topology.add_vertex(name);
             }
 
             auto scheduled = std::make_unique<std::map<pkgname_cref, pkgxx::pkgvars const&>>();
@@ -414,27 +414,22 @@ namespace {
                         pkgxx::pkgname const& dep = best->first;
 
                         verbose(opts) << dep << std::endl;
-                        tsort.cin() << dep << sufx << ' ' << name << sufx << std::endl;
-                        if (seen.count(dep) == 0) {
+                        if (!topology.has_vertex(dep)) {
                             scheduled->insert(*best);
-                            seen.insert(dep);
                         }
+                        topology.add_edge(name, dep);
                     }
                     else {
                         verbose(opts) << "(nothing matches)" << std::endl;
                         fatal_later(opts) << name << ": missing dependency " << dep_pattern << std::endl;
                     }
                 }
-
-                if (vars.DEPENDS.empty()) {
-                    tsort.cin() << name << sufx << ' ' << name << sufx << std::endl;
-                }
             }
             to_list.swap(scheduled);
         }
-        tsort.cin().close();
-        for (std::string line; std::getline(tsort.cout(), line); ) {
-            std::cout << line << std::endl;
+
+        for (auto name: topology.tsort()) {
+            std::cout << name << sufx << std::endl;
         }
     }
 }

@@ -21,7 +21,6 @@ AX_COMMAND([pkg_add])
 AX_COMMAND([pkg_admin])
 AX_COMMAND([pkg_delete])
 AX_COMMAND([pkg_info])
-AX_COMMAND([tsort])
 
 AC_ARG_VAR([MAKECONF], [path to mk.conf])
 AS_IF([test -n "$MAKECONF"],

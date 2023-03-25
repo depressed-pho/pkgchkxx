@@ -4,6 +4,7 @@ libpkgxx_la_SOURCES = \
 	build_version.hxx build_version.cxx \
 	bzip2stream.cxx bzip2stream.hxx \
 	fdstream.hxx fdstream.cxx \
+	graph.hxx \
 	gzipstream.cxx gzipstream.hxx \
 	harness.hxx harness.cxx \
 	makevars.cxx makevars.hxx \
