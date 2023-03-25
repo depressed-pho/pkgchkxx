@@ -1,6 +1,6 @@
 #pragma once
 
-#include <algorithm>
+#include <deque>
 #include <exception>
 #include <functional>
 #include <cassert>
@@ -12,6 +12,24 @@
 #include <vector>
 
 namespace pkgxx {
+    namespace detail {
+        // std::unwrap_ref_decay is a C++20 thing and we can't use it atm.
+        template <typename T>
+        struct unwrap_reference {
+            using type = T;
+        };
+        template <typename T>
+        struct unwrap_reference<std::reference_wrapper<T>> {
+            using type = T&;
+        };
+
+        template <typename T>
+        struct unwrap_ref_decay: unwrap_reference<std::decay_t<T>> {};
+
+        template <typename T>
+        using unwrap_ref_decay_t = typename unwrap_ref_decay<T>::type;
+    }
+
     /** A cycle has been detected while tsorting a graph. */
     template <typename T>
     struct not_a_dag: std::runtime_error {
@@ -35,6 +53,16 @@ namespace pkgxx {
      */
     template <typename T>
     struct graph {
+        /** The type of <tt>std::reference_wrapper<T const></tt>, works
+         * even when T is itself a reference wrapper.
+         */
+        using cref_wrapper_type =
+            std::reference_wrapper<
+                std::decay_t<
+                    detail::unwrap_ref_decay_t<T>
+                    > const
+            >;
+
         /** Add a vertex to the graph if it doesn't already exist. */
         void
         add_vertex(T const& v) {
@@ -53,11 +81,16 @@ namespace pkgxx {
             return _vertex_id_of.count(v) != 0;
         }
 
+        /** Compute the shortest path between two vertices, if such a path
+         * exists. */
+        std::optional<std::vector<cref_wrapper_type>>
+        shortest_path(T const& src, T const& dest) const;
+
         /** Perform a topological sort on the graph. Vertices that have no
          * out-edges will appear on the last. If it has a cycle \ref
          * not_a_dag will be thrown.
          */
-        std::vector<std::reference_wrapper<T const>>
+        std::vector<cref_wrapper_type>
         tsort() const;
 
     private:
@@ -72,12 +105,16 @@ namespace pkgxx {
         };
 
         enum class colour {
+            white, // unvisited vertices
             grey,  // visited but has unvisited edges
             black  // visited and has no unvisited edges
         };
 
         vertex_id
         add_vertex_impl(T const& v);
+
+        std::optional<std::vector<cref_wrapper_type>>
+        shortest_path_impl(vertex_id const& src, vertex_id const& dest) const;
 
         std::map<T, vertex_id> _vertex_id_of;
         std::map<vertex_id, vertex> _vertices;
@@ -130,57 +167,143 @@ namespace pkgxx {
     }
 
     template <typename T>
-    std::vector<std::reference_wrapper<T const>>
+    std::vector<typename graph<T>::cref_wrapper_type>
     graph<T>::tsort() const {
         std::map<vertex_id, colour> visited;
-        std::vector<vertex_id> stack;
-        std::vector<std::reference_wrapper<T const>> tsorted;
+        std::vector<cref_wrapper_type> tsorted;
+
+        for (auto const& [id, _v]: _vertices) {
+            visited[id] = colour::white;
+        }
 
         auto const go =
             [&](auto const& self, vertex_id id, vertex const& v) -> void {
-                auto const depth = stack.size();
+                auto c = visited.find(id);
+                assert(c != visited.end());
 
-                auto&& [_it, emplaced] = visited.try_emplace(id, colour::grey);
-                if (!emplaced) {
-                    // Already visited.
-                    return;
+                if (c->second == colour::white) {
+                    c->second = colour::grey;
                 }
-                stack.push_back(id);
+                else {
+                    return; // Already visited.
+                }
 
                 for (vertex_id out: v.outs) {
-                    if (visited.count(out)) {
-                        // We have seen this vertex before. Is there a
-                        // cycle anywhere?
-                        if (auto it = std::find(stack.begin(), stack.end(), out); it != stack.end()) {
-                            // Yes, [it, end()] is a cycle.
+                    auto out_c = visited.find(out);
+                    assert(out_c != visited.end());
+
+                    switch (out_c->second) {
+                    case colour::white:
+                        {
+                            auto it = _vertices.find(out);
+                            assert(it != _vertices.end());
+                            // This is a recursive DFS. Maybe we should
+                            // turn this into a non-recursive one?
+                            self(self, out, it->second);
+                        }
+                        break;
+
+                    case colour::grey:
+                        // The edge "id" -> "out" forms a cycle, which
+                        // means there must be a path going from "out" all
+                        // the way back to "id". Find it using BFS and
+                        // raise an exception.
+                        {
                             std::vector<T> cycle;
-                            for (auto it2 = it; it2 != stack.end(); it2++) {
-                                auto it3 = _vertices.find(*it2);
-                                assert(it3 != _vertices.end());
-                                cycle.push_back(*(it3->second.value));
+                            for (auto value: shortest_path_impl(out, id).value()) {
+                                cycle.push_back(value);
                             }
+                            auto it = _vertices.find(out);
+                            assert(it != _vertices.end());
+                            cycle.push_back(*(it->second.value));
                             throw not_a_dag(std::move(cycle));
                         }
-                    }
-                    else {
-                        auto it = _vertices.find(out);
-                        assert(it != _vertices.end());
-                        self(self, out, it->second);
+                        break;
+
+                    case colour::black:
+                        // The node has already been visited but this is
+                        // definitely not a cycle. No need to do anything.
+                        break;
                     }
                 }
 
-                if (visited[id] == colour::grey) {
+                if (c->second == colour::grey) {
                     tsorted.push_back(std::cref(*(v.value)));
                     visited[id] = colour::black;
                 }
-                stack.resize(depth);
             };
 
         for (auto const& [id, v]: _vertices) {
             go(go, id, v);
-            assert(stack.empty());
         }
 
         return tsorted;
+    }
+
+    template <typename T>
+    std::optional<std::vector<typename graph<T>::cref_wrapper_type>>
+    graph<T>::shortest_path(T const& src, T const& dest) const {
+        auto src_id  = _vertex_id_of.find(src);
+        auto dest_id = _vertex_id_of.find(dest);
+
+        if (src_id != _vertex_id_of.end() && dest_id != _vertex_id_of.end()) {
+            return shortest_path_impl(src_id->second, dest_id->second);
+        }
+        else {
+            return std::nullopt;
+        }
+    }
+
+    template <typename T>
+    std::optional<std::vector<typename graph<T>::cref_wrapper_type>>
+    graph<T>::shortest_path_impl(vertex_id const& src, vertex_id const& dest) const {
+        std::map<vertex_id, colour> visited;
+        std::vector<cref_wrapper_type> path;
+        std::deque<vertex_id> queue;
+
+        for (auto const& [id, _v]: _vertices) {
+            visited[id] = (id == src) ? colour::grey : colour::white;
+        }
+
+        auto const& go =
+            [&](vertex const& v) -> bool {
+                for (vertex_id out: v.outs) {
+                    if (out == dest) {
+                        // Found the final destination.
+                        path.push_back(std::cref(*(v.value)));
+                        return true;
+                    }
+
+                    auto c = visited.find(out);
+                    assert(c != visited.end());
+                    if (c->second == colour::white) {
+                        c->second = colour::grey;
+                        queue.push_back(out);
+                    }
+                }
+                return false;
+            };
+
+        auto src_v = _vertices.find(src);
+        assert(src_v != _vertices.end());
+        path.push_back(std::cref(*(src_v->second.value)));
+
+        if (go(src_v->second)) {
+            return std::move(path);
+        }
+
+        while (!queue.empty()) {
+            auto id = queue.front();
+            queue.pop_front();
+
+            auto it = _vertices.find(id);
+            assert(it != _vertices.end());
+
+            if (go(it->second)) {
+                return std::move(path);
+            }
+        }
+
+        return std::nullopt;
     }
 }

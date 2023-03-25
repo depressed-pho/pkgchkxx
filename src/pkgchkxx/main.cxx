@@ -374,7 +374,7 @@ namespace {
 
         using pkgname_cref = std::reference_wrapper<pkgxx::pkgname const>;
         auto to_list = std::make_unique<std::map<pkgname_cref, pkgxx::pkgvars const&>>();
-        pkgxx::graph<pkgxx::pkgname> topology;
+        pkgxx::graph<pkgname_cref> topology;
 
         for (auto const& path:
                  conf.pkgpaths(
@@ -428,8 +428,18 @@ namespace {
             to_list.swap(scheduled);
         }
 
-        for (auto name: topology.tsort()) {
-            std::cout << name << sufx << std::endl;
+        try {
+            for (auto name: topology.tsort()) {
+                std::cout << name << sufx << std::endl;
+            }
+        }
+        catch (pkgxx::not_a_dag<pkgname_cref>& e) {
+            // This exception contains reference wrappers to pkgname, which
+            // means we can't just let it go down the stack because those
+            // wrappers would become dangling at some point.
+            fatal(opts, [&](auto& out) {
+                            out << e.what() << std::endl;
+                        });
         }
     }
 }
