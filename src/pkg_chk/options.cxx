@@ -166,7 +166,7 @@ namespace pkg_chk {
 
     void usage(std::filesystem::path const& progname) {
         std::cout
-            << "Usage: " << progname << " [opts]" << std::endl
+            << "Usage: " << progname.string() << " [opts]" << std::endl
             << "    -a       Add all missing packages" << std::endl
             << "    -B       Force exact pkg match - check \"Build version\" & even downgrade" << std::endl
             << "    -b       Use binary packages" << std::endl

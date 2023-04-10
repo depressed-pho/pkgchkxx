@@ -91,6 +91,7 @@ AC_CONFIG_FILES([
     lib/Makefile
     lib/pkgxx/Makefile
     src/Makefile
-    src/pkgchkxx/Makefile
+    src/pkg_chk/Makefile
+    src/pkg_rr/Makefile
 ])
 AC_OUTPUT
