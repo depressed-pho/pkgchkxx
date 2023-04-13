@@ -10,8 +10,7 @@ pkgchkxx_SOURCES = \
 	tag.cxx tag.hxx
 
 pkgchkxx_CXXFLAGS = \
-	-I$(top_srcdir)/lib \
-	-DCFG_PREFIX='"$(prefix)"'
+	-I$(top_srcdir)/lib
 
 pkgchkxx_LDADD = \
 	$(top_builddir)/lib/pkgxx/libpkgxx.la

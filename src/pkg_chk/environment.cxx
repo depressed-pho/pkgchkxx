@@ -1,7 +1,6 @@
 #include <cerrno>
 #include <filesystem>
 #include <initializer_list>
-#include <stdlib.h>
 #include <string>
 #include <sys/utsname.h>
 #include <system_error>
@@ -11,6 +10,7 @@
 
 #include <pkgxx/harness.hxx>
 #include <pkgxx/makevars.hxx>
+#include <pkgxx/pkgdb.hxx>
 
 #include "config.h"
 #include "environment.hxx"
@@ -20,12 +20,6 @@ using namespace std::literals;
 namespace fs = std::filesystem;
 
 namespace {
-    std::string
-    cgetenv(std::string const& name) {
-        char const* const value = getenv(name.c_str());
-        return value ? value : "";
-    }
-
     utsname
     cuname() {
         utsname un;
@@ -50,7 +44,6 @@ namespace {
         fs::path        PACKAGES;
         std::string     PKG_ADD;
         std::string     PKG_ADMIN;
-        fs::path        PKG_DBDIR;
         std::string     PKG_DELETE;
         std::string     PKG_INFO;
         std::string     PKG_SUFX;
@@ -75,86 +68,14 @@ namespace {
 }
 
 namespace pkg_chk {
-    environment::environment(pkg_chk::options const& opts) {
-        // Hide PKG_PATH to avoid breakage in 'make' calls.
-        {
-            std::promise<fs::path> p;
-            p.set_value(cgetenv("PKG_PATH"));
-            PKG_PATH = p.get_future();
-            unsetenv("PKG_PATH");
-        }
-
-        // MAKECONF
-        MAKECONF = std::async(
-            std::launch::deferred,
-            [&opts]() {
-                fs::path vMAKECONF = cgetenv("MAKECONF");
-                if (vMAKECONF.empty()) {
-                    std::initializer_list<fs::path> const candidates = {
-#if defined(CFG_MAKECONF)
-                        CFG_MAKECONF,
-#endif
-                        CFG_PREFIX "/etc/mk.conf",
-                        "/etc/mk.conf"
-                    };
-                    for (auto const mkconf: candidates) {
-                        if (fs::exists(mkconf)) {
-                            vMAKECONF = mkconf;
-                            break;
-                        }
-                    }
-                }
-                if (vMAKECONF.empty()) {
-                    vMAKECONF = "/dev/null";
-                }
-                verbose_var(opts, "MAKECONF", vMAKECONF);
-                return vMAKECONF;
-            }).share();
-
-        // PKGSRCDIR
-        PKGSRCDIR = std::async(
-            std::launch::deferred,
-            [this, &opts]() {
-                fs::path vPKGSRCDIR = cgetenv("PKGSRCDIR");
-                fs::path vLOCALBASE = cgetenv("LOCALBASE");
-
-                if (vPKGSRCDIR.empty()) {
-                    std::vector<std::string> vars = {
-                        "PKGSRCDIR"
-                    };
-                    if (vLOCALBASE.empty()) {
-                        vars.push_back("LOCALBASE");
-                    }
-
-                    auto value_of = pkgxx::extract_mkconf_vars(MAKECONF.get(), vars).value();
-                    for (auto const& [var, value]: value_of) {
-                        verbose_var(opts, var, value);
-                    }
-
-                    vPKGSRCDIR = value_of["PKGSRCDIR"];
-                    if (vLOCALBASE.empty()) {
-                        vLOCALBASE = value_of["LOCALBASE"];
-                    }
-                }
-                if (vPKGSRCDIR.empty()) {
-                    // We couldn't extract PKGSRCDIR from mk.conf.
-                    std::initializer_list<fs::path> const candidates = {
-                        vLOCALBASE / "pkgsrc",
-                        ".",
-                        "..",
-                        "../..",
-                        "/usr/pkgsrc"
-                    };
-                    for (auto const pkgsrcdir: candidates) {
-                        if (fs::exists(pkgsrcdir / "mk/bsd.pkg.mk")) {
-                            vPKGSRCDIR = fs::absolute(pkgsrcdir);
-                            break;
-                        }
-                    }
-                    verbose_var(opts, "PKGSRCDIR", vPKGSRCDIR);
-                }
-                return vPKGSRCDIR;
-            }).share();
+    environment::environment(pkg_chk::options const& opts)
+        : pkgxx::environment(
+            [&](auto&& var, auto&& value) {
+                verbose_var(
+                    opts,
+                    std::forward<decltype(var)>(var),
+                    std::forward<decltype(value)>(value));
+            }) {
 
         // Now we have PKGSRCDIR, use it to collect values that can only be
         // obtained from pkgsrc Makefiles.
@@ -174,7 +95,6 @@ namespace pkg_chk {
                     "PACKAGES",
                     "PKG_ADD",
                     "PKG_ADMIN",
-                    "PKG_DBDIR",
                     "PKG_DELETE",
                     "PKG_INFO",
                     "PKG_SUFX",
@@ -192,7 +112,7 @@ namespace pkg_chk {
                     vars.push_back("SU_CMD");
                 }
                 std::map<std::string, std::string> value_of;
-                auto const pkgpath = PKGSRCDIR.get() / "pkgtools/pkg_chk"; // Any package will do.
+                auto const pkgpath = PKGSRCDIR.get() / "pkgtools/pkg_install"; // Any package will do.
                 if (fs::is_directory(pkgpath)) {
                     value_of = pkgxx::extract_pkgmk_vars(pkgpath, vars).value();
                 }
@@ -208,7 +128,6 @@ namespace pkg_chk {
                     : url_safe_absolute(opts.bin_pkg_path);
                 _menv.PKG_ADD            = value_of["PKG_ADD"   ].empty() ? CFG_PKG_ADD    : value_of["PKG_ADD"   ];
                 _menv.PKG_ADMIN          = value_of["PKG_ADMIN" ].empty() ? CFG_PKG_ADMIN  : value_of["PKG_ADMIN" ];
-                _menv.PKG_DBDIR          = value_of["PKG_DBDIR" ];
                 _menv.PKG_DELETE         = value_of["PKG_DELETE"].empty() ? CFG_PKG_DELETE : value_of["PKG_DELETE"];
                 _menv.PKG_INFO           = value_of["PKG_INFO"  ].empty() ? CFG_PKG_INFO   : value_of["PKG_INFO"  ];
                 _menv.PKG_SUFX           = value_of["PKG_SUFX"      ];
@@ -229,13 +148,6 @@ namespace pkg_chk {
                 if (fs::is_directory(_menv.PACKAGES / "All")) {
                     _menv.PACKAGES /= "All";
                     verbose_var(opts, "PACKAGES", _menv.PACKAGES);
-                }
-                if (!fs::is_directory(_menv.PKG_DBDIR)) {
-                    fatal(opts, [&_menv](auto& out) {
-                                    out << "Unable to locate PKG_DBDIR ("
-                                        << (_menv.PKG_DBDIR.empty() ? "not set" : _menv.PKG_DBDIR)
-                                        << ")" << std::endl;
-                                });
                 }
                 if (_menv.PKGCHK_CONF.empty()) {
                     // Check PKG_SYSCONFDIR then fall back to PKGSRCDIR.
@@ -258,7 +170,6 @@ namespace pkg_chk {
         PACKAGES           = std::async(std::launch::deferred, [menv]() { return menv.get().PACKAGES;           }).share();
         PKG_ADD            = std::async(std::launch::deferred, [menv]() { return menv.get().PKG_ADD;            }).share();
         PKG_ADMIN          = std::async(std::launch::deferred, [menv]() { return menv.get().PKG_ADMIN;          }).share();
-        PKG_DBDIR          = std::async(std::launch::deferred, [menv]() { return menv.get().PKG_DBDIR;          }).share();
         PKG_DELETE         = std::async(std::launch::deferred, [menv]() { return menv.get().PKG_DELETE;         }).share();
         PKG_INFO           = std::async(std::launch::deferred, [menv]() { return menv.get().PKG_INFO;           }).share();
         PKG_SUFX           = std::async(std::launch::deferred, [menv]() { return menv.get().PKG_SUFX;           }).share();
@@ -341,15 +252,9 @@ namespace pkg_chk {
                 // installed_pkgpaths_with_pkgnames has been evaluated, and
                 // spawn pkg_info(1) only if not. But std::shared_future
                 // doesn't have a method to check that.
-                pkgxx::harness pkg_info(pkgxx::shell, {pkgxx::shell, "-s", "--", "-e", "*"});
-                pkg_info.cin() << "exec " << PKG_INFO.get() << " \"$@\"" << std::endl;
-                pkg_info.cin().close();
-
                 std::set<pkgxx::pkgname> pkgnames;
-                for (std::string line; std::getline(pkg_info.cout(), line); ) {
-                    if (!line.empty()) {
-                        pkgnames.emplace(line);
-                    }
+                for (auto& name: pkgxx::installed_pkgnames(PKG_INFO.get())) {
+                    pkgnames.insert(std::move(name));
                 }
                 return pkgnames;
             }).share();

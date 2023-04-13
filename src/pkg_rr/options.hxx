@@ -25,6 +25,7 @@ namespace pkg_rr {
         std::map<std::string, std::string> make_vars; // -D
         bool just_fetch;                              // -F
         bool help;                                    // -h
+        unsigned concurrency;                         // -j
         bool continue_on_errors;                      // -k
         std::optional<std::filesystem::path> log_dir; // -L
         bool dry_run;                                 // -n

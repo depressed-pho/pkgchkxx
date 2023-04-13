@@ -6,6 +6,7 @@
 #include <set>
 #include <string>
 
+#include <pkgxx/environment.hxx>
 #include <pkgxx/summary.hxx>
 
 #include "options.hxx"
@@ -19,7 +20,7 @@ namespace pkg_chk {
      * Objects of this class MUST NOT be shared by threads. Each thread
      * must have its own copy.
      */
-    struct environment {
+    struct environment: public pkgxx::environment {
         environment(pkg_chk::options const& opts);
 
         bool
@@ -30,16 +31,12 @@ namespace pkg_chk {
         std::optional<std::filesystem::path>
         binary_package_file_of(pkgxx::pkgname const& name) const;
 
-        std::shared_future<std::filesystem::path> PKG_PATH;
         std::shared_future<std::string>           MACHINE_ARCH;
-        std::shared_future<std::filesystem::path> MAKECONF;
         std::shared_future<std::string>           OPSYS;
         std::shared_future<std::string>           OS_VERSION;
-        std::shared_future<std::filesystem::path> PKGSRCDIR;
         std::shared_future<std::filesystem::path> PACKAGES;
         std::shared_future<std::string>           PKG_ADD;
         std::shared_future<std::string>           PKG_ADMIN;
-        std::shared_future<std::filesystem::path> PKG_DBDIR;
         std::shared_future<std::string>           PKG_DELETE;
         std::shared_future<std::string>           PKG_INFO;
         std::shared_future<std::string>           PKG_SUFX;

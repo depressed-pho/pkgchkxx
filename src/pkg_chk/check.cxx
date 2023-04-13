@@ -165,10 +165,10 @@ namespace pkg_chk {
         std::set<pkgxx::pkgpath> const& pkgpaths) {
 
         pkgxx::guarded<check_result> res;
-        pkgxx::nursery n;
+        pkgxx::nursery n(opts.concurrency);
         for (pkgxx::pkgpath const& path: pkgpaths) {
             n.start_soon(
-                [&]() {
+                [&, path]() {
                     // Find the set of latest PKGNAMEs provided by this
                     // PKGPATH. Most PKGPATHs have just one corresponding
                     // PKGNAME but some (py-*) have more.
@@ -178,7 +178,7 @@ namespace pkg_chk {
                         : latest_pkgnames_from_binary(opts, env, path);
 
                     if (latest_pkgnames.empty()) {
-                        res.lock()->MISSING_DONE.insert(path);
+                        res.lock()->MISSING_DONE.insert(std::move(path));
                         return;
                     }
 
@@ -294,7 +294,7 @@ namespace pkg_chk {
                                         << (env.is_binary_available(name) ? " (has binary package)" : "")
                                         << std::endl;
                                 });
-                            res.lock()->MISSING_TODO.insert_or_assign(name, path);
+                            res.lock()->MISSING_TODO.insert_or_assign(name, std::move(path));
                         }
                     }
                 });

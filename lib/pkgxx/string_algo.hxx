@@ -66,7 +66,7 @@ namespace pkgxx {
         /// Iterator incrementation.
         word_iterator
         operator++ (int) {
-            word_iterator it = *this;
+            auto it = *this;
             ++(*this);
             return it;
         }
@@ -154,5 +154,48 @@ namespace pkgxx {
         return
             str.size() >= suffix.size() &&
             str.substr(str.size() - suffix.size()) == suffix;
+    }
+
+    /// Return \c true iff the given character represents an ASCII digit.
+    inline bool
+    is_ascii_digit(char c) noexcept {
+        return c >= '0' && c <= '9';
+    }
+
+    /// Return \c true iff the given character represents an ASCII alphabet.
+    inline bool
+    is_ascii_alpha(char c) noexcept {
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
+    }
+
+    /// Convert an ASCII upper-case letter to the corresponding lower-case
+    /// one.
+    inline char
+    ascii_tolower(char c) noexcept {
+        return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
+    }
+
+    /// Return \c true iff a string represented by a pair of iterators
+    /// starts with a given prefix, ignoring case with regard to ASCII
+    /// alphabets.
+    template <typename Iter>
+    bool
+    ci_starts_with(Iter begin, Iter end, std::string_view const& prefix) {
+        Iter it = begin;
+        for (auto c: prefix) {
+            if (it == end) {
+                // The input is shorter than the prefix.
+                return false;
+            }
+            else if (ascii_tolower(*it) == ascii_tolower(c)) {
+                it++;
+                continue;
+            }
+            else {
+                // Letters mismatched.
+                return false;
+            }
+        }
+        return true;
     }
 }

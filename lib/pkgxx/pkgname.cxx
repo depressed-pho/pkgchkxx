@@ -1,47 +1,12 @@
 #include <algorithm>
 
 #include "pkgname.hxx"
+#include "string_algo.hxx"
 
 using namespace std::literals;
 
 namespace {
     using namespace pkgxx;
-
-    inline bool
-    is_ascii_digit(char c) noexcept {
-        return c >= '0' && c <= '9';
-    }
-
-    inline bool
-    is_ascii_alpha(char c) noexcept {
-        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z');
-    }
-
-    inline char
-    ascii_tolower(char c) noexcept {
-        return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
-    }
-
-    template <typename Iter>
-    bool
-    ci_starts_with(Iter begin, Iter end, std::string_view const& str) {
-        Iter it = begin;
-        for (auto c: str) {
-            if (it == end) {
-                // The input is shorter than 'str'.
-                return false;
-            }
-            else if (ascii_tolower(*it) == ascii_tolower(c)) {
-                it++;
-                continue;
-            }
-            else {
-                // Letters mismatched.
-                return false;
-            }
-        }
-        return true;
-    }
 
     std::vector<pkgversion::modifier> const modifiers = {
         pkgversion::modifier(pkgversion::modifier::kind::ALPHA, "alpha"),

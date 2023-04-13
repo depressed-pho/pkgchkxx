@@ -33,7 +33,7 @@ namespace pkg_chk {
 
         std::optional<pkg_chk::mode> mode_;
         int ch;
-        while ((ch = getopt(argc, argv, "BC:D:L:P:U:abcdfghijklNnpqrsuv")) != -1) {
+        while ((ch = getopt(argc, argv, "BC:D:L:P:U:abcdfghij:klNnpqrsuv")) != -1) {
             switch (ch) {
             case 'a':
                 mode_       = mode::ADD_DELETE_UPDATE;

@@ -1,5 +1,7 @@
+#include <cstdlib>
 #include <iostream>
 #include <string_view>
+#include <thread>
 #include <unistd.h>
 
 #include <pkgxx/string_algo.hxx>
@@ -31,6 +33,8 @@ namespace pkg_rr {
     options::options(int argc, char* const argv[])
         : check_build_version(false)
         , just_fetch(false)
+        , help(false)
+        , concurrency(std::max(1u, std::thread::hardware_concurrency()))
         , continue_on_errors(false)
         , dry_run(false)
         , just_replace(false)
@@ -41,7 +45,7 @@ namespace pkg_rr {
         make_vars["IN_PKG_ROLLING_REPLACE"] = "1";
 
         int ch;
-        while ((ch = getopt(argc, argv, "BD:FhkL:nrsuvX:x:")) != -1) {
+        while ((ch = getopt(argc, argv, "BD:Fhj:kL:nrsuvX:x:")) != -1) {
             switch (ch) {
             case 'B':
                 check_build_version = true;
@@ -54,6 +58,15 @@ namespace pkg_rr {
                 break;
             case 'h':
                 help = true;
+                break;
+            case 'j':
+                if (int const n = std::atoi(optarg); n > 0) {
+                    concurrency = n;
+                }
+                else {
+                    std::cerr << argv[0] << ": option -j takes a positive integer" << std::endl;
+                    throw bad_options();
+                }
                 break;
             case 'k':
                 continue_on_errors = true;

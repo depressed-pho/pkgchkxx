@@ -36,7 +36,7 @@ namespace pkg_chk {
         tagset add_tags;                        // -D
         bool no_clean;                          // -d
         bool fetch;                             // -f
-        unsigned concurrency;                   // -c
+        unsigned concurrency;                   // -j
         bool continue_on_errors;                // -k
         mutable std::ofstream logfile;          // -L
         bool dry_run;                           // -n
