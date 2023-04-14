@@ -168,7 +168,7 @@ namespace pkg_chk {
         pkgxx::nursery n(opts.concurrency);
         for (pkgxx::pkgpath const& path: pkgpaths) {
             n.start_soon(
-                [&, path]() {
+                [&, path = std::move(path)]() {
                     // Find the set of latest PKGNAMEs provided by this
                     // PKGPATH. Most PKGPATHs have just one corresponding
                     // PKGNAME but some (py-*) have more.

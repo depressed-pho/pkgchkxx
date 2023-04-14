@@ -10,6 +10,7 @@
 #include "message.hxx"
 #include "options.hxx"
 
+using namespace std::literals;
 using namespace pkg_rr;
 namespace fs = std::filesystem;
 
@@ -32,7 +33,7 @@ namespace {
                 continue;
             }
             n.start_soon(
-                [&, name]() {
+                [&, name = std::move(name)]() {
                     pkgxx::harness pkg_info(
                         pkgxx::shell, {pkgxx::shell, "-s", "--", "-Bq", name.string()});
 
@@ -65,6 +66,29 @@ namespace {
             return packages_w_flag(opts, env, "mismatch", opts.no_check);
         }
     }
+
+    std::set<pkgxx::pkgbase>
+    check_rebuild(options const& opts, environment const& env) {
+        if (opts.just_fetch) {
+            return {};
+        }
+        else {
+            msg() << "Checking for rebuild-requested installed packages (rebuild=YES)" << std::endl;
+            return packages_w_flag(opts, env, "rebuild");
+        }
+    }
+
+    std::set<pkgxx::pkgbase>
+    check_unsafe(options const& opts, environment const& env) {
+        if (opts.just_fetch) {
+            return {};
+        }
+        else {
+            auto const flag = opts.strict ? "unsafe_depends_strict"sv : "unsafe_depends"sv;
+            msg() << "Checking for unsafe installed packages (" << flag << "=YES)" << std::endl;
+            return packages_w_flag(opts, env, flag);
+        }
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -78,6 +102,8 @@ int main(int argc, char* argv[]) {
 
         environment env(opts);
         auto MISMATCH_TODO = check_mismatch(opts, env);
+        auto REBUILD_TODO  = check_rebuild(opts, env);
+        auto UNSAFE_TODO   = check_unsafe(opts, env);
     }
     catch (bad_options& e) {
         return 1;
