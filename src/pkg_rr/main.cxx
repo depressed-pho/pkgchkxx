@@ -1,92 +1,66 @@
 #include <iostream>
 
-#include <pkgxx/harness.hxx>
-#include <pkgxx/mutex_guard.hxx>
-#include <pkgxx/nursery.hxx>
-#include <pkgxx/pkgdb.hxx>
-#include <pkgxx/string_algo.hxx>
-
 #include "environment.hxx"
 #include "message.hxx"
+#include "scan.hxx"
 #include "options.hxx"
 
-using namespace std::literals;
 using namespace pkg_rr;
 namespace fs = std::filesystem;
 
+using todo_type = std::set<pkgxx::pkgbase>;
+
 namespace {
-    std::set<pkgxx::pkgbase>
+    todo_type
     packages_w_flag(
         options const& opts,
         environment const& env,
-        std::string_view const& flag,
+        std::string const& flag,
         std::set<pkgxx::pkgbase> const& exclude = {}) {
 
-        pkgxx::guarded<
-            std::set<pkgxx::pkgbase>
-            > res;
-        pkgxx::nursery n(opts.concurrency);
-        for (auto const& name: pkgxx::installed_pkgnames(env.PKG_INFO.get())) {
-            if (exclude.count(name.base) > 0) {
-                // The caller wants it to be excluded from the result: we
-                // don't even need to see if it has the given flag.
-                continue;
-            }
-            n.start_soon(
-                [&, name = std::move(name)]() {
-                    pkgxx::harness pkg_info(
-                        pkgxx::shell, {pkgxx::shell, "-s", "--", "-Bq", name.string()});
-
-                    pkg_info.cin() << "exec " << env.PKG_INFO.get() << " \"$@\"" << std::endl;
-                    pkg_info.cin().close();
-
-                    for (std::string line; std::getline(pkg_info.cout(), line); ) {
-                        if (line.size() == flag.size() + 4 &&
-                            std::string_view(line).substr(0, flag.size()) == flag &&
-                            line[flag.size()] == '=' &&
-                            pkgxx::ascii_tolower(line[flag.size()+1]) == 'y' &&
-                            pkgxx::ascii_tolower(line[flag.size()+1]) == 'e' &&
-                            pkgxx::ascii_tolower(line[flag.size()+1]) == 's') {
-
-                            res.lock()->insert(std::move(name.base));
-                        }
-                    }
-                });
+        std::future<todo_type> res;
+        {
+            pkg_rr::package_scanner scanner(env.PKG_INFO.get(), opts.concurrency);
+            res = scanner.add_axis(flag, exclude);
         }
-        return std::move(*res.lock());
+        return res.get();
     }
 
-    std::set<pkgxx::pkgbase>
-    check_mismatch(options const& opts, environment const& env) {
+    std::future<todo_type>
+    check_mismatch(options const& opts, pkg_rr::package_scanner& scanner) {
         if (opts.check_for_updates) {
             throw "FIXME: -u not implemented";
         }
         else {
             msg() << "Checking for mismatched installed packages (mismatch=YES)" << std::endl;
-            return packages_w_flag(opts, env, "mismatch", opts.no_check);
+            return scanner.add_axis("mismatch", opts.no_check);
         }
     }
 
-    std::set<pkgxx::pkgbase>
-    check_rebuild(options const& opts, environment const& env) {
+    std::future<todo_type>
+    check_rebuild(options const& opts, pkg_rr::package_scanner& scanner) {
         if (opts.just_fetch) {
-            return {};
+            std::promise<todo_type> res;
+            res.set_value({});
+            return res.get_future();
         }
         else {
             msg() << "Checking for rebuild-requested installed packages (rebuild=YES)" << std::endl;
-            return packages_w_flag(opts, env, "rebuild");
+            return scanner.add_axis("rebuild");
         }
     }
 
-    std::set<pkgxx::pkgbase>
-    check_unsafe(options const& opts, environment const& env) {
+    std::future<todo_type>
+    check_unsafe(options const& opts, pkg_rr::package_scanner& scanner) {
         if (opts.just_fetch) {
-            return {};
+            std::promise<todo_type> res;
+            res.set_value({});
+            return res.get_future();
         }
         else {
-            auto const flag = opts.strict ? "unsafe_depends_strict"sv : "unsafe_depends"sv;
+            auto const flag = opts.strict ? "unsafe_depends_strict" : "unsafe_depends";
             msg() << "Checking for unsafe installed packages (" << flag << "=YES)" << std::endl;
-            return packages_w_flag(opts, env, flag);
+            return scanner.add_axis(flag);
         }
     }
 }
@@ -101,9 +75,18 @@ int main(int argc, char* argv[]) {
         }
 
         environment env(opts);
-        auto MISMATCH_TODO = check_mismatch(opts, env);
-        auto REBUILD_TODO  = check_rebuild(opts, env);
-        auto UNSAFE_TODO   = check_unsafe(opts, env);
+        std::future<todo_type> MISMATCH_TODO_f;
+        std::future<todo_type> REBUILD_TODO_f;
+        std::future<todo_type> UNSAFE_TODO_f;
+        {
+            pkg_rr::package_scanner scanner(env.PKG_INFO.get(), opts.concurrency);
+            MISMATCH_TODO_f = check_mismatch(opts, scanner);
+            REBUILD_TODO_f  = check_rebuild(opts, scanner);
+            UNSAFE_TODO_f   = check_unsafe(opts, scanner);
+        }
+        auto MISMATCH_TODO = MISMATCH_TODO_f.get();
+        auto REBUILD_TODO  = REBUILD_TODO_f.get();
+        auto UNSAFE_TODO   = UNSAFE_TODO_f.get();
     }
     catch (bad_options& e) {
         return 1;

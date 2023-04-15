@@ -1,12 +1,13 @@
 #pragma once
 
 #include <mutex>
+#include <utility>
 
 namespace pkgxx {
     /** An object-guarding container resembling std::sync::Mutex from
      * Rust. Unlike C++11 std::atomic, the contained type T doesn't need to
-     * be TriviallyCopyable. It doesn't even need to be Copyable or
-     * Movable.
+     * be TriviallyCopyable. It doesn't even need to be Copyable or Movable
+     * unless the instance of \c guarded is to be copied or moved.
      */
     template <typename T>
     class guarded {
@@ -44,6 +45,15 @@ namespace pkgxx {
         template <typename... Args>
         guarded(Args&&... args)
             : _val(std::forward<Args>(args)...) {}
+
+        /** Copy-constructing \c guarded<T> requires \c T to be
+         * Copyable. */
+        guarded(guarded const& from)
+            : _val(from._val) {}
+
+        /** Move-constructing \c guarded<T> requires \c T to be Movable. */
+        guarded(guarded&& from)
+            : _val(std::move(from._val)) {}
 
         /** Return an RAII guard that can dereference to the contained
          * value of type T.
