@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <set>
 
 #include <pkgxx/harness.hxx>
 #include <pkgxx/ordered.hxx>
@@ -87,4 +88,16 @@ namespace pkgxx {
     private:
         std::string _pkg_info;
     };
+
+    /// Obtain the set of @blddep entries of an installed package. This
+    /// includes \c BUILD_DEPENDS and \c DEPENDS but not \c TOOL_DEPENDS.
+    std::set<pkgxx::pkgname>
+    build_depends(std::string const& PKG_INFO, pkgxx::pkgbase const& name);
+
+    /// Obtain the set of @blddep entries of an installed package. This
+    /// includes \c BUILD_DEPENDS and \c DEPENDS but not \c TOOL_DEPENDS.
+    inline std::set<pkgxx::pkgname>
+    build_depends(std::string const& PKG_INFO, pkgxx::pkgname const& name) {
+        return build_depends(PKG_INFO, name.base);
+    }
 }

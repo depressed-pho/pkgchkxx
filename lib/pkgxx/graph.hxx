@@ -8,6 +8,7 @@
 #include <optional>
 #include <set>
 #include <sstream>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -49,9 +50,12 @@ namespace pkgxx {
 
     /** A directed graph that is barely enough for topological sorting. The
      * type \c T is the type of vertex and needs to be copy-constructible,
-     * totally ordered, and outputtable.
+     * totally ordered, and outputtable. Instances with \c IsBidirectional
+     * being \c true have slightly more overhead but supports additional
+     * operations.
      */
-    template <typename T>
+    template <typename T,
+              bool IsBidirectional = false>
     struct graph {
         /** The type of <tt>std::reference_wrapper<T const></tt>, works
          * even when T is itself a reference wrapper.
@@ -69,11 +73,21 @@ namespace pkgxx {
             add_vertex_impl(v);
         }
 
+        /** Remove a vertex from the graph if it exists. Only available for
+         * bidirectional graphs. */
+        std::enable_if_t<IsBidirectional, void>
+        remove_vertex(T const& v);
+
         /** Add an edge between two vertices to the graph. The vertices
          * don't need to be added prior to calling this method.
          */
         void
         add_edge(T const& src, T const& dest);
+
+        /** Remove an edge from the graph if it exists. Only available for
+         * bidirectional graphs. */
+        std::enable_if_t<IsBidirectional, void>
+        remove_edge(T const& src, T const& dest);
 
         /** See if the graph has the given vertex. */
         bool
@@ -87,8 +101,8 @@ namespace pkgxx {
         shortest_path(T const& src, T const& dest) const;
 
         /** Perform a topological sort on the graph. Vertices that have no
-         * out-edges will appear on the last. If it has a cycle \ref
-         * not_a_dag will be thrown.
+         * out-edges will appear first. If it has a cycle \ref not_a_dag
+         * will be thrown.
          */
         std::vector<cref_wrapper_type>
         tsort() const;
@@ -96,12 +110,20 @@ namespace pkgxx {
     private:
         using vertex_id = unsigned long;
 
+        template <bool IsBidi, typename = void>
         struct vertex {
             vertex(T const& value_)
                 : value(&value_) {}
 
             std::set<vertex_id> outs;
             T const* value;
+        };
+
+        template <bool IsBidi>
+        struct vertex<IsBidi, std::enable_if_t<IsBidi>>: public vertex<false> {
+            using vertex<false>::vertex;
+
+            std::set<vertex_id> ins;
         };
 
         enum class colour {
@@ -117,7 +139,7 @@ namespace pkgxx {
         shortest_path_impl(vertex_id const& src, vertex_id const& dest) const;
 
         std::map<T, vertex_id> _vertex_id_of;
-        std::map<vertex_id, vertex> _vertices;
+        std::map<vertex_id, vertex<IsBidirectional>> _vertices;
     };
 
     // Implementation
@@ -145,9 +167,9 @@ namespace pkgxx {
     }
 #endif
 
-    template <typename T>
-    typename graph<T>::vertex_id
-    graph<T>::add_vertex_impl(T const& value) {
+    template <typename T, bool IsBidirectional>
+    typename graph<T, IsBidirectional>::vertex_id
+    graph<T, IsBidirectional>::add_vertex_impl(T const& value) {
         auto&& [it, emplaced] = _vertex_id_of.try_emplace(value, _vertex_id_of.size());
         if (emplaced) {
             _vertices.try_emplace(it->second, it->first);
@@ -155,20 +177,65 @@ namespace pkgxx {
         return it->second;
     }
 
-    template <typename T>
+    template <typename T, bool IsBidirectional>
+    std::enable_if_t<IsBidirectional, void>
+    graph<T, IsBidirectional>::remove_vertex(T const& v) {
+        if (auto id = _vertex_id_of.find(v); id != _vertex_id_of.end()) {
+            auto v = _vertices.find(id->second);
+            assert(v != _vertices.end());
+
+            for (vertex_id out_id: v->second.outs) {
+                auto out_v = _vertices.find(out_id);
+                assert(out_v != _vertices.end());
+                out_v->second.ins.erase(id->second);
+            }
+
+            for (vertex_id in_id: v->second.ins) {
+                auto in_v = _vertices.find(in_id);
+                assert(in_v != _vertices.end());
+                in_v->second.outs.erase(id->second);
+            }
+
+            _vertices.erase(id->second);
+            _vertex_id_of.erase(v);
+        }
+    }
+
+    template <typename T, bool IsBidirectional>
     void
-    graph<T>::add_edge(T const& src, T const& dest) {
+    graph<T, IsBidirectional>::add_edge(T const& src, T const& dest) {
         vertex_id const src_id  = add_vertex_impl(src);
         vertex_id const dest_id = add_vertex_impl(dest);
 
-        auto it = _vertices.find(src_id);
-        assert(it != _vertices.end());
-        it->second.outs.insert(dest_id);
+        auto sv = _vertices.find(src_id);
+        assert(sv != _vertices.end());
+        sv->second.outs.insert(dest_id);
+
+        if constexpr (IsBidirectional) {
+            auto dv = _vertices.find(dest_id);
+            assert(dv != _vertices.end());
+            dv->second.ins.insert(src_id);
+        }
     }
 
-    template <typename T>
-    std::vector<typename graph<T>::cref_wrapper_type>
-    graph<T>::tsort() const {
+    template <typename T, bool IsBidirectional>
+    std::enable_if_t<IsBidirectional, void>
+    graph<T, IsBidirectional>::remove_edge(T const& src, T const& dest) {
+        if (auto id = _vertex_id_of.find(src); id != _vertex_id_of.end()) {
+            auto it = _vertices.find(id->second);
+            assert(it != _vertices.end());
+            it->second.outs.erase(id->second);
+        }
+        if (auto id = _vertex_id_of.find(dest); id != _vertex_id_of.end()) {
+            auto it = _vertices.find(id->second);
+            assert(it != _vertices.end());
+            it->second.ins.erase(id->second);
+        }
+    }
+
+    template <typename T, bool IsBidirectional>
+    std::vector<typename graph<T, IsBidirectional>::cref_wrapper_type>
+    graph<T, IsBidirectional>::tsort() const {
         std::map<vertex_id, colour> visited;
         std::vector<cref_wrapper_type> tsorted;
 
@@ -177,7 +244,7 @@ namespace pkgxx {
         }
 
         auto const go =
-            [&](auto const& self, vertex_id id, vertex const& v) -> void {
+            [&](auto const& self, vertex_id id, vertex<IsBidirectional> const& v) -> void {
                 auto c = visited.find(id);
                 assert(c != visited.end());
 
@@ -240,9 +307,9 @@ namespace pkgxx {
         return tsorted;
     }
 
-    template <typename T>
-    std::optional<std::vector<typename graph<T>::cref_wrapper_type>>
-    graph<T>::shortest_path(T const& src, T const& dest) const {
+    template <typename T, bool IsBidirectional>
+    std::optional<std::vector<typename graph<T, IsBidirectional>::cref_wrapper_type>>
+    graph<T, IsBidirectional>::shortest_path(T const& src, T const& dest) const {
         auto src_id  = _vertex_id_of.find(src);
         auto dest_id = _vertex_id_of.find(dest);
 
@@ -254,9 +321,9 @@ namespace pkgxx {
         }
     }
 
-    template <typename T>
-    std::optional<std::vector<typename graph<T>::cref_wrapper_type>>
-    graph<T>::shortest_path_impl(vertex_id const& src, vertex_id const& dest) const {
+    template <typename T, bool IsBidirectional>
+    std::optional<std::vector<typename graph<T, IsBidirectional>::cref_wrapper_type>>
+    graph<T, IsBidirectional>::shortest_path_impl(vertex_id const& src, vertex_id const& dest) const {
         std::map<vertex_id, colour> visited;
         std::vector<cref_wrapper_type> path;
         std::deque<vertex_id> queue;
@@ -266,7 +333,7 @@ namespace pkgxx {
         }
 
         auto const& go =
-            [&](vertex const& v) -> bool {
+            [&](vertex<IsBidirectional> const& v) -> bool {
                 for (vertex_id out: v.outs) {
                     if (out == dest) {
                         // Found the final destination.

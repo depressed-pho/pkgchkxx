@@ -7,15 +7,16 @@
 
 #include <pkgxx/mutex_guard.hxx>
 #include <pkgxx/pkgname.hxx>
+#include <pkgxx/pkgpath.hxx>
 
 namespace pkg_rr {
     /** Obtaining the set of installed packages having a specific flag is a
-     * very slow operation, but it can be combined with a relatively small
-     * overhead. With this class you can register many different flags for
-     * aggregation and obtain resulting sets all at once. */
+     * slow operation, but they can be combined with a relatively small
+     * additional cost. With this class you can register many different
+     * flags for aggregation and obtain resulting sets all at once. */
     struct package_scanner {
         /** A result of a single operation. */
-        using result_type = std::set<pkgxx::pkgbase>;
+        using result_type = std::map<pkgxx::pkgbase, pkgxx::pkgpath>;
 
         /** Construct an empty scanner that does nothing. */
         package_scanner(std::string const& PKG_INFO, unsigned concurrency)

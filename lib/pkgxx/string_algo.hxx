@@ -175,6 +175,23 @@ namespace pkgxx {
         return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
     }
 
+    /// Return \c true iff two strings are equivalent, ignoring case with
+    /// regard to ASCII alphabets.
+    inline bool
+    ci_equal(std::string_view const& a, std::string_view const& b) {
+        if (a.size() == b.size()) {
+            for (std::string_view::size_type i = 0; i < a.size(); i++) {
+                if (ascii_tolower(a[i]) != ascii_tolower(b[i])) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
     /// Return \c true iff a string represented by a pair of iterators
     /// starts with a given prefix, ignoring case with regard to ASCII
     /// alphabets.

@@ -373,7 +373,7 @@ namespace {
         // TODO: We don't take account of SUPERSEDES but how do we do it?
 
         using pkgname_cref = std::reference_wrapper<pkgxx::pkgname const>;
-        auto to_list = std::make_unique<std::map<pkgname_cref, pkgxx::pkgvars const&>>();
+        std::map<pkgname_cref, pkgxx::pkgvars const&> to_list;
         pkgxx::graph<pkgname_cref> topology;
 
         for (auto const& path:
@@ -387,7 +387,7 @@ namespace {
                     assert(latest != sum.rend());
 
                     if (env.is_binary_available(latest->first)) {
-                        to_list->insert(*latest);
+                        to_list.insert(*latest);
                     }
                     else {
                         fatal_later(opts)
@@ -400,13 +400,13 @@ namespace {
             }
         }
 
-        while (!to_list->empty()) {
-            for (auto const& [name, _vars]: *to_list) {
+        while (!to_list.empty()) {
+            for (auto const& [name, _vars]: to_list) {
                 topology.add_vertex(name);
             }
 
-            auto scheduled = std::make_unique<std::map<pkgname_cref, pkgxx::pkgvars const&>>();
-            for (auto const& [name, vars]: *to_list) {
+            decltype(to_list) scheduled;
+            for (auto const& [name, vars]: to_list) {
                 verbose(opts) << vars.PKGPATH << ": " << name << std::endl;
                 for (auto const& dep_pattern: vars.DEPENDS) {
                     verbose(opts) << "    depends on " << dep_pattern << ": ";
@@ -415,7 +415,7 @@ namespace {
 
                         verbose(opts) << dep << std::endl;
                         if (!topology.has_vertex(dep)) {
-                            scheduled->insert(*best);
+                            scheduled.insert(*best);
                         }
                         topology.add_edge(name, dep);
                     }
@@ -425,7 +425,7 @@ namespace {
                     }
                 }
             }
-            to_list.swap(scheduled);
+            to_list = scheduled;
         }
 
         try {

@@ -24,4 +24,22 @@ namespace pkgxx {
         }
         return *this;
     }
+
+    std::set<pkgxx::pkgname>
+    build_depends(std::string const& PKG_INFO, pkgxx::pkgbase const& base) {
+        pkgxx::harness pkg_info(
+            pkgxx::shell, {pkgxx::shell, "-s", "--", "-Nq", base});
+
+        pkg_info.cin() << "exec " << PKG_INFO << " \"$@\"" << std::endl;
+        pkg_info.cin().close();
+
+        std::set<pkgxx::pkgname> deps;
+        for (std::string line; std::getline(pkg_info.cout(), line); ) {
+            if (line.empty()) {
+                break;
+            }
+            deps.emplace(line);
+        }
+        return deps;
+    }
 }
