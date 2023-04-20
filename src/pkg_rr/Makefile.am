@@ -5,7 +5,8 @@ pkgrrxx_SOURCES = \
 	scan.cxx scan.hxx \
 	main.cxx \
 	message.cxx message.hxx \
-	options.cxx options.hxx
+	options.cxx options.hxx \
+	replacer.cxx replacer.hxx
 
 pkgrrxx_CXXFLAGS = \
 	-I$(top_srcdir)/lib

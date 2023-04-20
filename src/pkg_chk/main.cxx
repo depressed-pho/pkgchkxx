@@ -25,7 +25,6 @@
 #include "message.hxx"
 #include "options.hxx"
 
-using namespace pkg_chk;
 namespace fs = std::filesystem;
 
 namespace {
@@ -40,8 +39,8 @@ namespace {
 
     bool
     run_cmd(
-        options const& opts,
-        environment const& env [[maybe_unused]],
+        pkg_chk::options const& opts,
+        pkg_chk::environment const& env [[maybe_unused]],
         std::string const& cmd,
         std::vector<std::string> const& args,
         bool fail_ok,
@@ -94,8 +93,8 @@ namespace {
 
     bool
     run_cmd_su(
-        options const& opts,
-        environment const& env,
+        pkg_chk::options const& opts,
+        pkg_chk::environment const& env,
         std::string const& cmd,
         std::vector<std::string> const& args,
         bool fail_ok,
@@ -111,7 +110,11 @@ namespace {
     }
 
     void
-    delete_pkgs(options const& opts, environment const& env, std::set<pkgxx::pkgname> const& pkgnames) {
+    delete_pkgs(
+        pkg_chk::options const& opts,
+        pkg_chk::environment const& env,
+        std::set<pkgxx::pkgname> const& pkgnames) {
+
         for (pkgxx::pkgname const& name: pkgnames) {
             if (pkgxx::is_pkg_installed(env.PKG_INFO.get(), name)) {
                 run_cmd_su(opts, env, env.PKG_DELETE.get(), {"-r", name.string()}, true);
@@ -120,7 +123,7 @@ namespace {
     }
 
     std::set<pkgxx::pkgpath>
-    pkgpaths_to_check(options const& opts, environment const& env) {
+    pkgpaths_to_check(pkg_chk::options const& opts, pkg_chk::environment const& env) {
         std::set<pkgxx::pkgpath> pkgpaths;
         if (opts.delete_mismatched || opts.update) {
             pkgpaths = env.installed_pkgpaths.get();
@@ -130,7 +133,7 @@ namespace {
                                    // or verbose messages would interleave.
             verbose(opts) << "Append to PKGDIRLIST based on config "
                           << env.PKGCHK_CONF.get() << std::endl;
-            config const conf(env.PKGCHK_CONF.get());
+            pkg_chk::config const conf(env.PKGCHK_CONF.get());
             for (auto const& path:
                      conf.pkgpaths(
                          env.included_tags.get(), env.excluded_tags.get())) {
@@ -142,10 +145,10 @@ namespace {
 
     void
     delete_and_recheck(
-        options const& opts,
-        environment const& env,
+        pkg_chk::options const& opts,
+        pkg_chk::environment const& env,
         std::set<pkgxx::pkgpath> const& pkgpaths,
-        check_result& res) {
+        pkg_chk::check_result& res) {
 
         std::set<pkgxx::pkgpath> update_conf;
         if (opts.update) {
@@ -155,7 +158,7 @@ namespace {
             fs::path const& update_conf_file = env.PKGCHK_UPDATE_CONF.get();
             if (fs::exists(update_conf_file)) {
                 msg(opts) << "Merging in previous " << update_conf_file << std::endl;
-                update_conf = config(update_conf_file).pkgpaths();
+                update_conf = pkg_chk::config(update_conf_file).pkgpaths();
             }
 
             for (pkgxx::pkgpath const& path: env.installed_pkgpaths.get()) {
@@ -189,14 +192,23 @@ namespace {
     }
 
     bool
-    try_fetch(options const& opts, environment const& env, pkgxx::pkgpath const& path) {
+    try_fetch(
+        pkg_chk::options const& opts,
+        pkg_chk::environment const& env,
+        pkgxx::pkgpath const& path) {
+
         std::stringstream ss;
         ss << CFG_BMAKE << " -C " << (env.PKGSRCDIR.get() / path) << " fetch-list | " << pkgxx::shell;
         return run_cmd(opts, env, ss.str(), {}, true);
     }
 
     bool
-    try_install(options const& opts, environment const& env, pkgxx::pkgname const& name, pkgxx::pkgpath const& path) {
+    try_install(
+        pkg_chk::options const& opts,
+        pkg_chk::environment const& env,
+        pkgxx::pkgname const& name,
+        pkgxx::pkgpath const& path) {
+
         if (pkgxx::is_pkg_installed(env.PKG_INFO.get(), name)) {
             msg(opts) << name << " was installed in a previous stage" << std::endl;
             return run_cmd_su(
@@ -227,7 +239,7 @@ namespace {
     }
 
     void
-    add_delete_update(options const& opts, environment const& env) {
+    add_delete_update(pkg_chk::options const& opts, pkg_chk::environment const& env) {
         std::set<pkgxx::pkgpath> const pkgpaths = pkgpaths_to_check(opts, env);
         if (opts.print_pkgpaths_to_check) {
             for (pkgxx::pkgpath const& path: pkgpaths) {
@@ -236,7 +248,7 @@ namespace {
             return;
         }
 
-        check_result res = check_installed_packages(opts, env, pkgpaths);
+        pkg_chk::check_result res = check_installed_packages(opts, env, pkgpaths);
         if (!res.MISMATCH_TODO.empty() ||
             (opts.update && fs::exists(env.PKGCHK_UPDATE_CONF.get()))) {
 
@@ -304,7 +316,7 @@ namespace {
     }
 
     void
-    generate_conf_from_installed(options const& opts, environment const& env) {
+    generate_conf_from_installed(pkg_chk::options const& opts, pkg_chk::environment const& env) {
         fs::path const& file = env.PKGCHK_CONF.get();
         verbose(opts) << "Write " << file << " based on installed packages" << std::endl;
 
@@ -324,15 +336,15 @@ namespace {
         out << "# Generated automatically at "
             << std::put_time(std::localtime(&now), "%c %Z") << std::endl;
 
-        config conf;
+        pkg_chk::config conf;
         for (pkgxx::pkgpath const& path: env.installed_pkgpaths.get()) {
-            conf.emplace_back(config::pkg_def(path, std::vector<tagpat>()));
+            conf.emplace_back(pkg_chk::config::pkg_def(path, std::vector<pkg_chk::tagpat>()));
         }
         out << conf;
     }
 
     void
-    lookup_todo(environment const& env) {
+    lookup_todo(pkg_chk::environment const& env) {
         /* Spawning pkg_info(1) isn't instantaneous. Start parsing the TODO
          * file right now to save some time. */
         auto f_todo = std::async(
@@ -358,11 +370,11 @@ namespace {
     }
 
     void
-    list_bin_pkgs(options const& opts, environment const& env) {
+    list_bin_pkgs(pkg_chk::options const& opts, pkg_chk::environment const& env) {
         std::string    const& sufx = env.PKG_SUFX.get();
         pkgxx::summary const& sum  = env.bin_pkg_summary.get();
         pkgxx::pkgmap  const& pm   = env.bin_pkg_map.get();
-        config const conf(env.PKGCHK_CONF.get());
+        pkg_chk::config const conf(env.PKGCHK_CONF.get());
 
         // TODO: We don't take account of SUPERSEDES but how do we do it?
 
@@ -440,7 +452,7 @@ namespace {
 
 int main(int argc, char* argv[]) {
     try {
-        options opts(argc, argv);
+        pkg_chk::options opts(argc, argv);
 
         verbose(opts) << "ARGV:";
         for (int i = 0; i < argc; i++) {
@@ -448,25 +460,25 @@ int main(int argc, char* argv[]) {
         }
         verbose(opts) << std::endl;
 
-        environment env(opts);
+        pkg_chk::environment env(opts);
         switch (opts.mode) {
-        case mode::ADD_DELETE_UPDATE:
+        case pkg_chk::mode::ADD_DELETE_UPDATE:
             add_delete_update(opts, env);
             break;
 
-        case mode::GENERATE_PKGCHK_CONF:
+        case pkg_chk::mode::GENERATE_PKGCHK_CONF:
             generate_conf_from_installed(opts, env);
             break;
 
-        case mode::HELP:
-            usage(argv[0]);
+        case pkg_chk::mode::HELP:
+            pkg_chk::usage(argv[0]);
             return 1;
 
-        case mode::LIST_BIN_PKGS:
+        case pkg_chk::mode::LIST_BIN_PKGS:
             list_bin_pkgs(opts, env);
             break;
 
-        case mode::LOOKUP_TODO:
+        case pkg_chk::mode::LOOKUP_TODO:
             lookup_todo(env);
             break;
 
@@ -476,7 +488,7 @@ int main(int argc, char* argv[]) {
         }
         return 0;
     }
-    catch (bad_options& e) {
+    catch (pkg_chk::bad_options& e) {
         return 1;
     }
     catch (std::exception& e) {
