@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <mutex>
+#include <thread>
 #include <optional>
 #include <type_traits>
 
@@ -60,8 +61,8 @@ namespace pkg_rr {
     }
 
     inline msg_logger
-    verbose(pkg_rr::options const& opts) {
-        if (opts.verbose) {
+    verbose(pkg_rr::options const& opts, unsigned level = 1) {
+        if (opts.verbose >= level) {
             return msg_logger(std::cout);
         }
         else {
@@ -69,15 +70,37 @@ namespace pkg_rr {
         }
     }
 
+    template <typename Function>
+    inline void
+    verbose(pkg_rr::options const& opts, Function&& f, unsigned level = 1) {
+        static_assert(std::is_invocable_v<Function&&, std::ostream&>);
+
+        std::lock_guard<std::mutex> lk(detail::message_mutex);
+        auto out = verbose(opts, level);
+        f(out);
+    }
+
     inline void
     verbose_var(
         pkg_rr::options const& opts,
         std::string_view const& var,
-        std::string_view const& value) {
+        std::string_view const& value,
+        unsigned level = 2) {
 
         std::lock_guard<std::mutex> lk(detail::message_mutex);
-        verbose(opts)
+        verbose(opts, level)
             << "Variable: " << var << " = " << (value.empty() ? "(empty)" : value) << std::endl;
+    }
+
+    template <typename Rep, typename Period>
+    void vsleep(
+        pkg_rr::options const& opts,
+        const std::chrono::duration<Rep, Period>& duration,
+        unsigned level = 2) {
+
+        if (opts.verbose >= level) {
+            std::this_thread::sleep_for(duration);
+        }
     }
 
     template <typename Function>

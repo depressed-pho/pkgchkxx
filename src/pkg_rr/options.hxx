@@ -32,7 +32,7 @@ namespace pkg_rr {
         bool just_replace;                            // -r
         bool strict;                                  // -s
         bool check_for_updates;                       // -u
-        bool verbose;                                 // -v
+        unsigned verbose;                             // -v
         std::set<pkgxx::pkgbase> no_rebuild;          // -X
         std::set<pkgxx::pkgbase> no_check;            // -x
     };

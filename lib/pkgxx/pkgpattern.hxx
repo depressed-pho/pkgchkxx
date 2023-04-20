@@ -4,12 +4,15 @@
 #include <functional>
 #include <optional>
 #include <ostream>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <type_traits>
 #include <variant>
 #include <vector>
 
+#include <pkgxx/hash.hxx>
+#include <pkgxx/ordered.hxx>
 #include <pkgxx/pkgname.hxx>
 #include <pkgxx/string_algo.hxx>
 
@@ -29,7 +32,7 @@ namespace pkgxx {
 
     /** A class that represents a package name pattern.
      */
-    struct pkgpattern {
+    struct pkgpattern: equality_comparable<pkgpattern> {
         /// csh-style alternatives, e.g. \c foo{bar,{baz,qux}}
         class alternatives {
         public:
@@ -68,6 +71,12 @@ namespace pkgxx {
             /// stream.
             friend std::ostream&
             operator<< (std::ostream& out, alternatives const& alts);
+
+            /// Equality of alternatives.
+            friend bool
+            operator== (alternatives const& a, alternatives const& b) {
+                return a._expanded == b._expanded;
+            }
 
         private:
             std::string _original;
@@ -113,6 +122,12 @@ namespace pkgxx {
                 friend std::ostream&
                 operator<< (std::ostream& out, ge const& ver);
 
+                /// Equality
+                friend bool
+                operator== (ge const& a, ge const& b) {
+                    return a.min == b.min && a.sup == b.sup;
+                }
+
                 pkgversion min; ///< \c >=1.1
                 std::optional<
                     std::variant<
@@ -130,6 +145,12 @@ namespace pkgxx {
                 /// Print a version constraint to an output stream.
                 friend std::ostream&
                 operator<< (std::ostream& out, gt const& ver);
+
+                /// Equality
+                friend bool
+                operator== (gt const& a, gt const& b) {
+                    return a.inf == b.inf && a.sup == b.sup;
+                }
 
                 pkgversion inf; ///< \c >1.1
                 std::optional<
@@ -179,6 +200,14 @@ namespace pkgxx {
             friend std::ostream&
             operator<< (std::ostream& out, version_range const& ver);
 
+            /// Equality of version constraints.
+            friend bool
+            operator== (version_range const& a, version_range const& b) {
+                return
+                    a.base == b.base &&
+                    a.cst  == b.cst;
+            }
+
             pkgbase base;   ///< The base name of package, e.g. \c foo
             constraint cst; ///< The version constraints, e.g. \c >=1.1<2
         };
@@ -200,6 +229,14 @@ namespace pkgxx {
 
         /// Parse a package name pattern string.
         pkgpattern(std::string_view const& patstr);
+
+        /// Construct a package pattern by copying one of pattern variants.
+        pkgpattern(pattern_type const& pat)
+            : _pat(pat) {}
+
+        /// Construct a package pattern by moving one of pattern variants.
+        pkgpattern(pattern_type&& pat)
+            : _pat(std::move(pat)) {}
 
         /** Apply a function \c f to each package matching to the pattern
          * in a set \c s. The set is expected to either be \c
@@ -226,10 +263,25 @@ namespace pkgxx {
             return _pat;
         }
 
+        /// Obtain a string representation of \ref pkgpattern.
+        std::string
+        string() const {
+            std::stringstream ss;
+            ss << *this;
+            return ss.str();
+        }
+
         /// Print a string representation of \ref pkgpattern to an output
         /// stream.
         friend std::ostream&
         operator<< (std::ostream& out, pkgpattern const& pat);
+
+        /// Equality of two patterns is defined as the equality of string
+        /// representations. This is fishy, but is the best we can do.
+        friend bool
+        operator== (pkgpattern const& a, pkgpattern const& b) {
+            return a._pat == b._pat;
+        }
 
     private:
         pattern_type _pat;
@@ -422,3 +474,91 @@ namespace pkgxx {
         }
     }
 }
+
+// Forward declaration
+template <>
+struct std::hash<pkgxx::pkgpattern>;
+
+template <>
+struct std::hash<pkgxx::pkgpattern::alternatives> {
+    std::size_t
+    operator() (pkgxx::pkgpattern::alternatives const& alts) const noexcept {
+        std::size_t seed = 0;
+        for (auto const& alt: alts) {
+            pkgxx::hash_append(seed, alt);
+        }
+        return seed;
+    }
+};
+
+template <>
+struct std::hash<pkgxx::pkgpattern::version_range> {
+    std::size_t
+    operator() (pkgxx::pkgpattern::version_range const& ver) const noexcept {
+        return pkgxx::hash_combine(ver.base, ver.cst);
+    }
+};
+
+template <>
+struct std::hash<pkgxx::pkgpattern::version_range::le> {
+    std::size_t
+    operator() (pkgxx::pkgpattern::version_range::le const& ver) const noexcept {
+        return std::hash<pkgxx::pkgversion>{}(ver);
+    }
+};
+
+template <>
+struct std::hash<pkgxx::pkgpattern::version_range::lt> {
+    std::size_t
+    operator() (pkgxx::pkgpattern::version_range::lt const& ver) const noexcept {
+        return std::hash<pkgxx::pkgversion>{}(ver);
+    }
+};
+
+template <>
+struct std::hash<pkgxx::pkgpattern::version_range::ge> {
+    std::size_t
+    operator() (pkgxx::pkgpattern::version_range::ge const& ver) const noexcept {
+        return pkgxx::hash_combine(ver.min, ver.sup);
+    }
+};
+
+template <>
+struct std::hash<pkgxx::pkgpattern::version_range::gt> {
+    std::size_t
+    operator() (pkgxx::pkgpattern::version_range::gt const& ver) const noexcept {
+        return pkgxx::hash_combine(ver.inf, ver.sup);
+    }
+};
+
+template <>
+struct std::hash<pkgxx::pkgpattern::version_range::eq> {
+    std::size_t
+    operator() (pkgxx::pkgpattern::version_range::eq const& ver) const noexcept {
+        return std::hash<pkgxx::pkgversion>{}(ver);
+    }
+};
+
+template <>
+struct std::hash<pkgxx::pkgpattern::version_range::ne> {
+    std::size_t
+    operator() (pkgxx::pkgpattern::version_range::ne const& ver) const noexcept {
+        return std::hash<pkgxx::pkgversion>{}(ver);
+    }
+};
+
+template <>
+struct std::hash<pkgxx::pkgpattern::glob> {
+    std::size_t
+    operator() (pkgxx::pkgpattern::glob const& g) const noexcept {
+        return std::hash<std::string>{}(g);
+    }
+};
+
+template <>
+struct std::hash<pkgxx::pkgpattern> {
+    std::size_t
+    operator() (pkgxx::pkgpattern const& pattern) const noexcept {
+        return std::hash<pkgxx::pkgpattern::pattern_type>{}(pattern);
+    }
+};

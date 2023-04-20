@@ -8,6 +8,8 @@ libpkgxx_la_SOURCES = \
 	graph.hxx \
 	gzipstream.cxx gzipstream.hxx \
 	harness.hxx harness.cxx \
+	hash.hxx \
+	iterable.hxx \
 	makevars.cxx makevars.hxx \
 	mutex_guard.hxx \
 	nursery.cxx nursery.hxx \
@@ -20,6 +22,7 @@ libpkgxx_la_SOURCES = \
 	summary.hxx summary.cxx \
 	tempfile.cxx tempfile.hxx \
 	todo.cxx todo.hxx \
+	unwrap.hxx \
 	wwwstream.cxx wwwstream.hxx \
 	xargs_fold.hxx
 

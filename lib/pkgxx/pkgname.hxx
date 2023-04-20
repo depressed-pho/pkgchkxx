@@ -11,6 +11,7 @@
 #include <variant>
 #include <vector>
 
+#include <pkgxx/hash.hxx>
 #include <pkgxx/ordered.hxx>
 
 namespace pkgxx {
@@ -42,14 +43,16 @@ namespace pkgxx {
 
             /// Print an instance of \ref digits to an output stream.
             friend std::ostream&
-            operator<< (std::ostream& out, pkgversion::digits const& digits) {
-                if (digits._width >= 0) {
-                    out << std::setfill('0') << std::setw(digits._width);
+            operator<< (std::ostream& out, digits const& ds) {
+                if (ds._width >= 0) {
+                    out << std::setfill('0') << std::setw(ds._width);
                 }
-                return out << digits._num;
+                return out << ds._num;
             }
 
         private:
+            friend struct std::hash<digits>;
+
             int _num;
             int _width;
         };
@@ -94,11 +97,13 @@ namespace pkgxx {
 
             /// Print a modifier to an output stream.
             friend std::ostream&
-            operator<< (std::ostream& out, pkgversion::modifier const& mod) {
+            operator<< (std::ostream& out, modifier const& mod) {
                 return out << mod._str;
             }
 
         private:
+            friend struct std::hash<modifier>;
+
             kind _kind;
             std::string _str;
         };
@@ -193,6 +198,8 @@ namespace pkgxx {
         }
 
     private:
+        friend struct std::hash<pkgversion>;
+
         bool
         is_neg_inf() const noexcept {
             return _comps.empty();
@@ -257,3 +264,40 @@ namespace pkgxx {
         pkgversion version; ///< The PKGVERSION.
     };
 }
+
+template <>
+struct std::hash<pkgxx::pkgversion> {
+    std::size_t
+    operator() (pkgxx::pkgversion const& v) const noexcept {
+        std::size_t seed = 0;
+        for (auto const& comp: v._comps) {
+            pkgxx::hash_append(seed, comp);
+        }
+        pkgxx::hash_append(seed, v._rev);
+        return seed;
+    }
+};
+
+template <>
+struct std::hash<pkgxx::pkgversion::digits> {
+    std::size_t
+    operator() (pkgxx::pkgversion::digits const& ds) const noexcept {
+        return pkgxx::hash_combine(ds._num, ds._width);
+    }
+};
+
+template <>
+struct std::hash<pkgxx::pkgversion::modifier> {
+    std::size_t
+    operator() (pkgxx::pkgversion::modifier const& mod) const noexcept {
+        return pkgxx::hash_combine(mod._kind, mod._str);
+    }
+};
+
+template <>
+struct std::hash<pkgxx::pkgversion::alpha> {
+    std::size_t
+    operator() (pkgxx::pkgversion::alpha const& alpha) const noexcept {
+        return std::hash<char>{}(alpha);
+    }
+};

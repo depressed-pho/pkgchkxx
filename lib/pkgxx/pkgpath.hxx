@@ -5,6 +5,7 @@
 #include <ostream>
 #include <string_view>
 
+#include <pkgxx/hash.hxx>
 #include <pkgxx/ordered.hxx>
 
 namespace pkgxx {
@@ -58,3 +59,11 @@ namespace pkgxx {
         std::string subdir;   ///< Package subdirectory
     };
 }
+
+template <>
+struct std::hash<pkgxx::pkgpath> {
+    std::size_t
+    operator() (pkgxx::pkgpath const& path) const noexcept {
+        return pkgxx::hash_combine(path.category, path.subdir);
+    }
+};

@@ -31,7 +31,8 @@ namespace pkgxx {
         std::map<std::string, std::string> const& assignments = {});
 
     /** A variant of extract_pkgmk_vars() that extracts a value of a single
-     * variable.
+     * variable. \c T must be a type where <tt>T(std::string&&)</tt> is
+     * well-formed.
      */
     template <typename T = std::string>
     inline std::optional<T>

@@ -2,10 +2,12 @@
 
 #include <memory>
 #include <set>
+#include <type_traits>
 
 #include <pkgxx/harness.hxx>
 #include <pkgxx/ordered.hxx>
 #include <pkgxx/pkgname.hxx>
+#include <pkgxx/pkgpattern.hxx>
 
 namespace pkgxx {
     /** An iterator that iterates through installed packages. */
@@ -89,15 +91,53 @@ namespace pkgxx {
         std::string _pkg_info;
     };
 
-    /// Obtain the set of @blddep entries of an installed package. This
-    /// includes \c BUILD_DEPENDS and \c DEPENDS but not \c TOOL_DEPENDS.
-    std::set<pkgxx::pkgname>
-    build_depends(std::string const& PKG_INFO, pkgxx::pkgbase const& name);
+    namespace detail {
+        bool
+        is_pkg_installed(std::string const& PKG_INFO, pkgxx::pkgpattern const& pat);
+    }
 
-    /// Obtain the set of @blddep entries of an installed package. This
-    /// includes \c BUILD_DEPENDS and \c DEPENDS but not \c TOOL_DEPENDS.
+    /// Check if a package is installed. \c Name must either be a \ref
+    /// pkgxx::pkgbase or \ref pkgxx::pkgname.
+    template <typename Name>
+    inline bool
+    is_pkg_installed(std::string const& PKG_INFO, Name const& name) {
+        if constexpr (std::is_same_v<pkgxx::pkgname const&, decltype(name)>) {
+            return detail::is_pkg_installed(
+                PKG_INFO,
+                pkgxx::pkgpattern::pattern_type(
+                    pkgxx::pkgpattern::glob { name.string() }));
+        }
+        else {
+            return detail::is_pkg_installed(
+                PKG_INFO,
+                pkgxx::pkgpattern::pattern_type(
+                    pkgxx::pkgpattern::glob { name }));
+        }
+    }
+
+    namespace detail {
+        std::set<pkgxx::pkgname>
+        build_depends(std::string const& PKG_INFO, pkgxx::pkgpattern const& pat);
+    }
+
+    /// Obtain the set of \c \@blddep entries of an installed package. \c
+    /// Name must either be a \ref pkgxx::pkgbase or \ref
+    /// pkgxx::pkgname. This includes \c BUILD_DEPENDS and \c DEPENDS but
+    /// not \c TOOL_DEPENDS.
+    template <typename Name>
     inline std::set<pkgxx::pkgname>
-    build_depends(std::string const& PKG_INFO, pkgxx::pkgname const& name) {
-        return build_depends(PKG_INFO, name.base);
+    build_depends(std::string const& PKG_INFO, Name const& name) {
+        if constexpr (std::is_same_v<pkgxx::pkgname const&, decltype(name)>) {
+            return detail::build_depends(
+                PKG_INFO,
+                pkgxx::pkgpattern::pattern_type(
+                    pkgxx::pkgpattern::glob { name.string() }));
+        }
+        else {
+            return detail::build_depends(
+                PKG_INFO,
+                pkgxx::pkgpattern::pattern_type(
+                    pkgxx::pkgpattern::glob { name }));
+        }
     }
 }

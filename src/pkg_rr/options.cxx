@@ -40,7 +40,7 @@ namespace pkg_rr {
         , just_replace(false)
         , strict(false)
         , check_for_updates(false)
-        , verbose(false) {
+        , verbose(0) {
 
         make_vars["IN_PKG_ROLLING_REPLACE"] = "1";
 
@@ -87,7 +87,7 @@ namespace pkg_rr {
                 check_for_updates = true;
                 break;
             case 'v':
-                verbose = true;
+                ++verbose;
                 break;
             case 'X':
                 for (auto const& pkg: pkgxx::words(optarg, ",")) {

@@ -15,6 +15,7 @@
 #include <pkgxx/config.h>
 #include <pkgxx/graph.hxx>
 #include <pkgxx/harness.hxx>
+#include <pkgxx/pkgdb.hxx>
 #include <pkgxx/pkgpath.hxx>
 #include <pkgxx/todo.hxx>
 
@@ -109,17 +110,10 @@ namespace {
         }
     }
 
-    bool is_pkg_installed(std::string const& PKG_INFO, pkgxx::pkgname const& name) {
-        pkgxx::harness pkg_info(pkgxx::shell, {pkgxx::shell, "-s", "--", "-q", "-e", name.string()});
-        pkg_info.cin() << "exec " << PKG_INFO << " \"$@\"" << std::endl;
-        pkg_info.cin().close();
-        return pkg_info.wait_exit().status == 0;
-    }
-
     void
     delete_pkgs(options const& opts, environment const& env, std::set<pkgxx::pkgname> const& pkgnames) {
         for (pkgxx::pkgname const& name: pkgnames) {
-            if (is_pkg_installed(env.PKG_INFO.get(), name)) {
+            if (pkgxx::is_pkg_installed(env.PKG_INFO.get(), name)) {
                 run_cmd_su(opts, env, env.PKG_DELETE.get(), {"-r", name.string()}, true);
             }
         }
@@ -203,7 +197,7 @@ namespace {
 
     bool
     try_install(options const& opts, environment const& env, pkgxx::pkgname const& name, pkgxx::pkgpath const& path) {
-        if (is_pkg_installed(env.PKG_INFO.get(), name)) {
+        if (pkgxx::is_pkg_installed(env.PKG_INFO.get(), name)) {
             msg(opts) << name << " was installed in a previous stage" << std::endl;
             return run_cmd_su(
                 opts, env, env.PKG_ADMIN.get(), {"unset", "automatic", name.string()}, true);
@@ -425,7 +419,7 @@ namespace {
                     }
                 }
             }
-            to_list = scheduled;
+            to_list = std::move(scheduled);
         }
 
         try {
