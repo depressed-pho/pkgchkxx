@@ -6,7 +6,7 @@
 #include <pkgxx/pkgdb.hxx>
 #include <pkgxx/string_algo.hxx>
 
-#include "scan.hxx"
+#include "scanner.hxx"
 
 namespace pkg_rr {
     package_scanner::~package_scanner() noexcept(false) {

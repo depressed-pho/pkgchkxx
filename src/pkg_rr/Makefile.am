@@ -2,7 +2,7 @@ sbin_PROGRAMS = pkgrrxx
 
 pkgrrxx_SOURCES = \
 	environment.cxx environment.hxx \
-	scan.cxx scan.hxx \
+	scanner.cxx scanner.hxx \
 	main.cxx \
 	message.cxx message.hxx \
 	options.cxx options.hxx \

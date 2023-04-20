@@ -16,7 +16,7 @@
 #include "config.h"
 #include "environment.hxx"
 #include "message.hxx"
-#include "scan.hxx"
+#include "scanner.hxx"
 #include "options.hxx"
 
 namespace pkg_rr {
