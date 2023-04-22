@@ -22,11 +22,6 @@ namespace pkgxx {
         /** Parse a PKGPATH string. */
         pkgpath(std::string_view const& dir);
 
-        /** Convert a PKGPATH into a relative \c path object. */
-        operator std::filesystem::path () const {
-            return std::filesystem::path(category) / subdir;
-        }
-
         /// \ref pkgpath equality.
         friend bool
         operator== (pkgpath const& a, pkgpath const& b) noexcept {
@@ -46,6 +41,17 @@ namespace pkgxx {
                     a.category == b.category &&
                     a.subdir   <  b.subdir;
             }
+        }
+
+        /** Convert a PKGPATH into a string. */
+        std::string
+        string() const {
+            return static_cast<std::filesystem::path>(*this).string();
+        }
+
+        /** Convert a PKGPATH into a relative \c path object. */
+        operator std::filesystem::path () const {
+            return std::filesystem::path(category) / subdir;
         }
 
         /// Print the string representation of PKGPATH to an output stream.

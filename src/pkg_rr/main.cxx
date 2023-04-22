@@ -4,24 +4,6 @@
 #include "options.hxx"
 #include "replacer.hxx"
 
-/* FIXME
-
-    todo_type
-    packages_w_flag(
-        options const& opts,
-        environment const& env,
-        std::string const& flag,
-        std::set<pkgxx::pkgbase> const& exclude = {}) {
-
-        std::future<todo_type> res;
-        {
-            pkg_rr::package_scanner scanner(env.PKG_INFO.get(), opts.concurrency);
-            res = scanner.add_axis(flag, exclude);
-        }
-        return res.get();
-    }
-*/
-
 int main(int argc, char* argv[]) {
     try {
         pkg_rr::options opts(argc, argv);

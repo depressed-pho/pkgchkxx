@@ -32,7 +32,7 @@ namespace pkg_rr {
          * the instance of \c package_scanner gets destructed. */
         std::future<result_type>
         add_axis(
-            std::string const& flag,
+            std::string_view const& flag,
             std::set<pkgxx::pkgbase> const& exclude = {}) {
 
             auto& axis = _axes.emplace_back(

@@ -41,6 +41,9 @@ namespace pkg_rr {
         std::future<todo_type>
         check_unsafe(pkg_rr::package_scanner& scanner) const;
 
+        void
+        recheck_unsafe(pkgxx::pkgbase const& base);
+
         /// Update REPLACE_TODO based on the current contents of other
         /// TODOs.
         void
@@ -53,9 +56,9 @@ namespace pkg_rr {
         dump_todo(std::ostream& out, std::string const& label, todo_type const& todo) const;
 
         bool
-        is_pkg_installed(pkgxx::pkgbase const& base);
+        is_pkg_installed(pkgxx::pkgbase const& base) const;
 
-        pkgxx::graph<pkgxx::pkgbase, true>
+        pkgxx::graph<pkgxx::pkgbase, void, true>
         depgraph_installed() const;
 
         std::pair<pkgxx::pkgbase, pkgxx::pkgpath>
@@ -63,6 +66,14 @@ namespace pkg_rr {
 
         void
         update_depends_with_source(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path);
+
+        [[gnu::pure]] static bool
+        depends_differ(
+            std::set<
+                std::reference_wrapper<pkgxx::pkgbase const>,
+                std::less<pkgxx::pkgbase>
+                > const& old_depends,
+            std::map<pkgxx::pkgbase, pkgxx::pkgpath> const& new_depends);
 
         void
         dump_new_depends(
@@ -78,12 +89,34 @@ namespace pkg_rr {
 
         pkgxx::harness
         spawn_make(
-            std::filesystem::path const& path,
-            std::string const& target,
+            pkgxx::pkgpath const& path,
+            std::initializer_list<std::string> const& targets,
+            std::map<std::string, std::string> const& vars) const;
+
+        void
+        run_make(
+            pkgxx::pkgpath const& path,
+            std::initializer_list<std::string> const& targets,
             std::map<std::string, std::string> const& vars) const;
 
         std::map<pkgxx::pkgbase, pkgxx::pkgpath>
         source_depends(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path) const;
+
+        void
+        fetch(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path);
+
+        void
+        replace(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path);
+
+        template <typename Function>
+        void
+        error(Function&& f) const {
+            static_assert(std::is_invocable_v<Function&&, std::ostream&>);
+            pkg_rr::msg(
+                [&](auto& out) {
+                    out << "*** "; f(out);
+                });
+        }
 
         template <typename Function>
         [[noreturn]] void
@@ -91,7 +124,7 @@ namespace pkg_rr {
             static_assert(std::is_invocable_v<Function&&, std::ostream&>);
             pkg_rr::fatal(
                 [&](auto& out) {
-                    out << "*** "; f(out);
+                    f(out);
                     out << "*** Please read the errors listed above, fix the problem," << std::endl
                         << "*** then re-run " << progname.filename().string() << " to continue." << std::endl;
                     report();
@@ -105,6 +138,8 @@ namespace pkg_rr {
         options opts;
         environment env;
 
+        std::string_view const UNSAFE_VAR;
+
         todo_type MISMATCH_TODO;
         todo_type REBUILD_TODO;
         todo_type MISSING_TODO;
@@ -117,11 +152,11 @@ namespace pkg_rr {
         /* The dependency graph is initially built with installed packages
          * and will be progressively updated when new depends are
          * discovered or new packages are installed. */
-        pkgxx::graph<pkgxx::pkgbase, true> topology;
+        pkgxx::graph<pkgxx::pkgbase, void, true> topology;
 
         /* A copy of the dependency graph that is never mutated after its
          * initial construction. We need this only in the dry-run mode. */
-        pkgxx::graph<pkgxx::pkgbase, true> initial_topology;
+        pkgxx::graph<pkgxx::pkgbase, void, true> initial_topology;
 
         /* Newer versions in pkgsrc sometimes have different sets of
          * dependencies from that are recorded for installed versions. When
@@ -137,6 +172,6 @@ namespace pkg_rr {
             > mutable pattern_to_base_cache;
 
         // See a comment in is_pkg_installed().
-        std::set<pkgxx::pkgbase> definitely_installed;
+        std::set<pkgxx::pkgbase> mutable definitely_installed;
     };
 }

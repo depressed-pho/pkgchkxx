@@ -228,7 +228,15 @@ namespace pkgxx {
             >;
 
         /// Parse a package name pattern string.
-        pkgpattern(std::string_view const& patstr);
+        explicit pkgpattern(std::string_view const& patstr);
+
+        /// Construct a package pattern that matches a specific package name.
+        explicit pkgpattern(pkgxx::pkgname const& name)
+            : _pat(glob {name.string()}) {}
+
+        /// Construct a package pattern that matches a specific package base.
+        explicit pkgpattern(pkgxx::pkgbase const& base)
+            : _pat(glob {base}) {}
 
         /// Construct a package pattern by copying one of pattern variants.
         pkgpattern(pattern_type const& pat)

@@ -10,7 +10,7 @@
 
 namespace pkg_rr {
     namespace detail {
-        inline std::mutex message_mutex;
+        inline std::recursive_mutex message_mutex;
     }
 
     struct msg_logger: public std::ostream {
@@ -60,6 +60,15 @@ namespace pkg_rr {
         return msg_logger(std::cout);
     }
 
+    template <typename Function>
+    inline void
+    msg(Function&& f) {
+        static_assert(std::is_invocable_v<Function&&, std::ostream&>);
+
+        std::lock_guard<std::recursive_mutex> lk(detail::message_mutex);
+        f(std::cout);
+    }
+
     inline msg_logger
     verbose(pkg_rr::options const& opts, unsigned level = 1) {
         if (opts.verbose >= level) {
@@ -75,7 +84,7 @@ namespace pkg_rr {
     verbose(pkg_rr::options const& opts, Function&& f, unsigned level = 1) {
         static_assert(std::is_invocable_v<Function&&, std::ostream&>);
 
-        std::lock_guard<std::mutex> lk(detail::message_mutex);
+        std::lock_guard<std::recursive_mutex> lk(detail::message_mutex);
         auto out = verbose(opts, level);
         f(out);
     }
@@ -87,7 +96,7 @@ namespace pkg_rr {
         std::string_view const& value,
         unsigned level = 2) {
 
-        std::lock_guard<std::mutex> lk(detail::message_mutex);
+        std::lock_guard<std::recursive_mutex> lk(detail::message_mutex);
         verbose(opts, level)
             << "Variable: " << var << " = " << (value.empty() ? "(empty)" : value) << std::endl;
     }
@@ -108,9 +117,9 @@ namespace pkg_rr {
     fatal(Function&& f) {
         static_assert(std::is_invocable_v<Function&&, std::ostream&>);
 
-        std::lock_guard<std::mutex> lk(detail::message_mutex);
-        std::cerr << "*** ";
-        f(std::cerr);
+        std::lock_guard<std::recursive_mutex> lk(detail::message_mutex);
+        std::cout << "*** ";
+        f(std::cout);
         std::exit(1);
     }
 }

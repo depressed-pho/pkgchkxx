@@ -1,8 +1,18 @@
+#include <exception>
+#include <filesystem>
+
+#include <pkgxx/string_algo.hxx>
+
 #include "replacer.hxx"
 
 using namespace std::chrono_literals;
+namespace fs = std::filesystem;
 
 namespace {
+    struct replace_failed: std::runtime_error {
+        using std::runtime_error::runtime_error;
+    };
+
     std::optional<pkgxx::pkgbase>
     obvious_pkgbase_of(pkgxx::pkgpattern const& pat) {
         return std::visit(
@@ -17,29 +27,28 @@ namespace {
             static_cast<pkgxx::pkgpattern::pattern_type const&>(pat));
     }
 
-    bool
-    depends_differ(
-        std::set<
-            std::reference_wrapper<pkgxx::pkgbase const>,
-            std::less<pkgxx::pkgbase>> const& old_depends,
-        std::map<pkgxx::pkgbase, pkgxx::pkgpath> const& new_depends) {
+    std::vector<std::string>
+    make_argv(fs::path const& PKGSRCDIR,
+              pkgxx::pkgpath const& path,
+              std::initializer_list<std::string> const& targets,
+              std::map<std::string, std::string> const& vars) {
 
-        if (old_depends.size() != new_depends.size()) {
-            return true;
+        auto const& abspath   = PKGSRCDIR / path;
+        if (!fs::is_directory(abspath)) {
+            throw replace_failed(
+                "No package directory `" + path.string() + "' in " + PKGSRCDIR.string());
         }
-        else {
-            for (auto const& dep_base: old_depends) {
-                if (new_depends.count(dep_base) == 0) {
-                    return true;
-                }
-            }
-            for (auto const& [dep_base, _dep_path]: new_depends) {
-                if (old_depends.count(dep_base) == 0) {
-                    return true;
-                }
-            }
-            return false;
+
+        std::vector<std::string> argv = {
+            CFG_BMAKE, "-C", abspath.string(),
+        };
+        for (auto const& target: targets) {
+            argv.push_back(target);
         }
+        for (auto const& [var, value]: vars) {
+            argv.push_back(var + '=' + value);
+        }
+        return argv;
     }
 }
 
@@ -51,6 +60,7 @@ namespace pkg_rr {
         : progname(progname_)
         , opts(opts_)
         , env(env_)
+        , UNSAFE_VAR(opts.strict ? "unsafe_depends_strict" : "unsafe_depends")
         , pattern_to_base_cache(0) {
 
         std::future<todo_type> MISMATCH_TODO_f;
@@ -85,18 +95,48 @@ namespace pkg_rr {
     rolling_replacer::run() {
         while (!REPLACE_TODO.empty()) {
             auto [base, path] = choose_one();
-            if (DEPENDS_CHECKED.count(base)) {
-                msg() << "Selecting " << base << " ("
-                      << static_cast<std::filesystem::path const&>(path).string()
-                      << ") as next package to replace";
-                vsleep(opts, 1s);
+            try {
+                if (DEPENDS_CHECKED.count(base)) {
+                    msg() << "Selecting " << base << " ("
+                          << static_cast<std::filesystem::path const&>(path).string()
+                          << ") as next package to replace" << std::endl;
+                    vsleep(opts, 1s);
+                }
+                else {
+                    update_depends_with_source(base, path);
+                    DEPENDS_CHECKED.insert(base);
+                    continue;
+                }
+
+                if (opts.just_fetch) {
+                    fetch(base, path);
+                }
+                else {
+                    replace(base, path);
+                }
+                SUCCEEDED.insert(base);
             }
-            else {
-                update_depends_with_source(base, path);
-                DEPENDS_CHECKED.insert(base);
-                continue;
+            catch (replace_failed const& e) {
+                FAILED.insert(base);
+                auto const& cb = [&](auto& out) { out << e.what() << std::endl; };
+                if (opts.continue_on_errors) {
+                    error(cb);
+                }
+                else {
+                    abort(cb);
+                }
             }
-            break;//
+
+            // Remove just-replaced package from all *_TODO lists
+            // regardless of whether it succeeded or not.
+            MISMATCH_TODO.erase(base);
+            REBUILD_TODO.erase(base);
+            MISSING_TODO.erase(base);
+            UNSAFE_TODO.erase(base);
+
+            refresh_todo();
+            dump_todo();
+            vsleep(opts, 2s);
         }
         msg() << "No more packages to replace; done." << std::endl;
         report();
@@ -134,9 +174,63 @@ namespace pkg_rr {
             return res.get_future();
         }
         else {
-            auto const flag = opts.strict ? "unsafe_depends_strict" : "unsafe_depends";
-            msg() << "Checking for unsafe installed packages (" << flag << "=YES)" << std::endl;
-            return scanner.add_axis(flag);
+            msg() << "Checking for unsafe installed packages (" << UNSAFE_VAR << "=YES)" << std::endl;
+            return scanner.add_axis(UNSAFE_VAR);
+        }
+    }
+
+    void
+    rolling_replacer::recheck_unsafe(pkgxx::pkgbase const& base) {
+        msg() << "Re-checking for unsafe installed packages (" << UNSAFE_VAR << "=YES)" << std::endl;
+        auto const& PKG_INFO = env.PKG_INFO.get();
+        pkgxx::guarded<todo_type> unsafe_pkgs;
+        {
+            pkgxx::nursery n(opts.concurrency);
+            for (auto const& unsafe_pkg: pkgxx::who_requires(PKG_INFO, base)) {
+                if (UNSAFE_TODO.count(unsafe_pkg.base) > 0) {
+                    // Already in the set. Skip it.
+                    continue;
+                }
+                else if (opts.dry_run) {
+                    // With -n, the replace didn't happen, and thus the
+                    // packages that would have been marked
+                    // unsafe_depends=YES were not. Add the set that would
+                    // have been marked so we can watch what the actual run
+                    // would have done.
+                    //
+                    // Note that this is only an approximation because
+                    // "make replace" marks packages as unsafe only when it
+                    // has potentially caused an ABI change. We don't want
+                    // to replicate the logic just for our dry-run.
+                    n.start_soon(
+                        [&, unsafe_pkg = std::move(unsafe_pkg)]() {
+                            auto build_info  = pkgxx::build_info(PKG_INFO, unsafe_pkg.base);
+                            auto unsafe_path = build_info.find("PKGPATH");
+                            assert(unsafe_path != build_info.end());
+                            unsafe_pkgs.lock()->emplace(unsafe_pkg.base, unsafe_path->second);
+                        });
+                }
+                else {
+                    n.start_soon(
+                        [&, unsafe_pkg = std::move(unsafe_pkg)]() {
+                            std::optional<pkgxx::pkgpath> unsafe_path;
+                            for (auto const& [var, value]: pkgxx::build_info(PKG_INFO, unsafe_pkg.base)) {
+                                if (var == "PKGPATH") {
+                                    unsafe_path.emplace(value);
+                                }
+                                else if (var == UNSAFE_VAR && pkgxx::ci_equal(value, "yes")) {
+                                    assert(unsafe_path.has_value());
+                                    unsafe_pkgs.lock()->emplace(unsafe_pkg.base, *unsafe_path);
+                                }
+                            }
+                        });
+                }
+            }
+        }
+        for (auto const& unsafe_pkg: *(unsafe_pkgs.lock())) {
+            auto const& [unsafe_base, _unsafe_path] = unsafe_pkg;
+            topology.add_edge(unsafe_base, base);
+            UNSAFE_TODO.insert(unsafe_pkg);
         }
     }
 
@@ -207,7 +301,7 @@ namespace pkg_rr {
     }
 
     bool
-    rolling_replacer::is_pkg_installed(pkgxx::pkgbase const& base) {
+    rolling_replacer::is_pkg_installed(pkgxx::pkgbase const& base) const {
         // pkg_rr never deinstalls anything. Once we find something's
         // installed, it will never disappear. And no, we cannot
         // support OLDNAME unfortunately, because doing it would mean
@@ -226,7 +320,7 @@ namespace pkg_rr {
         }
     }
 
-    pkgxx::graph<pkgxx::pkgbase, true>
+    pkgxx::graph<pkgxx::pkgbase, void, true>
     rolling_replacer::depgraph_installed() const {
         msg() << "Building dependency graph for installed packages" << std::endl;
 
@@ -238,7 +332,7 @@ namespace pkg_rr {
         // the latter. We do the latter here.
         auto const& PKG_INFO = env.PKG_INFO.get();
         pkgxx::guarded<
-            pkgxx::graph<pkgxx::pkgbase, true>
+            decltype(depgraph_installed())
             > depgraph;
 
         std::set<pkgxx::pkgbase> to_scan;
@@ -292,8 +386,8 @@ namespace pkg_rr {
     void
     rolling_replacer::update_depends_with_source(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path) {
         msg() << "Checking if " << base << " has new depends..." << std::endl;
-        auto const& old_depends = topology.out_edges(base).value();
-        auto const& new_depends = source_depends(base, path);
+        auto const old_depends = topology.out_edges(base).value();
+        auto const new_depends = source_depends(base, path);
 
         if (depends_differ(old_depends, new_depends)) {
             dump_new_depends(base, old_depends, new_depends);
@@ -301,8 +395,9 @@ namespace pkg_rr {
 
             bool something_is_missing = false;
             for (auto const& dep: new_depends) {
-                topology.add_edge(base, dep.first);
-                if (!is_pkg_installed(dep.first)) {
+                auto const& [dep_base, _dep_path] = dep;
+                topology.add_edge(base, dep_base);
+                if (!is_pkg_installed(dep_base)) {
                     // This dependency isn't installed yet, and we don't
                     // know which packages it depends on. We will need to
                     // discover that later.
@@ -318,6 +413,32 @@ namespace pkg_rr {
         }
     }
 
+    bool
+    rolling_replacer::depends_differ(
+        std::set<
+            std::reference_wrapper<pkgxx::pkgbase const>,
+            std::less<pkgxx::pkgbase>
+            > const& old_depends,
+        std::map<pkgxx::pkgbase, pkgxx::pkgpath> const& new_depends) {
+
+        if (old_depends.size() != new_depends.size()) {
+            return true;
+        }
+        else {
+            for (auto const& dep_base: old_depends) {
+                if (new_depends.count(dep_base) == 0) {
+                    return true;
+                }
+            }
+            for (auto const& [dep_base, _dep_path]: new_depends) {
+                if (old_depends.count(dep_base) == 0) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
     void
     rolling_replacer::dump_new_depends(
         pkgxx::pkgbase const& base,
@@ -329,7 +450,7 @@ namespace pkg_rr {
 
         auto out = msg();
         bool is_first = true;
-        for (auto const& [dep_base, _dep_pkg]: new_depends) {
+        for (auto const& [dep_base, _pair]: new_depends) {
             if (old_depends.count(dep_base) == 0) {
                 if (is_first) {
                     out << base << " has the following new depends (need to re-tsort):" << std::endl
@@ -362,19 +483,34 @@ namespace pkg_rr {
 
     pkgxx::harness
     rolling_replacer::spawn_make(
-        std::filesystem::path const& path,
-        std::string const& target,
+        pkgxx::pkgpath const& path,
+        std::initializer_list<std::string> const& targets,
         std::map<std::string, std::string> const& vars) const {
 
-        std::vector<std::string> argv = {
-            CFG_BMAKE, "-C", path.string(), target
-        };
-        for (auto const& [var, value]: vars) {
-            argv.push_back(var + '=' + value);
-        }
-        pkgxx::harness make(CFG_BMAKE, argv);
+        pkgxx::harness make(CFG_BMAKE, make_argv(env.PKGSRCDIR.get(), path, targets, vars));
         make.cin().close();
         return make;
+    }
+
+    void
+    rolling_replacer::run_make(
+        pkgxx::pkgpath const& path,
+        std::initializer_list<std::string> const& targets,
+        std::map<std::string, std::string> const& vars) const {
+
+        auto const& argv = make_argv(env.PKGSRCDIR.get(), path, targets, vars);
+        if (opts.dry_run) {
+            msg([&](auto& out) {
+                    out << "Would run:";
+                    for (auto const& arg: argv) {
+                        out << ' ' << arg;
+                    }
+                    out << std::endl;
+                });
+        }
+        else {
+            throw replace_failed("FIXME: not implemented: non-dry-run");
+        }
     }
 
     std::map<pkgxx::pkgbase, pkgxx::pkgpath>
@@ -391,7 +527,7 @@ namespace pkg_rr {
                     [&]() {
                         auto&& make_vars = make_vars_for_pkg(base);
                         make_vars["VARNAME"] = var;
-                        auto&& make   = spawn_make(env.PKGSRCDIR.get() / path, "show-depends", make_vars);
+                        auto&& make   = spawn_make(path, {"show-depends"}, make_vars);
                         auto&& deps_g = deps.lock();
                         for (std::string line; std::getline(make.cout(), line); ) {
                             if (auto colon = line.find(':'); colon != std::string::npos) {
@@ -416,7 +552,7 @@ namespace pkg_rr {
         // although highly unlikely, that it is intended to match something
         // like "foo-0-bar-1.2nb3".
         pkgxx::guarded<
-            std::map<pkgxx::pkgbase, pkgxx::pkgpath>
+            decltype(source_depends(base, path))
             > ret;
         {
             pkgxx::nursery n(opts.concurrency);
@@ -461,12 +597,89 @@ namespace pkg_rr {
     }
 
     void
-    rolling_replacer::report() const {
-        for (auto const& base: SUCCEEDED) {
-            verbose(opts) << "+ " << base << std::endl;
+    rolling_replacer::fetch(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path) {
+        msg() << "Fetching " << base << std::endl;
+        run_make(path, {"fetch", "depends-fetch"}, make_vars_for_pkg(base));
+    }
+
+    void
+    rolling_replacer::replace(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path) {
+        bool const was_installed = is_pkg_installed(base);
+        if (was_installed) {
+            msg() << "Replacing " << base << std::endl;
         }
-        for (auto const& base: FAILED) {
-            verbose(opts) << "- " << base << std::endl;
+        else {
+            msg() << "Installing " << base << std::endl;
+        }
+
+        auto make_vars = make_vars_for_pkg(base);
+        make_vars["PKGSRC_KEEP_BIN_PKGS"] = opts.just_replace ? "NO" : "YES";
+        if (!was_installed) {
+            // If the package wasn't installed before we did, it's clear
+            // that the user didn't explicitly ask to install it. It's not
+            // nice to directly manipulate an internal variable here, but
+            // there is no better way to achieve this aside from doing a
+            // SU_CMD dance (which we really hate to do).
+            make_vars["_AUTOMATIC"] = "YES";
+        }
+
+        run_make(path, {"clean"}, opts.make_vars);
+        if (was_installed) {
+            run_make(path, {"replace"}, make_vars);
+        }
+        else {
+            run_make(path, {"install"}, make_vars);
+        }
+        run_make(path, {"clean"}, opts.make_vars);
+
+        if (!opts.dry_run) {
+            // Sanity checks: see if the newly installed package has a
+            // desired set of flags.
+            bool is_automatic = false;
+            for (auto const& [var, value]: pkgxx::build_info(env.PKG_INFO.get(), base)) {
+                if (var == "automatic" && pkgxx::ci_equal(value, "yes")) {
+                    is_automatic = true;
+                }
+                else if (var == "unsafe_depends_strict" && pkgxx::ci_equal(value, "yes")) {
+                    abort([&](auto& out) {
+                              out << "package `" << base << "' still has unsafe_depends_strict." << std::endl;
+                          });
+                }
+                else if (var == "unsafe_depends" && pkgxx::ci_equal(value, "yes")) {
+                    abort([&](auto& out) {
+                              out << "package `" << base << "' still has unsafe_depends." << std::endl;
+                          });
+                }
+                else if (var == "rebuild" && pkgxx::ci_equal(value, "yes")) {
+                    abort([&](auto& out) {
+                              out << "package `" << base << "' is still requested to be rebuilt." << std::endl;
+                          });
+                }
+                else if (var == "mismatch" && pkgxx::ci_equal(value, "yes")) {
+                    abort([&](auto& out) {
+                              out << "package `" << base << "' is still a mismatched version." << std::endl;
+                          });
+                }
+            }
+            if (!was_installed && !is_automatic) {
+                abort([&](auto& out) {
+                          out << "package `" << base << "' is not marked as automatically installed." << std::endl;
+                      });
+            }
+        }
+
+        recheck_unsafe(base);
+    }
+
+    void
+    rolling_replacer::report() const {
+        if (opts.verbose > 0) {
+            for (auto const& base: SUCCEEDED) {
+                std::cout << "+ " << base << std::endl;
+            }
+            for (auto const& base: FAILED) {
+                std::cout << "- " << base << std::endl;
+            }
         }
     }
 }
