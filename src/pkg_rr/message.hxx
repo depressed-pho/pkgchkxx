@@ -70,6 +70,13 @@ namespace pkg_rr {
     }
 
     inline msg_logger
+    warn() {
+        auto out = msg();
+        out << "WARNING: ";
+        return out;
+    }
+
+    inline msg_logger
     verbose(pkg_rr::options const& opts, unsigned level = 1) {
         if (opts.verbose >= level) {
             return msg_logger(std::cout);

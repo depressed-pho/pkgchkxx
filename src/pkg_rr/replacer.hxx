@@ -87,12 +87,6 @@ namespace pkg_rr {
         std::map<std::string, std::string>
         make_vars_for_pkg(pkgxx::pkgbase const& base) const;
 
-        pkgxx::harness
-        spawn_make(
-            pkgxx::pkgpath const& path,
-            std::initializer_list<std::string> const& targets,
-            std::map<std::string, std::string> const& vars) const;
-
         void
         run_make(
             pkgxx::pkgpath const& path,

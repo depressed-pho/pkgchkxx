@@ -26,30 +26,6 @@ namespace {
             },
             static_cast<pkgxx::pkgpattern::pattern_type const&>(pat));
     }
-
-    std::vector<std::string>
-    make_argv(fs::path const& PKGSRCDIR,
-              pkgxx::pkgpath const& path,
-              std::initializer_list<std::string> const& targets,
-              std::map<std::string, std::string> const& vars) {
-
-        auto const& abspath   = PKGSRCDIR / path;
-        if (!fs::is_directory(abspath)) {
-            throw replace_failed(
-                "No package directory `" + path.string() + "' in " + PKGSRCDIR.string());
-        }
-
-        std::vector<std::string> argv = {
-            CFG_BMAKE, "-C", abspath.string(),
-        };
-        for (auto const& target: targets) {
-            argv.push_back(target);
-        }
-        for (auto const& [var, value]: vars) {
-            argv.push_back(var + '=' + value);
-        }
-        return argv;
-    }
 }
 
 namespace pkg_rr {
@@ -481,24 +457,27 @@ namespace pkg_rr {
         return ret;
     }
 
-    pkgxx::harness
-    rolling_replacer::spawn_make(
-        pkgxx::pkgpath const& path,
-        std::initializer_list<std::string> const& targets,
-        std::map<std::string, std::string> const& vars) const {
-
-        pkgxx::harness make(CFG_BMAKE, make_argv(env.PKGSRCDIR.get(), path, targets, vars));
-        make.cin().close();
-        return make;
-    }
-
     void
     rolling_replacer::run_make(
         pkgxx::pkgpath const& path,
         std::initializer_list<std::string> const& targets,
         std::map<std::string, std::string> const& vars) const {
 
-        auto const& argv = make_argv(env.PKGSRCDIR.get(), path, targets, vars);
+        auto const& pkgdir = env.PKGSRCDIR.get() / path;
+        if (!fs::exists(pkgdir / "Makefile")) {
+            throw replace_failed("Makefile is missing from " + pkgdir.string());
+        }
+
+        std::vector<std::string> argv = {
+            CFG_BMAKE, "-C", pkgdir.string()
+        };
+        for (auto const& target: targets) {
+            argv.push_back(target);
+        }
+        for (auto const& [var, value]: vars) {
+            argv.push_back(var + '=' + value);
+        }
+
         if (opts.dry_run) {
             msg([&](auto& out) {
                     out << "Would run:";
@@ -509,40 +488,42 @@ namespace pkg_rr {
                 });
         }
         else {
+            //pkgxx::harness make(CFG_BMAKE, argv);
+            //make.cin().close();
             throw replace_failed("FIXME: not implemented: non-dry-run");
         }
     }
 
     std::map<pkgxx::pkgbase, pkgxx::pkgpath>
     rolling_replacer::source_depends(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path) const {
-        // Unfortunately pkgsrc doesn't provide a target that shows more
-        // than a single *_DEPENDS variable at once.
-        pkgxx::guarded<
-            std::unordered_map<pkgxx::pkgpattern, pkgxx::pkgpath>
-            > deps;
-        {
-            pkgxx::nursery n(opts.concurrency);
-            for (auto const& var: {"BUILD_DEPENDS", "TOOL_DEPENDS", "DEPENDS"}) {
-                n.start_soon(
-                    [&]() {
-                        auto&& make_vars = make_vars_for_pkg(base);
-                        make_vars["VARNAME"] = var;
-                        auto&& make   = spawn_make(path, {"show-depends"}, make_vars);
-                        auto&& deps_g = deps.lock();
-                        for (std::string line; std::getline(make.cout(), line); ) {
-                            if (auto colon = line.find(':'); colon != std::string::npos) {
-                                std::string_view const line_v = line;
-                                auto dep_pattern = line_v.substr(0, colon);
-                                auto dep_path    = line_v.substr(colon + 1);
-                                assert(dep_path.substr(0, 6) == "../../");
-                                deps_g->emplace(
-                                    pkgxx::pkgpattern(dep_pattern),
-                                    pkgxx::pkgpath(dep_path.substr(6)));
-                            }
-                        }
-                    });
+        auto const pkgdir = env.PKGSRCDIR.get() / path;
+        auto const vars   =
+            pkgxx::extract_pkgmk_vars(
+                pkgdir,
+                {"BUILD_DEPENDS", "TOOL_DEPENDS", "DEPENDS"},
+                make_vars_for_pkg(base));
+        if (!vars.has_value()) {
+            throw replace_failed("Makefile is missing from " + pkgdir.string());
+        }
+
+        std::unordered_map<pkgxx::pkgpattern, pkgxx::pkgpath> deps;
+        for (auto const& [var, value]: *vars) {
+            for (auto const& dep: pkgxx::words(value)) {
+                if (auto colon = dep.find(':'); colon != std::string_view::npos) {
+                    auto dep_pattern = dep.substr(0, colon);
+                    auto dep_path    = dep.substr(colon + 1);
+
+                    if (dep_path.substr(0, 6) == "../../") {
+                        deps.emplace(
+                            pkgxx::pkgpattern(dep_pattern),
+                            pkgxx::pkgpath(dep_path.substr(6)));
+                        continue;
+                    }
+                }
+                warn() << "Invalid dependency: `" << dep << "' in " << var << std::endl;
             }
         }
+
         // Now we need to extract a PKGBASE out of the pattern. In the
         // general case we have to consult pkgsrc, which is seriously a
         // constly operation. But if the pattern is a simple version
@@ -556,7 +537,7 @@ namespace pkg_rr {
             > ret;
         {
             pkgxx::nursery n(opts.concurrency);
-            for (auto const& dep: *(deps.lock())) {
+            for (auto const& dep: deps) {
                 auto const& [dep_pattern, dep_path] = dep;
 
                 if (auto dep_base = pattern_to_base_cache.find(dep);
@@ -584,10 +565,8 @@ namespace pkg_rr {
                                 ret.lock()->emplace(*dep_base, dep_path);
                             }
                             else {
-                                abort(
-                                    [&](auto& out) {
-                                        out << "Cannot retrieve PKGBASE from " << path << std::endl;
-                                    });
+                                throw replace_failed(
+                                    "Cannot retrieve PKGBASE from " + path.string());
                             }
                         });
                 }

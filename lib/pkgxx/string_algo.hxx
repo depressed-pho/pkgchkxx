@@ -15,17 +15,16 @@ namespace pkgxx {
         using reference         = value_type&;               ///< The reference type of the iterator.
 
         /// Construct an invalid word iterator that acts as \c .end()
-        word_iterator()
-            : _source(nullptr) {}
+        word_iterator() {}
 
         /// Construct a word iterator pointing at the first word in a given
         /// string. This class acts as a reference wrapper to the string.
         /// That is, the constructor does not copy it.
         word_iterator(std::string_view const& source,
-                      std::string      const& seps   = " \t")
-            : _source(&source)
+                      std::string_view const& seps   = " \t")
+            : _source(source)
             , _seps(seps)
-            , _pos(_source->find_first_not_of(_seps)) {
+            , _pos(_source.find_first_not_of(_seps)) {
 
             update_current();
         }
@@ -58,7 +57,7 @@ namespace pkgxx {
         word_iterator&
         operator++ () {
             _pos += _current.value().size();
-            _pos  = _source->find_first_not_of(_seps, _pos + 1);
+            _pos  = _source.find_first_not_of(_seps, _pos + 1);
             update_current();
             return *this;
         }
@@ -75,12 +74,12 @@ namespace pkgxx {
         void
         update_current() {
             if (_pos != std::string_view::npos) {
-                auto const space = _source->find_first_of(_seps, _pos + 1);
-                if (space != std::string_view::npos) {
-                    _current = _source->substr(_pos, space - _pos);
+                auto const next_sep = _source.find_first_of(_seps, _pos + 1);
+                if (next_sep != std::string_view::npos) {
+                    _current = _source.substr(_pos, next_sep - _pos);
                 }
                 else {
-                    _current = _source->substr(_pos);
+                    _current = _source.substr(_pos);
                 }
             }
             else {
@@ -88,8 +87,8 @@ namespace pkgxx {
             }
         }
 
-        std::string_view const* _source;
-        std::string _seps;
+        std::string_view _source;
+        std::string_view _seps;
         std::string_view::size_type _pos;
         std::optional<value_type> _current;
     };
@@ -103,7 +102,7 @@ namespace pkgxx {
         /// reference wrapper to the string given to the constructor. That
         /// is, the constructor does not copy the given string.
         words(std::string_view const& str,
-              std::string      const& seps = " \t")
+              std::string_view const& seps = " \t")
             : _str(str)
             , _seps(seps) {}
 
@@ -120,8 +119,8 @@ namespace pkgxx {
         }
 
     private:
-        std::string_view const& _str;
-        std::string const& _seps;
+        std::string_view const _str;
+        std::string_view const _seps;
     };
 
     /// Remove whitespaces at the beginning and the end of a string.
