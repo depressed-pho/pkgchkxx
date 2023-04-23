@@ -65,7 +65,11 @@ namespace {
         if (!opts.dry_run) {
             std::vector<std::string> argv = {pkgxx::shell, "-s", "--"};
             argv.insert(argv.end(), args.begin(), args.end());
-            pkgxx::harness prog(pkgxx::shell, argv, cwd, env_mod);
+            pkgxx::harness prog(
+                pkgxx::shell, argv, cwd, env_mod,
+                pkgxx::harness::fd_action::pipe,
+                pkgxx::harness::fd_action::pipe,
+                pkgxx::harness::fd_action::merge_with_stdout);
             prog.cin() << "exec " << cmd << " \"$@\"" << std::endl;
             prog.cin().close();
 

@@ -62,13 +62,15 @@ namespace pkgxx {
         std::string const& PKG_INFO,
         pkgname const& name) {
 
-        // Discard stderr because the package might not be installed. This
-        // is the only way to suppress errors in that case.
+        // Discard stderr because the package might not be installed. It's
+        // the only way to suppress errors in that case.
         harness pkg_info(
             shell,
             {shell, "-s", "--", "-q", "-b", name.string()},
             std::nullopt,
             [](auto&) {},
+            harness::fd_action::pipe,
+            harness::fd_action::close,
             harness::fd_action::close);
         pkg_info.cin() << "exec " << PKG_INFO << " \"$@\"" << std::endl;
         pkg_info.cin().close();

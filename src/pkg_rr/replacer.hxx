@@ -3,6 +3,7 @@
 #include <iostream>
 #include <type_traits>
 #include <unordered_map>
+#include <vector>
 
 #include <pkgxx/graph.hxx>
 #include <pkgxx/harness.hxx>
@@ -64,7 +65,7 @@ namespace pkg_rr {
         std::pair<pkgxx::pkgbase, pkgxx::pkgpath>
         choose_one() const;
 
-        void
+        pkgxx::pkgversion
         update_depends_with_source(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path);
 
         [[gnu::pure]] static bool
@@ -89,11 +90,15 @@ namespace pkg_rr {
 
         void
         run_make(
+            pkgxx::pkgbase const& base,
             pkgxx::pkgpath const& path,
             std::initializer_list<std::string> const& targets,
             std::map<std::string, std::string> const& vars) const;
 
-        std::map<pkgxx::pkgbase, pkgxx::pkgpath>
+        std::pair<
+            pkgxx::pkgversion,
+            std::map<pkgxx::pkgbase, pkgxx::pkgpath>
+            >
         source_depends(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path) const;
 
         void
@@ -140,8 +145,8 @@ namespace pkg_rr {
         todo_type UNSAFE_TODO;
         todo_type REPLACE_TODO;
 
-        std::set<pkgxx::pkgbase> SUCCEEDED;
-        std::set<pkgxx::pkgbase> FAILED;
+        std::vector<pkgxx::pkgbase> SUCCEEDED;
+        std::vector<pkgxx::pkgbase> FAILED;
 
         /* The dependency graph is initially built with installed packages
          * and will be progressively updated when new depends are
@@ -156,8 +161,8 @@ namespace pkg_rr {
          * dependencies from that are recorded for installed versions. When
          * this happens, we need to update the graph and re-tsort it. The
          * check must be done once (and only once) for every installed
-         * package. */
-        std::set<pkgxx::pkgbase> DEPENDS_CHECKED;
+         * package. The value is the PKGVERSION obtained from source. */
+        std::map<pkgxx::pkgbase, pkgxx::pkgversion> DEPENDS_CHECKED;
 
         // See a comment in source_depends().
         std::unordered_map<

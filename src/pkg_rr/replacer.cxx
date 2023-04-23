@@ -1,5 +1,6 @@
 #include <exception>
 #include <filesystem>
+#include <fstream>
 
 #include <pkgxx/string_algo.hxx>
 
@@ -79,8 +80,8 @@ namespace pkg_rr {
                     vsleep(opts, 1s);
                 }
                 else {
-                    update_depends_with_source(base, path);
-                    DEPENDS_CHECKED.insert(base);
+                    auto const version = update_depends_with_source(base, path);
+                    DEPENDS_CHECKED.emplace(base, version);
                     continue;
                 }
 
@@ -90,10 +91,10 @@ namespace pkg_rr {
                 else {
                     replace(base, path);
                 }
-                SUCCEEDED.insert(base);
+                SUCCEEDED.push_back(base);
             }
             catch (replace_failed const& e) {
-                FAILED.insert(base);
+                FAILED.push_back(base);
                 auto const& cb = [&](auto& out) { out << e.what() << std::endl; };
                 if (opts.continue_on_errors) {
                     error(cb);
@@ -359,11 +360,12 @@ namespace pkg_rr {
         assert("Internal inconsistency: cannot choose one" && false);
     }
 
-    void
+    pkgxx::pkgversion
     rolling_replacer::update_depends_with_source(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path) {
         msg() << "Checking if " << base << " has new depends..." << std::endl;
         auto const old_depends = topology.out_edges(base).value();
-        auto const new_depends = source_depends(base, path);
+        auto const source      = source_depends(base, path);
+        auto const& [version, new_depends] = source;
 
         if (depends_differ(old_depends, new_depends)) {
             dump_new_depends(base, old_depends, new_depends);
@@ -387,6 +389,8 @@ namespace pkg_rr {
                 dump_todo();
             }
         }
+
+        return std::move(version);
     }
 
     bool
@@ -459,6 +463,7 @@ namespace pkg_rr {
 
     void
     rolling_replacer::run_make(
+        pkgxx::pkgbase const& base,
         pkgxx::pkgpath const& path,
         std::initializer_list<std::string> const& targets,
         std::map<std::string, std::string> const& vars) const {
@@ -479,32 +484,78 @@ namespace pkg_rr {
         }
 
         if (opts.dry_run) {
-            msg([&](auto& out) {
-                    out << "Would run:";
-                    for (auto const& arg: argv) {
-                        out << ' ' << arg;
-                    }
-                    out << std::endl;
-                });
+            msg() << "Would run: " << pkgxx::stringify_argv(argv) << std::endl;
+        }
+        else if (opts.log_dir) {
+            auto const version  = DEPENDS_CHECKED.find(base);
+            assert(version != DEPENDS_CHECKED.end());
+            auto const log_dir  = *opts.log_dir / static_cast<fs::path>(path).parent_path();
+            auto const log_file = log_dir / pkgxx::pkgname(base, version->second).string();
+            fs::create_directories(log_dir);
+
+            std::ofstream log_out(log_file, std::ios_base::app);
+            if (!log_out) {
+                throw std::system_error(
+                    errno, std::generic_category(), "Failed to open " + log_file.string());
+            }
+            log_out.exceptions(std::ios_base::badbit);
+
+            pkgxx::harness make(
+                CFG_BMAKE, argv, std::nullopt, [](auto&) {},
+                pkgxx::harness::fd_action::inherit,
+                pkgxx::harness::fd_action::pipe,
+                pkgxx::harness::fd_action::merge_with_stdout);
+
+            std::array<char, 1024> buf;
+            using traits = std::decay_t<decltype(make.cin())>::traits_type;
+            while (true) {
+                if (auto const n_read = make.cout().readsome(buf.data(), buf.size()); n_read > 0) {
+                    std::cout.write(buf.data(), n_read);
+                    log_out.write(buf.data(), n_read);
+                }
+                else if (traits::eq_int_type(make.cout().peek(), traits::eof())) {
+                    // There were no characters readily available, and even
+                    // peek() could not get more.
+                    break;
+                }
+            }
+
+            if (make.wait_exit().status != 0) {
+                throw replace_failed("Command failed: " + pkgxx::stringify_argv(argv));
+            }
         }
         else {
-            //pkgxx::harness make(CFG_BMAKE, argv);
-            //make.cin().close();
-            throw replace_failed("FIXME: not implemented: non-dry-run");
+            pkgxx::harness make(
+                CFG_BMAKE, argv, std::nullopt, [](auto&) {},
+                pkgxx::harness::fd_action::inherit,
+                pkgxx::harness::fd_action::inherit,
+                pkgxx::harness::fd_action::inherit);
+
+            if (make.wait_exit().status != 0) {
+                throw replace_failed("Command failed: " + pkgxx::stringify_argv(argv));
+            }
         }
     }
 
-    std::map<pkgxx::pkgbase, pkgxx::pkgpath>
+    std::pair<
+        pkgxx::pkgversion,
+        std::map<pkgxx::pkgbase, pkgxx::pkgpath>
+        >
     rolling_replacer::source_depends(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path) const {
         auto const pkgdir = env.PKGSRCDIR.get() / path;
-        auto const vars   =
+        auto vars =
             pkgxx::extract_pkgmk_vars(
                 pkgdir,
-                {"BUILD_DEPENDS", "TOOL_DEPENDS", "DEPENDS"},
+                {"PKGVERSION", "BUILD_DEPENDS", "TOOL_DEPENDS", "DEPENDS"},
                 make_vars_for_pkg(base));
         if (!vars.has_value()) {
             throw replace_failed("Makefile is missing from " + pkgdir.string());
         }
+
+        auto it = vars->find("PKGVERSION");
+        assert(it != vars->end());
+        auto const version = pkgxx::pkgversion(it->second);
+        vars->erase(it);
 
         std::unordered_map<pkgxx::pkgpattern, pkgxx::pkgpath> deps;
         for (auto const& [var, value]: *vars) {
@@ -533,8 +584,8 @@ namespace pkg_rr {
         // although highly unlikely, that it is intended to match something
         // like "foo-0-bar-1.2nb3".
         pkgxx::guarded<
-            decltype(source_depends(base, path))
-            > ret;
+            std::map<pkgxx::pkgbase, pkgxx::pkgpath>
+            > resolved_deps;
         {
             pkgxx::nursery n(opts.concurrency);
             for (auto const& dep: deps) {
@@ -543,11 +594,11 @@ namespace pkg_rr {
                 if (auto dep_base = pattern_to_base_cache.find(dep);
                     dep_base != pattern_to_base_cache.end()) {
 
-                    ret.lock()->emplace(dep_base->second, dep_path);
+                    resolved_deps.lock()->emplace(dep_base->second, dep_path);
                 }
                 else if (auto dep_base = obvious_pkgbase_of(dep_pattern); dep_base.has_value()) {
                     pattern_to_base_cache.emplace(dep, *dep_base);
-                    ret.lock()->emplace(*dep_base, dep_path);
+                    resolved_deps.lock()->emplace(*dep_base, dep_path);
                 }
                 else {
                     // The worst case where we have no choice but to
@@ -562,7 +613,7 @@ namespace pkg_rr {
                                     env.PKGSRCDIR.get() / dep_path, "PKGBASE", make_vars);
                             if (dep_base.has_value()) {
                                 pattern_to_base_cache.emplace(dep, *dep_base);
-                                ret.lock()->emplace(*dep_base, dep_path);
+                                resolved_deps.lock()->emplace(*dep_base, dep_path);
                             }
                             else {
                                 throw replace_failed(
@@ -572,13 +623,15 @@ namespace pkg_rr {
                 }
             }
         }
-        return std::move(*(ret.lock()));
+        return std::make_pair(
+            std::move(version),
+            std::move(*(resolved_deps.lock())));
     }
 
     void
     rolling_replacer::fetch(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path) {
         msg() << "Fetching " << base << std::endl;
-        run_make(path, {"fetch", "depends-fetch"}, make_vars_for_pkg(base));
+        run_make(base, path, {"fetch", "depends-fetch"}, make_vars_for_pkg(base));
     }
 
     void
@@ -602,14 +655,14 @@ namespace pkg_rr {
             make_vars["_AUTOMATIC"] = "YES";
         }
 
-        run_make(path, {"clean"}, opts.make_vars);
+        run_make(base, path, {"clean"}, opts.make_vars);
         if (was_installed) {
-            run_make(path, {"replace"}, make_vars);
+            run_make(base, path, {"replace"}, make_vars);
         }
         else {
-            run_make(path, {"install"}, make_vars);
+            run_make(base, path, {"install"}, make_vars);
         }
-        run_make(path, {"clean"}, opts.make_vars);
+        run_make(base, path, {"clean"}, opts.make_vars);
 
         if (!opts.dry_run) {
             // Sanity checks: see if the newly installed package has a

@@ -61,7 +61,8 @@ namespace pkgxx {
         enum class fd_action {
             inherit,
             close,
-            pipe
+            pipe,
+            merge_with_stdout ///< Only makes sense for stderr.
         };
 
         /** The child process terminated normally by a call to \c _Exit(2)
@@ -88,6 +89,8 @@ namespace pkgxx {
             std::vector<std::string> const& argv,
             std::optional<std::filesystem::path> const& cwd = std::nullopt,
             std::function<void (std::map<std::string, std::string>&)> const& env_mod = [](auto&) {},
+            fd_action stdin_action  = fd_action::pipe,
+            fd_action stdout_action = fd_action::pipe,
             fd_action stderr_action = fd_action::inherit);
 
         harness(harness const&) = delete;

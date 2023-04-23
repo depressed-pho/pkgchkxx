@@ -54,6 +54,8 @@ namespace pkgxx {
         std::vector<std::string> const& argv,
         std::optional<std::filesystem::path> const& cwd,
         std::function<void (std::map<std::string, std::string>&)> const& env_mod,
+        fd_action stdin_action,
+        fd_action stdout_action,
         fd_action stderr_action)
         : _cmd(cmd)
         , _argv(argv)
@@ -67,8 +69,12 @@ namespace pkgxx {
         }
 
         auto const msg_fds    = cpipe(true);
-        auto const stdin_fds  = cpipe(true);
-        auto const stdout_fds = cpipe(true);
+        auto const stdin_fds  = stdin_action  == fd_action::pipe
+            ? std::make_optional(cpipe(true))
+            : std::nullopt;
+        auto const stdout_fds = stdout_action == fd_action::pipe
+            ? std::make_optional(cpipe(true))
+            : std::nullopt;
         auto const stderr_fds = stderr_action == fd_action::pipe
             ? std::make_optional(cpipe(true))
             : std::nullopt;
@@ -80,8 +86,34 @@ namespace pkgxx {
 #endif
         if (*_pid == 0) {
             close(msg_fds[0]);
-            dup2(stdin_fds[0], STDIN_FILENO);
-            dup2(stdout_fds[1], STDOUT_FILENO);
+            switch (stdin_action) {
+            case fd_action::inherit:
+                break;
+            case fd_action::close:
+                close(STDIN_FILENO);
+                break;
+            case fd_action::pipe:
+                dup2((*stdin_fds)[0], STDIN_FILENO);
+                break;
+            default:
+                std::string const err = "Invalid fd_action for stdin\n";
+                write(msg_fds[1], err.c_str(), err.size());
+                _exit(1);
+            }
+            switch (stdout_action) {
+            case fd_action::inherit:
+                break;
+            case fd_action::close:
+                close(STDOUT_FILENO);
+                break;
+            case fd_action::pipe:
+                dup2((*stdout_fds)[1], STDOUT_FILENO);
+                break;
+            default:
+                std::string const err = "Invalid fd_action for stdout\n";
+                write(msg_fds[1], err.c_str(), err.size());
+                _exit(1);
+            }
             switch (stderr_action) {
             case fd_action::inherit:
                 break;
@@ -91,8 +123,11 @@ namespace pkgxx {
             case fd_action::pipe:
                 dup2((*stderr_fds)[1], STDERR_FILENO);
                 break;
+            case fd_action::merge_with_stdout:
+                dup2(STDOUT_FILENO, STDERR_FILENO);
+                break;
             default:
-                std::string const err = "Unknown fd_action\n";
+                std::string const err = "Invalid fd_action for stderr\n";
                 write(msg_fds[1], err.c_str(), err.size());
                 _exit(1);
             }
@@ -133,8 +168,12 @@ namespace pkgxx {
         }
         else if (*_pid > 0) {
             close(msg_fds[1]);
-            close(stdin_fds[0]);
-            close(stdout_fds[1]);
+            if (stdin_fds) {
+                close((*stdin_fds)[0]);
+            }
+            if (stdout_fds) {
+                close((*stdout_fds)[1]);
+            }
             if (stderr_fds) {
                 close((*stderr_fds)[1]);
             }
@@ -154,15 +193,16 @@ namespace pkgxx {
                     std::move(msg));
             }
 
-            _stdin.emplace(stdin_fds[1]);
-            _stdout.emplace(stdout_fds[0]);
+            if (stdin_fds) {
+                _stdin.emplace((*stdin_fds)[1]);
+                _stdin->exceptions(std::ios_base::badbit);
+            }
+            if (stdout_fds) {
+                _stdout.emplace((*stdout_fds)[0]);
+                _stdout->exceptions(std::ios_base::badbit);
+            }
             if (stderr_fds) {
                 _stderr.emplace((*stderr_fds)[0]);
-            }
-
-            _stdin->exceptions(std::ios_base::badbit);
-            _stdout->exceptions(std::ios_base::badbit);
-            if (_stderr) {
                 _stderr->exceptions(std::ios_base::badbit);
             }
         }
