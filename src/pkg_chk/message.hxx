@@ -18,6 +18,8 @@ namespace pkg_chk {
         logger()
             : std::ostream(nullptr) {}
 
+        logger(logger const&) = delete;
+
         logger(pkg_chk::options const& opts, bool to_stderr)
             : std::ostream(nullptr)
             , _buf(std::in_place, opts, to_stderr) {

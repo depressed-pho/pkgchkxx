@@ -17,7 +17,7 @@ namespace pkg_chk {
         LOOKUP_TODO,          // -N
     };
 
-    struct bad_options: std::runtime_error {
+    struct bad_options: virtual std::runtime_error {
         bad_options()
             : std::runtime_error("") {}
 

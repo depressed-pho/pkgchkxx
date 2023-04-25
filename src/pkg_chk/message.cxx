@@ -19,19 +19,13 @@ namespace pkg_chk {
         if (!traits_type::eq_int_type(ch, traits_type::eof())) {
             char_type const c = traits_type::to_char_type(ch);
 
-            if (auto const buf = _opts.logfile.rdbuf()) {
-                buf->sputc(c);
-            }
+            _opts.logfile.put(c);
 
             if (_to_stderr || _opts.mode == pkg_chk::mode::LIST_BIN_PKGS) {
-                if (auto const buf = std::cerr.rdbuf()) {
-                    buf->sputc(c);
-                }
+                std::cerr.put(c);
             }
             else {
-                if (auto const buf = std::cout.rdbuf()) {
-                    buf->sputc(c);
-                }
+                std::cout.put(c);
             }
         }
         return ch;
@@ -39,19 +33,13 @@ namespace pkg_chk {
 
     std::streamsize
     logger::logger_buf::xsputn(const char_type* s, std::streamsize count) {
-        if (auto const buf = _opts.logfile.rdbuf()) {
-            buf->sputn(s, count);
-        }
+        _opts.logfile.write(s, count);
 
         if (_to_stderr || _opts.mode == pkg_chk::mode::LIST_BIN_PKGS) {
-            if (auto const buf = std::cerr.rdbuf()) {
-                buf->sputn(s, count);
-            }
+            std::cerr.write(s, count);
         }
         else {
-            if (auto const buf = std::cout.rdbuf()) {
-                buf->sputn(s, count);
-            }
+            std::cout.write(s, count);
         }
         return count;
     }

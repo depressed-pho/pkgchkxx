@@ -9,7 +9,7 @@
 #include <pkgxx/ordered.hxx>
 
 namespace pkgxx {
-    struct bad_pkgpath: std::runtime_error {
+    struct bad_pkgpath: virtual std::runtime_error {
         using std::runtime_error::runtime_error;
     };
 

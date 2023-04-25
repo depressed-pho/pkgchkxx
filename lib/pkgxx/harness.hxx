@@ -23,6 +23,10 @@ namespace pkgxx {
     template <typename Argv>
     inline std::string
     stringify_argv(Argv const& argv) {
+        using namespace std::literals;
+        static auto const any_specials    = " \t\n~`#$&*()\\|[];'\"<>?";
+        static auto const strong_specials = "$`\\\""sv;
+
         std::stringstream ss;
         bool is_first = true;
         for (auto const& arg: argv) {
@@ -32,17 +36,16 @@ namespace pkgxx {
             else {
                 ss << ' ';
             }
-            if (arg.find(' ') != std::string::npos) {
-                // The argument contains a space. Quote it to
-                // not confuse someone seeing this message.
+            if (arg.find_first_of(any_specials) != Argv::value_type::npos) {
+                // The argument contains some shell special
+                // characters. Quote it to not confuse someone seeing this
+                // message.
                 ss << '"';
                 for (auto c: arg) {
-                    if (c == '"') {
-                        ss << "\\\"";
+                    if (strong_specials.find(c) != std::string_view::npos) {
+                        ss << '\\';
                     }
-                    else {
-                        ss << c;
-                    }
+                    ss << c;
                 }
                 ss << '"';
             }
@@ -181,7 +184,7 @@ namespace pkgxx {
     };
 
     /** An error happened while running an external command. */
-    struct command_error: std::runtime_error {
+    struct command_error: virtual std::runtime_error {
 #if !defined(DOXYGEN)
         command_error(
             std::string&& cmd_,
@@ -210,7 +213,7 @@ namespace pkgxx {
     };
 
     /** An error happened while trying to spawn a process. */
-    struct failed_to_spawn_process: command_error {
+    struct failed_to_spawn_process: virtual command_error {
 #if !defined(DOXYGEN)
         failed_to_spawn_process(
             command_error&& ce,
@@ -227,7 +230,7 @@ namespace pkgxx {
     };
 
     /** A child process terminated in an unexpected way. */
-    struct process_terminated_unexpectedly: command_error {
+    struct process_terminated_unexpectedly: virtual command_error {
 #if !defined(DOXYGEN)
         process_terminated_unexpectedly(
             command_error&& ce,
@@ -239,7 +242,7 @@ namespace pkgxx {
     };
 
     /** A child process unexpectedly died of a signal. */
-    struct process_died_of_signal: public process_terminated_unexpectedly {
+    struct process_died_of_signal: virtual process_terminated_unexpectedly {
 #if !defined(DOXYGEN)
         process_died_of_signal(
             process_terminated_unexpectedly&& ptu,
@@ -261,7 +264,7 @@ namespace pkgxx {
     /** A child process unexpectedly terminated for a reason other than
      * calling \c _Exit(2) or \c exit(3) with an argument \c 0.
      */
-    struct process_exited_for_failure: public process_terminated_unexpectedly {
+    struct process_exited_for_failure: virtual process_terminated_unexpectedly {
 #if !defined(DOXYGEN)
         process_exited_for_failure(
             process_terminated_unexpectedly&& ptu,

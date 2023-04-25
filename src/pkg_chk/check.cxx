@@ -1,25 +1,201 @@
 #include <cassert>
 #include <thread>
 
-#include <pkgxx/build_version.hxx>
 #include <pkgxx/makevars.hxx>
 #include <pkgxx/mutex_guard.hxx>
 #include <pkgxx/nursery.hxx>
 
 #include "check.hxx"
-#include "config_file.hxx"
-#include "message.hxx"
 
 namespace fs = std::filesystem;
 
-namespace {
-    using namespace pkg_chk;
+namespace pkg_chk {
+    checker_base::checker_base(
+        bool add_missing,
+        bool check_build_version,
+        unsigned concurrency,
+        bool update,
+        bool delete_mismatched,
+        std::shared_future<std::string> const& PKG_INFO)
+        : _add_missing(add_missing)
+        , _check_build_version(check_build_version)
+        , _concurrency(concurrency)
+        , _update(update)
+        , _delete_mismatched(delete_mismatched)
+        , _PKG_INFO(PKG_INFO)
+        , _installed_pkg_summary(
+            std::async(
+                std::launch::deferred,
+                [this]() {
+                    atomic_verbose(
+                        [](auto& out) {
+                            out << "Getting summary from installed packages" << std::endl;
+                        });
+                    return pkgxx::summary(_PKG_INFO.get());
+                }).share())
+        , _installed_pkgnames(
+            std::async(
+                std::launch::deferred,
+                [this]() {
+                    std::set<pkgxx::pkgname> ret;
+                    for (auto const& [name, _vars]: _installed_pkg_summary.get()) {
+                        ret.insert(name);
+                    }
+                    return ret;
+                }).share())
+        , _installed_pkgpaths(
+            std::async(
+                std::launch::deferred,
+                [this]() {
+                    std::set<pkgxx::pkgpath> ret;
+                    for (auto const& [_name, vars]: _installed_pkg_summary.get()) {
+                        ret.insert(vars.PKGPATH);
+                    }
+                    return ret;
+                }).share()) {}
+
+    checker_base::result
+    checker_base::run(std::set<pkgxx::pkgpath> const& pkgpaths) const {
+        // This is the slowest part of pkg_chk. For each package we need to
+        // extract variables from package Makefiles unless we are using
+        // binary packages. Luckily for us each check is independent of
+        // each other so we can parallelise them.
+        pkgxx::guarded<result> res;
+        pkgxx::nursery n(_concurrency);
+        for (pkgxx::pkgpath const& path: pkgpaths) {
+            n.start_soon(
+                [&]() {
+                    // Find the set of latest PKGNAMEs provided by this
+                    // PKGPATH. Most PKGPATHs have just one corresponding
+                    // PKGNAME but some (py-*) have more.
+                    auto const latest_pkgnames = find_latest_pkgnames(path);
+                    if (latest_pkgnames.empty()) {
+                        res.lock()->MISSING_DONE.insert(path);
+                        return;
+                    }
+
+                    auto const& installed_pkgnames = _installed_pkgnames.get();
+                    for (pkgxx::pkgname const& name: latest_pkgnames) {
+                        if (auto installed = installed_pkgnames.lower_bound(
+                                pkgxx::pkgname(name.base, pkgxx::pkgversion()));
+                            installed != installed_pkgnames.end() && installed->base == name.base) {
+
+                            if (installed->version == name.version) {
+                                // The latest PKGNAME turned out to be
+                                // installed. Good, but that's not enough
+                                // if -B is given.
+                                if (_check_build_version) {
+                                    auto const latest_build_version    = fetch_build_version(name, path);
+                                    auto const installed_build_version =
+                                        pkgxx::build_version::from_installed(_PKG_INFO.get(), *installed);
+                                    assert(installed_build_version.has_value());
+
+                                    if (latest_build_version.has_value()) {
+                                        if (latest_build_version == installed_build_version) {
+                                            atomic_verbose(
+                                                [&](auto& out) {
+                                                    out << path << " - " << name << " OK" << std::endl;
+                                                });
+                                        }
+                                        else {
+                                            atomic_msg(
+                                                [&](auto& out) {
+                                                    out << path << " - " << name << " build_version mismatch" << std::endl;
+                                                });
+                                            atomic_verbose(
+                                                [&](auto& out) {
+                                                    out << "--current--"                   << std::endl
+                                                        << latest_build_version.value()
+                                                        << "--installed--"                 << std::endl
+                                                        << installed_build_version.value()
+                                                        << "----"                          << std::endl
+                                                        << std::endl;
+                                                });
+                                            res.lock()->MISMATCH_TODO.emplace(*installed, path);
+                                        }
+                                    }
+                                    else {
+                                        atomic_msg(
+                                            [&](auto& out) {
+                                                out << path << " - " << name << " build_version missing" << std::endl;
+                                            });
+                                    }
+                                }
+                                else {
+                                    atomic_verbose(
+                                        [&](auto& out) {
+                                            out << path << " - " << name << " OK" << std::endl;
+                                        });
+                                }
+                            }
+                            else if (installed->version < name.version) {
+                                // We have an older version installed.
+                                atomic_msg(
+                                    [&](auto& out) {
+                                        out << path << " - " << *installed << " < " << name
+                                            << (is_binary_available(name) ? " (has binary package)" : "")
+                                            << std::endl;
+                                    });
+                                res.lock()->MISMATCH_TODO.emplace(*installed, path);
+                            }
+                            else {
+                                // We have a newer version installed
+                                // but how can that happen?
+                                if (_check_build_version) {
+                                    atomic_msg(
+                                        [&](auto& out) {
+                                            out << path << " - " << *installed << " > " << name
+                                                << (is_binary_available(name) ? " (has binary package)" : "")
+                                                << std::endl;
+                                        });
+                                    res.lock()->MISMATCH_TODO.emplace(*installed, path);
+                                }
+                                else {
+                                    atomic_msg(
+                                        [&](auto& out) {
+                                            out << path << " - " << *installed << " > " << name << " - ignoring"
+                                                << (is_binary_available(name) ? " (has binary package)" : "")
+                                                << std::endl;
+                                        });
+                                }
+                            }
+                        }
+                        else {
+                            atomic_msg(
+                                [&](auto& out) {
+                                    out << path << " - " << name << " missing"
+                                        << (is_binary_available(name) ? " (has binary package)" : "")
+                                        << std::endl;
+                                });
+                            res.lock()->MISSING_TODO.emplace(name, path);
+                        }
+                    }
+                });
+        }
+        return std::move(*res.lock());
+    }
+
+    checker_base::result
+    checker_base::run() const {
+        return run(_installed_pkgpaths.get());
+    }
+
+    source_checker_base::source_checker_base(
+        std::shared_future<std::filesystem::path> const& PKGSRCDIR)
+        : _PKGSRCDIR(PKGSRCDIR)
+        , _installed_pkgpaths_with_pkgnames(
+            std::async(
+                std::launch::deferred,
+                [this]() {
+                    std::map<pkgxx::pkgpath, std::set<pkgxx::pkgname>> ret;
+                    for (auto const& [name, vars]: _installed_pkg_summary.get()) {
+                        ret[vars.PKGPATH].insert(name);
+                    }
+                    return ret;
+                }).share()) {}
 
     std::set<pkgxx::pkgname>
-    latest_pkgnames_from_source(
-        options const& opts,
-        environment const& env,
-        pkgxx::pkgpath const& path) {
+    source_checker_base::find_latest_pkgnames(pkgxx::pkgpath const& path) const {
         // There are simply no means to enumerate every possible PKGNAME a
         // PKGPATH can provide. So we first extract the default PKGNAME
         // from it, then retrieve other PKGNAMEs according to installed
@@ -35,9 +211,8 @@ namespace {
         //
         // * pkg_chk -r: Same as above.
         //
-        if (!fs::exists(env.PKGSRCDIR.get() / path / "Makefile")) {
+        if (!fs::exists(_PKGSRCDIR.get() / path / "Makefile")) {
             atomic_warn(
-                opts,
                 [&](auto& out) {
                     out << "No " << path << "/Makefile - package moved or obsolete?" << std::endl;
                 });
@@ -45,10 +220,9 @@ namespace {
         }
 
         auto const default_pkgname =
-            pkgxx::extract_pkgmk_var<pkgxx::pkgname>(env.PKGSRCDIR.get() / path, "PKGNAME");
+            pkgxx::extract_pkgmk_var<pkgxx::pkgname>(_PKGSRCDIR.get() / path, "PKGNAME");
         if (!default_pkgname) {
             fatal(
-                opts,
                 [&](auto& out) {
                     out << "Unable to extract PKGNAME for " << path << std::endl;
                 });
@@ -60,8 +234,8 @@ namespace {
         std::set<pkgxx::pkgname> pkgnames = {
             pkgxx::pkgname(*default_pkgname)
         };
-        if (opts.update || opts.delete_mismatched) {
-            auto const& pm = env.installed_pkgpaths_with_pkgnames.get();
+        if (_update || _delete_mismatched) {
+            auto const& pm = _installed_pkgpaths_with_pkgnames.get();
             if (auto installed_pkgnames = pm.find(path); installed_pkgnames != pm.end()) {
                 for (auto const& installed_pkgname: installed_pkgnames->second) {
                     if (installed_pkgname.base != default_pkgname->base) {
@@ -71,12 +245,12 @@ namespace {
                         // combining it with the already known PKGVERSION,
                         // but we can't. This is because previously
                         // supported Python versions (or Ruby, or Lua, or
-                        // whatever) may have become unsupported by this
-                        // PKGPATH, and we must treat it like a removed
-                        // package in that case.
+                        // whatever) might not be supported anymore, and we
+                        // must treat it like a removed package in that
+                        // case.
                         auto const alternative_pkgname =
                             pkgxx::extract_pkgmk_var<pkgxx::pkgname>(
-                                env.PKGSRCDIR.get() / path,
+                                _PKGSRCDIR.get() / path,
                                 "PKGNAME",
                                 {{"PKGNAME_REQD", installed_pkgname.base + "-[0-9]*"}}).value();
                         // If it doesn't support this PKGNAME_REQD, it
@@ -87,7 +261,6 @@ namespace {
                         }
                         else {
                             atomic_warn(
-                                opts,
                                 [&](auto& out) {
                                     out << path << " had presumably provided a package named like "
                                         << installed_pkgname.base << "-[0-9]* but it no longer does so. "
@@ -105,11 +278,37 @@ namespace {
         return pkgnames;
     }
 
+    std::optional<pkgxx::build_version>
+    source_checker_base::fetch_build_version(pkgxx::pkgname const&, pkgxx::pkgpath const& path) const {
+        return pkgxx::build_version::from_source(_PKGSRCDIR.get(), path);
+    }
+
+    binary_checker_base::binary_checker_base(
+        std::shared_future<std::filesystem::path> const& PACKAGES,
+        std::shared_future<std::string> const& PKG_SUFX,
+        std::shared_future<pkgxx::summary> const& bin_pkg_summary)
+        : _PACKAGES(PACKAGES)
+        , _PKG_SUFX(PKG_SUFX)
+        , _bin_pkg_summary(bin_pkg_summary)
+        , _bin_pkg_map(
+            std::async(
+                std::launch::deferred,
+                [this]() {
+                    return pkgxx::pkgmap(_bin_pkg_summary.get());
+                }).share())
+        , _installed_pkgbases(
+            std::async(
+                std::launch::deferred,
+                [this]() {
+                    std::set<pkgxx::pkgbase> ret;
+                    for (auto const& [name, _vars]: _installed_pkg_summary.get()) {
+                        ret.insert(name.base);
+                    }
+                    return ret;
+                }).share()) {}
+
     std::set<pkgxx::pkgname>
-    latest_pkgnames_from_binary(
-        options const& opts,
-        environment const& env,
-        pkgxx::pkgpath const& path) {
+    binary_checker_base::find_latest_pkgnames(pkgxx::pkgpath const& path) const {
         // We can enumerate every possible PKGNAME a PKGPATH can provide
         // just by querying the binary package summary. However, we cannot
         // know which one is the default without consulting the
@@ -117,10 +316,10 @@ namespace {
         // workaround we can do is to sort the pkgbases and pick the last
         // one, but this is of course not guaranteed to pick the correct
         // package.
-        auto const& pm = env.bin_pkg_map.get();
+        auto const& pm = _bin_pkg_map.get();
         if (auto pkgbases = pm.find(path); pkgbases != pm.end()) {
             std::set<pkgxx::pkgname> pkgnames;
-            if (opts.add_missing) {
+            if (_add_missing) {
                 // Guess the default pkgbase. This may be inaccurate.
                 auto guessed_default = pkgbases->second.rbegin();
                 assert(guessed_default != pkgbases->second.rend());
@@ -130,11 +329,11 @@ namespace {
 
                 pkgnames.insert(latest->first);
             }
-            if (opts.update || opts.delete_mismatched) {
+            if (_update || _delete_mismatched) {
                 // We need to enumerate only PKGBASEs that are already
                 // installed, otherwise -a would install every single
                 // PKGNAME that the PKGPATH provides.
-                auto const& installed_pkgbases = env.installed_pkgbases.get();
+                auto const& installed_pkgbases = _installed_pkgbases.get();
                 for (auto const& [base, sum]: pkgbases->second) {
                     if (installed_pkgbases.find(base) != installed_pkgbases.end()) {
                         auto latest = sum.rbegin();
@@ -151,154 +350,33 @@ namespace {
             return {};
         }
     }
-}
 
-namespace pkg_chk {
-    // This is the slowest part of pkg_chk. For each package we need to
-    // extract variables from package Makefiles unless we are using binary
-    // packages. Luckily for us each check is independent of each other so
-    // we can parallelise them.
-    check_result
-    check_installed_packages(
-        options const& opts,
-        environment const& env,
-        std::set<pkgxx::pkgpath> const& pkgpaths) {
-
-        pkgxx::guarded<check_result> res;
-        pkgxx::nursery n(opts.concurrency);
-        for (pkgxx::pkgpath const& path: pkgpaths) {
-            n.start_soon(
-                [&, path = std::move(path)]() {
-                    // Find the set of latest PKGNAMEs provided by this
-                    // PKGPATH. Most PKGPATHs have just one corresponding
-                    // PKGNAME but some (py-*) have more.
-                    std::set<pkgxx::pkgname> const latest_pkgnames
-                        = opts.build_from_source
-                        ? latest_pkgnames_from_source(opts, env, path)
-                        : latest_pkgnames_from_binary(opts, env, path);
-
-                    if (latest_pkgnames.empty()) {
-                        res.lock()->MISSING_DONE.insert(std::move(path));
-                        return;
-                    }
-
-                    auto const& installed_pkgnames = env.installed_pkgnames.get();
-                    for (pkgxx::pkgname const& name: latest_pkgnames) {
-                        if (auto installed = installed_pkgnames.lower_bound(
-                                pkgxx::pkgname(name.base, pkgxx::pkgversion()));
-                            installed != installed_pkgnames.end() && installed->base == name.base) {
-
-                            if (installed->version == name.version) {
-                                // The latest PKGNAME turned out to be
-                                // installed. Good, but that's not enough
-                                // if -B is given.
-                                if (opts.check_build_version) {
-                                    std::optional<pkgxx::build_version> latest_build_version;
-                                    if (opts.use_binary_pkgs && !opts.build_from_source) {
-                                        if (auto const file = env.binary_package_file_of(name); file) {
-                                            latest_build_version =
-                                                pkgxx::build_version::from_binary(env.PKG_INFO.get(), *file);
-                                        }
-                                    }
-                                    else {
-                                        latest_build_version =
-                                            pkgxx::build_version::from_source(env.PKGSRCDIR.get(), path);
-                                    }
-                                    auto const installed_build_version =
-                                        pkgxx::build_version::from_installed(env.PKG_INFO.get(), *installed);
-                                    assert(installed_build_version.has_value());
-
-                                    if (latest_build_version.has_value()) {
-                                        if (latest_build_version == installed_build_version) {
-                                            atomic_verbose(
-                                                opts,
-                                                [&](auto& out) {
-                                                    out << path << " - " << name << " OK" << std::endl;
-                                                });
-                                        }
-                                        else {
-                                            atomic_msg(
-                                                opts,
-                                                [&](auto& out) {
-                                                    out << path << " - " << name << " build_version mismatch" << std::endl;
-                                                });
-                                            atomic_verbose(
-                                                opts,
-                                                [&](auto& out) {
-                                                    out << "--current--"                   << std::endl
-                                                        << latest_build_version.value()
-                                                        << "--installed--"                 << std::endl
-                                                        << installed_build_version.value()
-                                                        << "----"                          << std::endl
-                                                        << std::endl;
-                                                });
-                                            res.lock()->MISMATCH_TODO.insert(*installed);
-                                        }
-                                    }
-                                    else {
-                                        atomic_msg(
-                                            opts,
-                                            [&](auto& out) {
-                                                out << path << " - " << name << " build_version missing" << std::endl;
-                                            });
-                                    }
-                                }
-                                else {
-                                    atomic_verbose(
-                                        opts,
-                                        [&](auto& out) {
-                                            out << path << " - " << name << " OK" << std::endl;
-                                        });
-                                }
-                            }
-                            else if (installed->version < name.version) {
-                                // We have an older version installed.
-                                atomic_msg(
-                                    opts,
-                                    [&](auto& out) {
-                                        out << path << " - " << *installed << " < " << name
-                                            << (env.is_binary_available(name) ? " (has binary package)" : "")
-                                            << std::endl;
-                                    });
-                                res.lock()->MISMATCH_TODO.insert(*installed);
-                            }
-                            else {
-                                // We have a newer version installed
-                                // but how can that happen?
-                                if (opts.check_build_version) {
-                                    atomic_msg(
-                                        opts,
-                                        [&](auto& out) {
-                                            out << path << " - " << *installed << " > " << name
-                                                << (env.is_binary_available(name) ? " (has binary package)" : "")
-                                                << std::endl;
-                                        });
-                                    res.lock()->MISMATCH_TODO.insert(*installed);
-                                }
-                                else {
-                                    atomic_msg(
-                                        opts,
-                                        [&](auto& out) {
-                                            out << path << " - " << *installed << " > " << name << " - ignoring"
-                                                << (env.is_binary_available(name) ? " (has binary package)" : "")
-                                                << std::endl;
-                                        });
-                                }
-                            }
-                        }
-                        else {
-                            atomic_msg(
-                                opts,
-                                [&](auto& out) {
-                                    out << path << " - " << name << " missing"
-                                        << (env.is_binary_available(name) ? " (has binary package)" : "")
-                                        << std::endl;
-                                });
-                            res.lock()->MISSING_TODO.insert_or_assign(name, std::move(path));
-                        }
-                    }
-                });
+    std::optional<pkgxx::build_version>
+    binary_checker_base::fetch_build_version(pkgxx::pkgname const& name, pkgxx::pkgpath const&) const {
+        if (auto const file = binary_package_file_of(name); file) {
+            return pkgxx::build_version::from_binary(_PKG_INFO.get(), *file);
         }
-        return std::move(*res.lock());
+        else {
+            return std::nullopt;
+        }
+    }
+
+    std::optional<std::filesystem::path>
+    binary_checker_base::binary_package_file_of(pkgxx::pkgname const& name) const {
+        auto const& sum = _bin_pkg_summary.get();
+
+        if (auto it = sum.find(name); it != sum.end()) {
+            if (it->second.FILE_NAME) {
+                return _PACKAGES.get() / *(it->second.FILE_NAME);
+            }
+            else {
+                auto file = _PACKAGES.get() / name.string();
+                file += _PKG_SUFX.get();
+                return file;
+            }
+        }
+        else {
+            return {};
+        }
     }
 }

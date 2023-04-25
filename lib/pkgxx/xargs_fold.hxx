@@ -61,7 +61,7 @@ namespace pkgxx {
                           unsigned int concurrency) {
                 lock_t lk(_mtx);
 
-                std::vector<std::string> argv = {CFG_XARGS, "-0"};
+                std::vector<std::string> argv = {CFG_XARGS, "-r", "-0"};
                 argv.insert(argv.end(), cmd.begin(), cmd.end());
 
                 for (unsigned int i = 0; i < concurrency; i++) {
@@ -139,6 +139,11 @@ namespace pkgxx {
         };
     }
 
+    /** Spawn several instances of xargs(1), let a function \c split feed
+     * them arguments in a round-robin manner, and then let a function \c
+     * parse the output and produce a result. The result type of the
+     * function \c parse must form a commutative monoid under its default
+     * constructor and \c operator+=. */
     template <typename Split, typename Parse>
     typename detail::xargs_nursery<Parse>::result_type
     xargs_fold(std::vector<std::string> const& cmd,
@@ -153,23 +158,7 @@ namespace pkgxx {
 
         assert(concurrency > 0);
         auto nursery = detail::xargs_nursery(cmd, parse, concurrency);
-
-        std::exception_ptr ex;
-        auto splitter = std::thread(
-            [&]() {
-                try {
-                    split(nursery.sink());
-                }
-                catch (...) {
-                    ex = std::current_exception();
-                }
-            });
-
-        auto result = nursery.await();
-        splitter.join();
-        if (ex) {
-            std::rethrow_exception(ex);
-        }
-        return result;
+        split(nursery.sink());
+        return nursery.await();
     }
 }

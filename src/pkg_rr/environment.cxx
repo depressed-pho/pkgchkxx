@@ -8,7 +8,9 @@ namespace fs = std::filesystem;
 
 namespace {
     struct makefile_env {
+        std::string PKG_ADMIN;
         std::string PKG_INFO;
+        std::string SU_CMD;
     };
 }
 
@@ -37,7 +39,8 @@ namespace pkg_rr {
                           });
                 }
                 std::vector<std::string> vars = {
-                    "PKG_INFO"
+                    "PKG_INFO",
+                    "SU_CMD"
                 };
                 std::map<std::string, std::string> value_of;
                 auto const pkgpath = PKGSRCDIR.get() / "pkgtools/pkg_install"; // Any package will do.
@@ -50,9 +53,13 @@ namespace pkg_rr {
                 for (auto const& [var, value]: value_of) {
                     verbose_var(opts, var, value);
                 }
-                _menv.PKG_INFO = value_of["PKG_INFO"].empty() ? CFG_PKG_INFO : value_of["PKG_INFO"];
+                _menv.PKG_ADMIN = value_of["PKG_ADMIN"].empty() ? CFG_PKG_ADMIN : value_of["PKG_ADMIN"];
+                _menv.PKG_INFO  = value_of["PKG_INFO" ].empty() ? CFG_PKG_INFO  : value_of["PKG_INFO" ];
+                _menv.SU_CMD    = value_of["SU_CMD"   ];
                 return _menv;
             }).share();
-        PKG_INFO = std::async(std::launch::deferred, [menv]() { return menv.get().PKG_INFO; }).share();
+        PKG_ADMIN = std::async(std::launch::deferred, [menv]() { return menv.get().PKG_ADMIN; }).share();
+        PKG_INFO  = std::async(std::launch::deferred, [menv]() { return menv.get().PKG_INFO;  }).share();
+        SU_CMD    = std::async(std::launch::deferred, [menv]() { return menv.get().SU_CMD;    }).share();
     }
 }

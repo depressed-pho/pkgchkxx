@@ -18,6 +18,7 @@ libpkgxx_la_SOURCES = \
 	pkgname.cxx pkgname.hxx \
 	pkgpath.cxx pkgpath.hxx \
 	pkgpattern.cxx pkgpattern.hxx \
+	stream.hxx \
 	string_algo.hxx \
 	summary.hxx summary.cxx \
 	tempfile.cxx tempfile.hxx \

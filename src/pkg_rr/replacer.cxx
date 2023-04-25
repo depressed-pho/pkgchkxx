@@ -4,14 +4,51 @@
 
 #include <pkgxx/string_algo.hxx>
 
+#include "pkg_chk/check.hxx"
 #include "replacer.hxx"
 
 using namespace std::chrono_literals;
 namespace fs = std::filesystem;
 
 namespace {
-    struct replace_failed: std::runtime_error {
+    struct replace_failed: virtual std::runtime_error {
         using std::runtime_error::runtime_error;
+    };
+
+    struct source_checker: virtual pkg_chk::source_checker_base {
+        source_checker(pkg_rr::options const& opts, pkg_rr::environment const& env)
+            : checker_base(
+                false, // add_missing (-a)
+                opts.check_build_version,
+                opts.concurrency,
+                true,  // update (-u)
+                false, // delete_mismatched (-r)
+                env.PKG_INFO)
+            , source_checker_base(env.PKGSRCDIR)
+            , _opts(opts) {}
+
+    protected:
+        virtual void
+        atomic_msg(std::function<void (std::ostream&)> const& f) const override {
+            pkg_rr::atomic_msg(f);
+        }
+
+        virtual void
+        atomic_warn(std::function<void (std::ostream&)> const& f) const override {
+            pkg_rr::atomic_warn(f);
+        }
+
+        virtual void
+        atomic_verbose(std::function<void (std::ostream&)> const&) const override {
+            // Don't show verbose messages from pkg_chk.
+        }
+
+        virtual void
+        fatal(std::function<void (std::ostream&)> const& f) const override {
+            pkg_rr::fatal(f);
+        }
+
+        pkg_rr::options const& _opts;
     };
 
     std::optional<pkgxx::pkgbase>
@@ -97,7 +134,7 @@ namespace pkg_rr {
                 FAILED.push_back(base);
                 auto const& cb = [&](auto& out) { out << e.what() << std::endl; };
                 if (opts.continue_on_errors) {
-                    error(cb);
+                    atomic_error(cb);
                 }
                 else {
                     abort(cb);
@@ -122,7 +159,35 @@ namespace pkg_rr {
     std::future<rolling_replacer::todo_type>
     rolling_replacer::check_mismatch(pkg_rr::package_scanner& scanner) const {
         if (opts.check_for_updates) {
-            throw "FIXME: -u not implemented";
+            msg() << "Checking for mismatched installed packages using pkg_chk" << std::endl;
+            auto result = source_checker(opts, env).run();
+
+            if (!result.MISMATCH_TODO.empty()) {
+                // Spawn xargs only if it's non-empty; otherwise we would
+                // end up asking for password for nothing.
+                msg() << "Marking outdated packages as mismatched" << std::endl;
+
+                pkgxx::harness xargs = spawn_su({CFG_XARGS, env.PKG_ADMIN.get(), "set", "mismatch=YES"});
+                for (auto const& [name, _]: result.MISMATCH_TODO) {
+                    xargs.cin() << name << std::endl;
+                }
+                xargs.cin().close();
+
+                if (xargs.wait_exit().status != 0) {
+                    warn() << "mismatch variable not set due to permissions; "
+                           << "the status will not persist." << std::endl;
+                }
+            }
+
+            // pkg_chk gives us PKGNAME but we want PKGBASE.
+            todo_type todo;
+            for (auto&& [name, path]: result.MISMATCH_TODO) {
+                todo.emplace(std::move(name.base), std::move(path));
+            }
+
+            std::promise<todo_type> res;
+            res.set_value(std::move(todo));
+            return res.get_future();
         }
         else {
             msg() << "Checking for mismatched installed packages (mismatch=YES)" << std::endl;
@@ -236,20 +301,24 @@ namespace pkg_rr {
     void
     rolling_replacer::dump_todo() const {
         if (opts.just_fetch) {
-            verbose(opts, [&](auto& out) {
-                              out << "Packages to fetch:" << std::endl;
-                              dump_todo(out, "MISMATCH_TODO", MISMATCH_TODO);
-                              dump_todo(out, "MISSING_TODO" , MISSING_TODO );
-                          });
+            atomic_verbose(
+                opts,
+                [&](auto& out) {
+                    out << "Packages to fetch:" << std::endl;
+                    dump_todo(out, "MISMATCH_TODO", MISMATCH_TODO);
+                    dump_todo(out, "MISSING_TODO" , MISSING_TODO );
+                });
         }
         else {
-            verbose(opts, [&](auto& out) {
-                              out << "Packages to rebuild:" << std::endl;
-                              dump_todo(out, "MISMATCH_TODO", MISMATCH_TODO);
-                              dump_todo(out, "REBUILD_TODO" , REBUILD_TODO );
-                              dump_todo(out, "MISSING_TODO" , MISSING_TODO );
-                              dump_todo(out, "UNSAFE_TODO"  , UNSAFE_TODO  );
-                          });
+            atomic_verbose(
+                opts,
+                [&](auto& out) {
+                    out << "Packages to rebuild:" << std::endl;
+                    dump_todo(out, "MISMATCH_TODO", MISMATCH_TODO);
+                    dump_todo(out, "REBUILD_TODO" , REBUILD_TODO );
+                    dump_todo(out, "MISSING_TODO" , MISSING_TODO );
+                    dump_todo(out, "UNSAFE_TODO"  , UNSAFE_TODO  );
+                });
         }
         vsleep(opts, 2s);
     }
@@ -537,6 +606,25 @@ namespace pkg_rr {
         }
     }
 
+    pkgxx::harness
+    rolling_replacer::spawn_su(std::vector<std::string> const& cmd) const {
+        pkgxx::harness su(
+            pkgxx::shell, {pkgxx::shell, "-s"},
+            std::nullopt, [](auto&) {},
+            pkgxx::harness::fd_action::pipe,
+            pkgxx::harness::fd_action::inherit,
+            pkgxx::harness::fd_action::inherit);
+        if (env.SU_CMD.get().empty()) {
+            su.cin() << "exec " << pkgxx::stringify_argv(cmd) << std::endl;
+        }
+        else {
+            su.cin() << "exec " << env.SU_CMD.get() << ' '
+                     << pkgxx::stringify_argv(cmd) << std::endl;
+        }
+        su.cin().close();
+        return su;
+    }
+
     std::pair<
         pkgxx::pkgversion,
         std::map<pkgxx::pkgbase, pkgxx::pkgpath>
@@ -646,14 +734,6 @@ namespace pkg_rr {
 
         auto make_vars = make_vars_for_pkg(base);
         make_vars["PKGSRC_KEEP_BIN_PKGS"] = opts.just_replace ? "NO" : "YES";
-        if (!was_installed) {
-            // If the package wasn't installed before we did, it's clear
-            // that the user didn't explicitly ask to install it. It's not
-            // nice to directly manipulate an internal variable here, but
-            // there is no better way to achieve this aside from doing a
-            // SU_CMD dance (which we really hate to do).
-            make_vars["_AUTOMATIC"] = "YES";
-        }
 
         run_make(base, path, {"clean"}, opts.make_vars);
         if (was_installed) {
@@ -661,6 +741,9 @@ namespace pkg_rr {
         }
         else {
             run_make(base, path, {"install"}, make_vars);
+            // If the package wasn't installed before we did, it's clear
+            // that the user didn't explicitly ask to install it.
+            run_su({env.PKG_ADMIN.get(), "set", "automatic=YES", base});
         }
         run_make(base, path, {"clean"}, opts.make_vars);
 

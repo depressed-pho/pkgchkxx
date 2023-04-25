@@ -10,11 +10,11 @@
 #include <fetch.h>
 
 namespace pkgxx {
-    struct remote_file_error: std::runtime_error {
+    struct remote_file_error: virtual std::runtime_error {
         using std::runtime_error::runtime_error;
     };
 
-    struct remote_file_unavailable: remote_file_error {
+    struct remote_file_unavailable: virtual remote_file_error {
         using remote_file_error::remote_file_error;
     };
 

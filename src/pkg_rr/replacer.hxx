@@ -95,6 +95,14 @@ namespace pkg_rr {
             std::initializer_list<std::string> const& targets,
             std::map<std::string, std::string> const& vars) const;
 
+        pkgxx::harness
+        spawn_su(std::vector<std::string> const& cmd) const;
+
+        void
+        run_su(std::vector<std::string> const& cmd) const {
+            spawn_su(cmd).wait_success();
+        }
+
         std::pair<
             pkgxx::pkgversion,
             std::map<pkgxx::pkgbase, pkgxx::pkgpath>
@@ -106,16 +114,6 @@ namespace pkg_rr {
 
         void
         replace(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path);
-
-        template <typename Function>
-        void
-        error(Function&& f) const {
-            static_assert(std::is_invocable_v<Function&&, std::ostream&>);
-            pkg_rr::msg(
-                [&](auto& out) {
-                    out << "*** "; f(out);
-                });
-        }
 
         template <typename Function>
         [[noreturn]] void

@@ -62,7 +62,7 @@ namespace pkg_rr {
 
     template <typename Function>
     inline void
-    msg(Function&& f) {
+    atomic_msg(Function&& f) {
         static_assert(std::is_invocable_v<Function&&, std::ostream&>);
 
         std::lock_guard<std::recursive_mutex> lk(detail::message_mutex);
@@ -74,6 +74,26 @@ namespace pkg_rr {
         auto out = msg();
         out << "WARNING: ";
         return out;
+    }
+
+    template <typename Function>
+    void
+    atomic_warn(Function&& f) {
+        static_assert(std::is_invocable_v<Function&&, std::ostream&>);
+
+        std::lock_guard<std::recursive_mutex> lk(detail::message_mutex);
+        auto l = warn();
+        f(l);
+    }
+
+    template <typename Function>
+    inline void
+    atomic_error(Function&& f) {
+        static_assert(std::is_invocable_v<Function&&, std::ostream&>);
+
+        std::lock_guard<std::recursive_mutex> lk(detail::message_mutex);
+        std::cout << "*** ";
+        f(std::cout);
     }
 
     inline msg_logger
@@ -88,7 +108,7 @@ namespace pkg_rr {
 
     template <typename Function>
     inline void
-    verbose(pkg_rr::options const& opts, Function&& f, unsigned level = 1) {
+    atomic_verbose(pkg_rr::options const& opts, Function&& f, unsigned level = 1) {
         static_assert(std::is_invocable_v<Function&&, std::ostream&>);
 
         std::lock_guard<std::recursive_mutex> lk(detail::message_mutex);

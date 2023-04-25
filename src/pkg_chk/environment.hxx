@@ -28,9 +28,6 @@ namespace pkg_chk {
             return bin_pkg_summary.get().count(name) > 0;
         }
 
-        std::optional<std::filesystem::path>
-        binary_package_file_of(pkgxx::pkgname const& name) const;
-
         std::shared_future<std::string>           MACHINE_ARCH;
         std::shared_future<std::string>           OPSYS;
         std::shared_future<std::string>           OS_VERSION;
@@ -51,12 +48,6 @@ namespace pkg_chk {
 
         std::shared_future<std::set<pkgxx::pkgname>> installed_pkgnames; // Fastest to compute.
         std::shared_future<std::set<pkgxx::pkgpath>> installed_pkgpaths; // Moderately slow.
-        std::shared_future<pkgxx::summary>        installed_pkg_summary; // Slowest to compute.
-        std::shared_future<std::set<pkgxx::pkgbase>> installed_pkgbases; // Derived from installed_pkgnames.
-        std::shared_future<
-            std::map<
-                pkgxx::pkgpath,
-                std::set<pkgxx::pkgname>>> installed_pkgpaths_with_pkgnames; // Derived from installed_pkg_summary.
 
         std::shared_future<tagset>  included_tags;
         std::shared_future<tagset>  excluded_tags;

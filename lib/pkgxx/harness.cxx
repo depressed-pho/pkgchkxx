@@ -304,7 +304,8 @@ namespace pkgxx {
     failed_to_spawn_process::failed_to_spawn_process(
         command_error&& ce,
         std::string&& msg_)
-        : command_error(std::move(ce))
+        : std::runtime_error("")
+        , command_error(std::move(ce))
         , msg(
             std::async(
                 std::launch::deferred,
@@ -320,7 +321,8 @@ namespace pkgxx {
     process_terminated_unexpectedly::process_terminated_unexpectedly(
         command_error&& ce,
         pid_t pid_)
-        : command_error(std::move(ce))
+        : std::runtime_error("")
+        , command_error(std::move(ce))
         , pid(pid_) {}
 #endif
 
@@ -328,7 +330,9 @@ namespace pkgxx {
     process_died_of_signal::process_died_of_signal(
         process_terminated_unexpectedly&& ptu,
         harness::signaled const& st_)
-        : process_terminated_unexpectedly(std::move(ptu))
+        : std::runtime_error("")
+        , command_error(std::move(ptu))
+        , process_terminated_unexpectedly(std::move(ptu))
         , st(st_)
         , msg(
             std::async(
@@ -347,7 +351,9 @@ namespace pkgxx {
     process_exited_for_failure::process_exited_for_failure(
         process_terminated_unexpectedly&& ptu,
         harness::exited const& st_)
-        : process_terminated_unexpectedly(std::move(ptu))
+        : std::runtime_error("")
+        , command_error(std::move(ptu))
+        , process_terminated_unexpectedly(std::move(ptu))
         , st(st_)
         , msg(
             std::async(

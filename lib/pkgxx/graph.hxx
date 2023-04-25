@@ -17,7 +17,7 @@
 namespace pkgxx {
     /// A cycle has been detected while tsorting a graph.
     template <typename VertexT, typename EdgeT = void>
-    struct not_a_dag: std::runtime_error {
+    struct not_a_dag: virtual std::runtime_error {
 #if !defined(DOXYGEN)
         not_a_dag(std::vector<VertexT>&& vertices_, std::vector<EdgeT>&& edges_)
             : std::runtime_error("")
@@ -36,7 +36,7 @@ namespace pkgxx {
 
     /// A special case when EdgeT is void.
     template <typename VertexT>
-    struct not_a_dag<VertexT, void>: std::runtime_error {
+    struct not_a_dag<VertexT, void>: virtual std::runtime_error {
 #if !defined(DOXYGEN)
         not_a_dag(std::vector<VertexT>&& vertices_)
             : std::runtime_error("")

@@ -17,6 +17,8 @@ namespace pkg_rr {
     struct environment: public pkgxx::environment {
         environment(pkg_rr::options const& opts);
 
+        std::shared_future<std::string> PKG_ADMIN;
         std::shared_future<std::string> PKG_INFO;
+        std::shared_future<std::string> SU_CMD;
     };
 }

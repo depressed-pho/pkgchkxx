@@ -19,7 +19,7 @@
 #include <pkgxx/pkgpath.hxx>
 #include <pkgxx/todo.hxx>
 
-#include "check.hxx"
+#include "pkg_chk/check.hxx"
 #include "config_file.hxx"
 #include "environment.hxx"
 #include "message.hxx"
@@ -117,9 +117,9 @@ namespace {
     delete_pkgs(
         pkg_chk::options const& opts,
         pkg_chk::environment const& env,
-        std::set<pkgxx::pkgname> const& pkgnames) {
+        std::map<pkgxx::pkgname, pkgxx::pkgpath> const& pkgs) {
 
-        for (pkgxx::pkgname const& name: pkgnames) {
+        for (auto const& [name, _path]: pkgs) {
             if (pkgxx::is_pkg_installed(env.PKG_INFO.get(), name)) {
                 run_cmd_su(opts, env, env.PKG_DELETE.get(), {"-r", name.string()}, true);
             }
@@ -147,12 +147,54 @@ namespace {
         return pkgpaths;
     }
 
+    struct checker: virtual pkg_chk::configurable_checker_base {
+        checker(pkg_chk::options const& opts, pkg_chk::environment const& env)
+            : checker_base(
+                opts.add_missing,
+                opts.check_build_version,
+                opts.concurrency,
+                opts.update,
+                opts.delete_mismatched,
+                env.PKG_INFO)
+            , source_checker_base(env.PKGSRCDIR)
+            , binary_checker_base(
+                env.PACKAGES,
+                env.PKG_SUFX,
+                env.bin_pkg_summary)
+            , configurable_checker_base(opts.build_from_source)
+            , _opts(opts) {}
+
+    protected:
+        virtual void
+        atomic_msg(std::function<void (std::ostream&)> const& f) const override {
+            pkg_chk::atomic_msg(_opts, f);
+        }
+
+        virtual void
+        atomic_warn(std::function<void (std::ostream&)> const& f) const override {
+            pkg_chk::atomic_warn(_opts, f);
+        }
+
+        virtual void
+        atomic_verbose(std::function<void (std::ostream&)> const& f) const override {
+            pkg_chk::atomic_verbose(_opts, f);
+        }
+
+        virtual void
+        fatal(std::function<void (std::ostream&)> const& f) const override {
+            pkg_chk::fatal(_opts, f);
+        }
+
+        pkg_chk::options const& _opts;
+    };
+
     void
     delete_and_recheck(
         pkg_chk::options const& opts,
         pkg_chk::environment const& env,
         std::set<pkgxx::pkgpath> const& pkgpaths,
-        pkg_chk::check_result& res) {
+        checker const& chk,
+        checker::result& res) {
 
         std::set<pkgxx::pkgpath> update_conf;
         if (opts.update) {
@@ -190,7 +232,7 @@ namespace {
                 recheck_paths.insert(update_conf.begin(), update_conf.end());
             }
             if (opts.add_missing || opts.update) {
-                res = check_installed_packages(opts, env, recheck_paths);
+                res = chk.run(recheck_paths);
             }
         }
     }
@@ -252,11 +294,12 @@ namespace {
             return;
         }
 
-        pkg_chk::check_result res = check_installed_packages(opts, env, pkgpaths);
+        checker const chk(opts, env);
+        checker::result res = chk.run(pkgpaths);
         if (!res.MISMATCH_TODO.empty() ||
             (opts.update && fs::exists(env.PKGCHK_UPDATE_CONF.get()))) {
 
-            delete_and_recheck(opts, env, pkgpaths, res);
+            delete_and_recheck(opts, env, pkgpaths, chk, res);
         }
 
         std::set<pkgxx::pkgname> FAILED_DONE;

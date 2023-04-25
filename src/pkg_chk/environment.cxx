@@ -248,10 +248,6 @@ namespace pkg_chk {
             [this, &opts]() {
                 verbose(opts) << "Enumerate PKGNAME from installed packages" << std::endl;
 
-                // Ideally we should first check if
-                // installed_pkgpaths_with_pkgnames has been evaluated, and
-                // spawn pkg_info(1) only if not. But std::shared_future
-                // doesn't have a method to check that.
                 std::set<pkgxx::pkgname> pkgnames;
                 for (auto& name: pkgxx::installed_pkgnames(PKG_INFO.get())) {
                     pkgnames.insert(std::move(name));
@@ -263,10 +259,6 @@ namespace pkg_chk {
             [this, &opts]() {
                 verbose(opts) << "Enumerate PKGPATH from installed packages" << std::endl;
 
-                // Ideally we should first check if
-                // installed_pkgpaths_with_pkgnames has been evaluated, and
-                // spawn pkg_info(1) only if not. But std::shared_future
-                // doesn't have a method to check that.
                 pkgxx::harness pkg_info(pkgxx::shell, {pkgxx::shell, "-s", "--", "-aQ", "PKGPATH"});
                 pkg_info.cin() << "exec " << PKG_INFO.get() << " \"$@\"" << std::endl;
                 pkg_info.cin().close();
@@ -278,30 +270,6 @@ namespace pkg_chk {
                     }
                 }
                 return pkgpaths;
-            }).share();
-        installed_pkg_summary = std::async(
-            std::launch::deferred,
-            [this, &opts]() {
-                verbose(opts) << "Getting summary from installed packages" << std::endl;
-                return pkgxx::summary(PKG_INFO.get());
-            }).share();
-        installed_pkgbases = std::async(
-            std::launch::deferred,
-            [this, &opts]() {
-                std::set<pkgxx::pkgbase> ret;
-                for (auto const& name: installed_pkgnames.get()) {
-                    ret.insert(name.base);
-                }
-                return ret;
-            }).share();
-        installed_pkgpaths_with_pkgnames = std::async(
-            std::launch::deferred,
-            [this]() {
-                std::map<pkgxx::pkgpath, std::set<pkgxx::pkgname>> ret;
-                for (auto const& [name, vars]: installed_pkg_summary.get()) {
-                    ret[vars.PKGPATH].insert(name);
-                }
-                return ret;
             }).share();
 
         // Tags are collected from the platform, options, and Makefile
@@ -364,24 +332,5 @@ namespace pkg_chk {
             }).share();
         included_tags = std::async(std::launch::deferred, [tenv]() { return tenv.get().included_tags; }).share();
         excluded_tags = std::async(std::launch::deferred, [tenv]() { return tenv.get().excluded_tags; }).share();
-    }
-
-    std::optional<std::filesystem::path>
-    environment::binary_package_file_of(pkgxx::pkgname const& name) const {
-        auto const& sum = bin_pkg_summary.get();
-
-        if (auto it = sum.find(name); it != sum.end()) {
-            if (it->second.FILE_NAME) {
-                return PACKAGES.get() / *(it->second.FILE_NAME);
-            }
-            else {
-                auto file = PACKAGES.get() / name.string();
-                file += PKG_SUFX.get();
-                return file;
-            }
-        }
-        else {
-            return {};
-        }
     }
 }
