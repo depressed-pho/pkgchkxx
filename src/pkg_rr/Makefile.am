@@ -9,6 +9,7 @@ pkgrrxx_SOURCES = \
 	replacer.cxx replacer.hxx
 
 pkgrrxx_CXXFLAGS = \
+	-I$(top_builddir)/lib \
 	-I$(top_srcdir)/lib \
 	-I$(top_srcdir)/src
 

@@ -33,6 +33,9 @@ namespace pkgxx {
         MAKECONF = std::async(
             std::launch::deferred,
             [&]() {
+                //
+                // Lazy evaluation with std::async(std::launch::deferred).
+                //
                 fs::path vMAKECONF = cgetenv("MAKECONF");
                 if (vMAKECONF.empty()) {
                     std::initializer_list<fs::path> const candidates = {

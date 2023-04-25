@@ -5,6 +5,7 @@
 *.lo
 *.log
 *.scan
+*.tar.gz
 *.o
 ktrace.out
 
@@ -31,5 +32,6 @@ stamp-*
 
 doc/Doxyfile
 doc/_output
+doc/*.8
 src/pkg_chk/pkgchkxx
 src/pkg_rr/pkgrrxx

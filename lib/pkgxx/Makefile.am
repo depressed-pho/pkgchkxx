@@ -28,6 +28,7 @@ libpkgxx_la_SOURCES = \
 	xargs_fold.hxx
 
 libpkgxx_la_CXXFLAGS = \
+	-I$(top_builddir)/lib \
 	-I$(top_srcdir)/lib \
 	-DCFG_PREFIX='"$(prefix)"'
 	$(BZIP2_CPPFLAGS) \
