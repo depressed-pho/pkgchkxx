@@ -1,8 +1,9 @@
 SUBDIRS = doc lib src
 
 EXTRA_DIST = \
-	README.md \
-	HACKING.md
+	HACKING.md \
+	NEWS.md \
+	README.md
 
 # Let "make distcheck" use variables supplied to ./configure
 DISTCHECK_CONFIGURE_FLAGS = \
