@@ -33,7 +33,7 @@ libpkgxx_la_CXXFLAGS = \
 	-DCFG_PREFIX='"$(prefix)"'
 	$(BZIP2_CPPFLAGS) \
 	$(LIBFETCH_CPPFLAGS) \
-	$(ZLIB_CFLAGS)
+	$(ZLIB_CPPFLAGS)
 
 libpkgxx_la_LDFLAGS = \
 	$(BZIP2_LIBS) \

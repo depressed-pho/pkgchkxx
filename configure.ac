@@ -66,7 +66,7 @@ AX_CXX_STD_FILESYSTEM
 AX_CXX_STD_THREAD
 AX_BZIP2
 AX_LIBFETCH
-PKG_CHECK_MODULES([ZLIB], [zlib], [], [AC_MSG_ERROR([zlib is missing])])
+AX_ZLIB
 
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h])
