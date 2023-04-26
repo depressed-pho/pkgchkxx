@@ -40,6 +40,11 @@ simply not feasible.
   `pkg_summary(5)` files from a remote host.
 
 
+## Release notes
+
+See [NEWS](./NEWS.md).
+
+
 ## Building and installation
 
 ```
