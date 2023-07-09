@@ -399,16 +399,23 @@ namespace pkg_rr {
                             // This operation is expensive so we shouldn't
                             // lock guarded values while doing it.
                             auto const& deps = pkgxx::build_depends(PKG_INFO, base);
-
-                            // And of course we don't want to repeatedly
-                            // lock and unlock them.
-                            auto&& depgraph_g  = depgraph.lock();
-                            auto&& scheduled_g = scheduled.lock();
-                            for (auto const& dep: deps) {
-                                if (!depgraph_g->has_vertex(dep.base)) {
-                                    scheduled_g->insert(dep.base);
+                            if (deps.empty()) {
+                                // A package may have no dependencies at
+                                // all. Add at least a vertex in that case,
+                                // or we will fail to update it.
+                                depgraph.lock()->add_vertex(base);
+                            }
+                            else {
+                                // We don't want to repeatedly lock and
+                                // unlock them.
+                                auto&& depgraph_g  = depgraph.lock();
+                                auto&& scheduled_g = scheduled.lock();
+                                for (auto const& dep: deps) {
+                                    if (!depgraph_g->has_vertex(dep.base)) {
+                                        scheduled_g->insert(dep.base);
+                                    }
+                                    depgraph_g->add_edge(base, dep.base);
                                 }
-                                depgraph_g->add_edge(base, dep.base);
                             }
                         });
                 }
