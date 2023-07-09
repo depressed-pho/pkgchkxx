@@ -1,8 +1,8 @@
 .Dd April 26, 2023
-.Dt PKGRRXX 8
+.Dt @PKGRRXX_uc@ 8
 .Os
 .Sh NAME
-.Nm pkgrrxx
+.Nm @PKGRRXX@
 .Nd rebuild or update packages using 'make replace' in tsorted order
 .Sh SYNOPSIS
 .Nm
@@ -192,25 +192,25 @@ If not set in environment then defaults to
 To update all packages on the system and ensure correct shared library
 dependencies:
 .Bd -literal -offset indent
-pkg_rolling-replace -rsuv
+@PKGRRXX@ -rsuv
 .Ed
 .Pp
 To update all packages on the system, do as little rebuilding as possible,
 and also produce binary packages:
 .Bd -literal -offset indent
-pkg_rolling-replace -uv
+@PKGRRXX@ -uv
 .Ed
 .Pp
 To fetch all distfiles for the packages requiring an update on the system
 (packages with different version numbers than installed), and exit after it:
 .Bd -literal -offset indent
-pkg_rolling-replace -F
+@PKGRRXX@ -F
 .Ed
 .Pp
 To update gtk2+ and all packages that depend on it, except openoffice2:
 .Bd -literal -offset indent
 pkg_admin set rebuild=YES gtk2+
-pkg_rolling-replace -rsv -X openoffice2
+@PKGRRXX@ -rsv -X openoffice2
 .Ed
 .Pp
 To force rebuild of gtk2+ and all packages that depend on it, keep
@@ -218,7 +218,7 @@ going on even if one package fails, except openoffice2 - log to
 .Dq /var/log/pkg_rr :
 .Bd -literal -offset indent
 pkg_admin set rebuild=YES gtk2+
-pkg_rolling-replace -krsv -L /var/log/pkg_rr -X openoffice2
+@PKGRRXX@ -krsv -L /var/log/pkg_rr -X openoffice2
 .Ed
 .Pp
 To mark all packages that compiled against X11 as needing rebuild
@@ -230,7 +230,7 @@ sort -u | xargs pkg_admin set rebuild=YES
 .Pp
 To compile all packages heavily parallel, use
 .Bd -literal -offset indent
-pkg_rolling-replace -D MAKE_JOBS=8
+@PKGRRXX@ -D MAKE_JOBS=8
 .Ed
 .Sh AUTHORS
 .An -nosplit

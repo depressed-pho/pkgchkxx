@@ -8,7 +8,11 @@ EXTRA_DIST = $(man_MANS:=.in)
 $(man_MANS): %: %.in Makefile
 	$(SED) < $< > $@ \
 		-e 's|[@]MAKECONF@|$(sysconfdir)/mk.conf|g' \
-		-e 's|[@]PREFIX@|$(prefix)|g'
+		-e 's|[@]PREFIX@|$(prefix)|g' \
+		-e 's|[@]PKGCHKXX@|'`echo pkgchkxx | sed '@program_transform_name@'`'|g' \
+		-e 's|[@]PKGCHKXX_uc@|'`echo pkgchkxx | sed '@program_transform_name@' | tr a-z A-Z`'|g' \
+		-e 's|[@]PKGRRXX@|'`echo pkgrrxx | sed '@program_transform_name@'`'|g' \
+		-e 's|[@]PKGRRXX_uc@|'`echo pkgrrxx | sed '@program_transform_name@' | tr a-z A-Z`'|g'
 
 #
 # API documentation, generated with Doxygen.

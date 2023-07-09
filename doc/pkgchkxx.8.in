@@ -3,10 +3,10 @@
 .\" Absolutely no warranty.
 .\"
 .Dd November 25, 2018
-.Dt PKG_CHK 8
+.Dt @PKGCHKXX_uc@ 8
 .Os
 .Sh NAME
-.Nm pkg_chk
+.Nm @PKGCHKXX@
 .Nd check, and optionally update, installed packages
 .Sh SYNOPSIS
 .Nm
@@ -349,7 +349,9 @@ then
 should be appended to
 .Ev ${PACKAGES} .
 .It Ev PKGCHK_CONF
-Pathname to pkg_chk configuration file.
+Pathname to
+.Nm
+configuration file.
 If not set in environment then read from
 .Pa mk.conf .
 Defaults to
