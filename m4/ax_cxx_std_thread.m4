@@ -6,16 +6,13 @@ AC_DEFUN([AX_CXX_STD_THREAD], [
         [saved_CXXFLAGS="$CXXFLAGS"
          found_thread=no
          AC_LANG_PUSH([C++])
-         for flag in _none_ -pthread -lpthread; do
-             AS_IF([! test x"$flag" = x"_none_"],
-                   [CXXFLAGS="$saved_CXXFLAGS $flag"])
+         for flag in -pthread -lpthread; do
+             CXXFLAGS="$saved_CXXFLAGS $flag"
              AC_LINK_IFELSE(
                  [AC_LANG_PROGRAM(
                       [@%:@include <thread>],
                       [std::thread thr(@<:@@:>@(){}); thr.join();])],
-                 [AS_IF([test x"$flag" = x"_none_"],
-                        [ax_cv_flag_cxx_std_thread="none required"],
-                        [ax_cv_flag_cxx_std_thread="$flag"])
+                 [ax_cv_flag_cxx_std_thread="$flag"
                   found_thread=yes
                   break])
          done
