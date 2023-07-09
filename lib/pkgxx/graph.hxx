@@ -697,7 +697,7 @@ namespace pkgxx {
         }
 
         if (go(src_v->second)) {
-            return std::move(path);
+            return path;
         }
 
         while (!queue.empty()) {
@@ -708,7 +708,7 @@ namespace pkgxx {
             assert(it != _vertices.end());
 
             if (go(it->second)) {
-                return std::move(path);
+                return path;
             }
         }
 
