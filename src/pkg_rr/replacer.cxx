@@ -621,7 +621,6 @@ namespace pkg_rr {
             su.cin() << "exec " << env.SU_CMD.get() << ' '
                      << pkgxx::stringify_argv(cmd) << std::endl;
         }
-        su.cin().close();
         return su;
     }
 
