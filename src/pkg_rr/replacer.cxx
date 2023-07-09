@@ -608,20 +608,25 @@ namespace pkg_rr {
 
     pkgxx::harness
     rolling_replacer::spawn_su(std::vector<std::string> const& cmd) const {
-        pkgxx::harness su(
-            pkgxx::shell, {pkgxx::shell, "-s"},
+        std::vector<std::string> argv = {
+            pkgxx::shell, "-c"
+        };
+        if (env.SU_CMD.get().empty()) {
+            argv.push_back("exec " + pkgxx::stringify_argv(cmd));
+        }
+        else {
+            // SU_CMD expects that only a single argument is given. The
+            // argument is interpreted as a POSIX shell script.
+            argv.push_back("exec " + env.SU_CMD.get() + " \"$0\"");
+            argv.push_back(pkgxx::stringify_argv(cmd));
+        }
+
+        return pkgxx::harness(
+            pkgxx::shell, argv,
             std::nullopt, [](auto&) {},
             pkgxx::harness::fd_action::pipe,
             pkgxx::harness::fd_action::inherit,
             pkgxx::harness::fd_action::inherit);
-        if (env.SU_CMD.get().empty()) {
-            su.cin() << "exec " << pkgxx::stringify_argv(cmd) << std::endl;
-        }
-        else {
-            su.cin() << "exec " << env.SU_CMD.get() << ' '
-                     << pkgxx::stringify_argv(cmd) << std::endl;
-        }
-        return su;
     }
 
     std::pair<
