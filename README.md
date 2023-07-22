@@ -6,7 +6,8 @@
 [pkg_rolling-replace](https://pkgsrc.se/pkgtools/pkg_rolling-replace)
 respectively. These are functionally compatible but run faster:
 
-* `pkgrrxx -u` runs 2.96x faster than `pkg_rolling-replace -u`.
+* `pkgrrxx -u` runs roughly N times faster than `pkg_rolling-replace -u`
+  where N is the number of CPUs you have.
 * `pkgrrxx -sn` runs 14.8x faster than `pkg_rolling-replace -sn`.
 * `pkgchkxx -aur -b` runs 11x faster than `pkg_chk -aur -b` when
   [pkg_summary(5)](https://man.netbsd.org/pkg_summary.5) file is available.
