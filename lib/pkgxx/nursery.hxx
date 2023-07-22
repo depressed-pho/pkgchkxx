@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cassert>
+#include <condition_variable>
 #include <deque>
 #include <exception>
 #include <functional>
