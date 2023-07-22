@@ -156,14 +156,22 @@ namespace pkgxx {
             }
             cenvp.push_back(nullptr);
 
+            #ifdef HAVE_EXECVPE
             if (execvpe(
                     cmd.c_str(),
                     const_cast<char* const*>(cargv.data()),
                     const_cast<char* const*>(cenvp.data())) != 0) {
+            #else
+            environ = const_cast<char **>(cenvp.data());
+            if (execvp(
+                    cmd.c_str(),
+                    const_cast<char* const*>(cargv.data())) != 0) {
+            #endif
                 std::string const err
                     = "Cannot exec " + cmd + ": " + strerror(errno) + "\n";
                 write(msg_fds[1], err.c_str(), err.size());
             }
+
             _exit(1);
         }
         else if (*_pid > 0) {
@@ -232,7 +240,9 @@ namespace pkgxx {
                 _status.emplace(exited {WEXITSTATUS(cstatus)});
             }
             else if (WIFSIGNALED(cstatus)) {
-                _status.emplace(signaled {WTERMSIG(cstatus), WCOREDUMP(cstatus)});
+                _status.emplace(signaled {
+                    WTERMSIG(cstatus),
+                    static_cast<bool>(WCOREDUMP(cstatus))});
             }
             else {
                 std::cerr << "The process " << *_pid << " terminated but it didn't exit nor receive a signal. "
