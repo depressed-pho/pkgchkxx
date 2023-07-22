@@ -20,8 +20,8 @@ respectively. These are functionally compatible but run faster:
 * `pkgchkxx -N` runs 22x faster than `pkg_chk -N`.
 
 This implementation achieves better performance by using a faster language,
-better algorithms, and making use of many CPUs whenever possible. The
-latter is the primary reason why a complete rewrite was needed: doing it in
+better algorithms, and making use of many CPUs whenever possible. The last
+one is the primary reason why a complete rewrite was needed: doing it in
 POSIX shell was simply not feasible.
 
 
