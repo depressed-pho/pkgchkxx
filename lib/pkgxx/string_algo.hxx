@@ -3,6 +3,7 @@
 #include <cassert>
 #include <iterator>
 #include <optional>
+#include <string_view>
 
 #include <pkgxx/ordered.hxx>
 
