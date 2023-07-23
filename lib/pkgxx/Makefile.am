@@ -30,7 +30,7 @@ libpkgxx_la_SOURCES = \
 libpkgxx_la_CXXFLAGS = \
 	-I$(top_builddir)/lib \
 	-I$(top_srcdir)/lib \
-	-DCFG_PREFIX='"$(prefix)"'
+	-DCFG_PREFIX='"$(prefix)"' \
 	$(BZIP2_CPPFLAGS) \
 	$(LIBFETCH_CPPFLAGS) \
 	$(ZLIB_CPPFLAGS)

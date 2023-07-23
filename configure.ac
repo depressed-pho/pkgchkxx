@@ -82,6 +82,7 @@ AC_CHECK_FUNCS([dup2])
 AC_CHECK_FUNCS([strerror])
 AC_CHECK_FUNCS([uname])
 AC_CHECK_FUNCS([vfork])
+AC_CHECK_FUNCS([execvpe])
 AC_FUNC_FORK
 
 AC_CONFIG_FILES([

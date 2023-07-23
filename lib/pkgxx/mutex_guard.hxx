@@ -37,7 +37,7 @@ namespace pkgxx {
 
         private:
             guarded<T>* _cell;
-            std::lock_guard<typename guarded<T>::mutex_t> _lk;
+            std::lock_guard<std::mutex> _lk;
         };
 
         /** In-place construction of type T inside guarded<T>.
