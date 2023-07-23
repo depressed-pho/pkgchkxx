@@ -64,9 +64,7 @@ namespace pkgxx {
         }
 
     private:
-        using mutex_t = std::mutex;
-
-        mutable mutex_t _mtx;
+        mutable std::mutex _mtx;
         T _val;
     };
 }
