@@ -45,7 +45,7 @@ namespace pkgxx {
                         CFG_PREFIX "/etc/mk.conf",
                         "/etc/mk.conf"
                     };
-                    for (auto const mkconf: candidates) {
+                    for (auto const &mkconf: candidates) {
                         if (fs::exists(mkconf)) {
                             vMAKECONF = mkconf;
                             break;
@@ -93,7 +93,7 @@ namespace pkgxx {
                         "../..",
                         "/usr/pkgsrc"
                     };
-                    for (auto const pkgsrcdir: candidates) {
+                    for (auto const &pkgsrcdir: candidates) {
                         if (fs::exists(pkgsrcdir / "mk/bsd.pkg.mk")) {
                             vPKGSRCDIR = fs::absolute(pkgsrcdir);
                             break;
