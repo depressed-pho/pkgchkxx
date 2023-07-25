@@ -105,7 +105,7 @@ namespace pkgxx {
                 , _thr(std::bind(&worker::thread_main, this)) {}
             worker() = delete;
             worker(worker const&) = delete;
-            worker(worker&&) = default;
+            worker(worker&&) = delete;
 
             std::thread::id
             get_id() const {
