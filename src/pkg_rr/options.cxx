@@ -102,7 +102,9 @@ namespace pkg_rr {
             case '?':
                 throw bad_options();
             default:
-                throw std::logic_error("Unhandled option: " + static_cast<char>(ch));
+		std::string msg = "Unhandled option: ";
+		msg += static_cast<char>(ch);
+                throw std::logic_error(msg);
             }
         }
     }
