@@ -20,7 +20,7 @@ on packages that have been marked to have unsafe dependencies,
 to be mismatched, or marked to be rebuilt.
 Optionally it can discover, mark and replace any mismatched packages
 (as reported by
-.Xr pkg_chk 8 )
+.Xr @PKGCHKXX@ 8 )
 as well.
 .Pp
 Whenever
@@ -60,8 +60,8 @@ If the
 .Fl u
 option is given,
 .Nm
-will use
-.Xr pkg_chk 8
+will use the same logic as
+.Dq @PKGCHKXX@ -u -s
 to check for packages for which the version in pkgsrc is different
 than the installed version, and run
 .Dq make replace
@@ -79,10 +79,8 @@ flag.
 .Ss Options
 .Bl -tag -width xxxxxxxx
 .It Fl B
-Pass
-.Dq -B
-to
-.Xr pkg_chk 8
+Use the same logic as
+.Dq @PKGCHKXX@ -B
 to also mark any packages with any change in build version data.
 .It Fl D Ar VARIABLE=VALUE
 Passes VARIABLE=VALUE to each make call.
@@ -134,12 +132,16 @@ tags.
 This will replace packages more aggressively and can be used to solve
 shared library problems.
 .It Fl u
-Use
-.Xr pkg_chk 8
-to check for mismatched packages, mark them with 'mismatch=YES',
+Use the same logic as
+.Dq @PKGCHKXX@ -u
+to check for mismatched packages, mark them with
+.Dq mismatch=YES ,
 and replace those too.
-Otherwise, consider packages marked 'mismatch=YES' to be mismatched.
-Marking with 'mismatch=YES' occurs via
+Otherwise, consider packages marked
+.Dq mismatch=YES
+to be mismatched.  Marking with
+.Dq mismatch=YES
+occurs via
 .Pa ${SU_CMD}
 so that non-root users can also use the option. It is not an error if this
 fails; it just does not persist the status.

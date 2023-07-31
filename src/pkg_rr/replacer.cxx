@@ -159,7 +159,7 @@ namespace pkg_rr {
     std::future<rolling_replacer::todo_type>
     rolling_replacer::check_mismatch(pkg_rr::package_scanner& scanner) const {
         if (opts.check_for_updates) {
-            msg() << "Checking for mismatched installed packages using pkg_chk" << std::endl;
+            msg() << "Checking for mismatched installed packages by scanning source tree" << std::endl;
             auto result = source_checker(opts, env).run();
 
             if (!result.MISMATCH_TODO.empty()) {
