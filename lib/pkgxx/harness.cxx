@@ -301,31 +301,37 @@ namespace pkgxx {
         , cmd(std::move(cmd_))
         , argv(std::move(argv_))
         , cwd(std::move(cwd_))
-        , env(std::move(env_))
-        , msg(
-            std::async(
-                std::launch::deferred,
-                [this]() {
-                    return "Command arguments were: " + stringify_argv(argv);
-                }).share()) {}
+        , env(std::move(env_)) {}
 #endif
+
+    char const*
+    command_error::what() const noexcept {
+        if (!msg) {
+            msg.emplace(
+                "Command arguments were: " + stringify_argv(argv));
+        }
+        return msg->c_str();
+    }
 
 #if !defined(DOXYGEN)
     failed_to_spawn_process::failed_to_spawn_process(
         command_error&& ce,
-        std::string&& msg_)
+        std::string&& reason_)
         : std::runtime_error("")
         , command_error(std::move(ce))
-        , msg(
-            std::async(
-                std::launch::deferred,
-                [this, msg_ = std::move(msg_)]() {
-                    std::stringstream ss;
-                    ss << "Failed to spawn command \"" << cmd << "\": " << msg_ << std::endl
-                       << command_error::what();
-                    return ss.str();
-                }).share()) {}
+        , reason(std::move(reason_)) {}
 #endif
+
+    char const*
+    failed_to_spawn_process::what() const noexcept {
+        if (!msg) {
+            std::stringstream ss;
+            ss << "Failed to spawn command \"" << cmd << "\": " << reason << std::endl
+               << command_error::what();
+            msg.emplace(ss.str());
+        }
+        return msg->c_str();
+    }
 
 #if !defined(DOXYGEN)
     process_terminated_unexpectedly::process_terminated_unexpectedly(
@@ -343,19 +349,21 @@ namespace pkgxx {
         : std::runtime_error("")
         , command_error(std::move(ptu))
         , process_terminated_unexpectedly(std::move(ptu))
-        , st(st_)
-        , msg(
-            std::async(
-                std::launch::deferred,
-                [this]() {
-                    std::stringstream ss;
-                    ss << "Command \"" << cmd << "\" (pid " << pid << ") died of signal "
-                       << strsignal(st.signal)
-                       << (st.coredumped ? " (core dumped). " : ". ")
-                       << process_terminated_unexpectedly::what();
-                    return ss.str();
-                }).share()) {}
+        , st(st_) {}
 #endif
+
+    char const*
+    process_died_of_signal::what() const noexcept {
+        if (!msg) {
+            std::stringstream ss;
+            ss << "Command \"" << cmd << "\" (pid " << pid << ") died of signal "
+               << strsignal(st.signal)
+               << (st.coredumped ? " (core dumped). " : ". ")
+               << process_terminated_unexpectedly::what();
+            msg.emplace(ss.str());
+        }
+        return msg->c_str();
+    }
 
 #if !defined(DOXYGEN)
     process_exited_for_failure::process_exited_for_failure(
@@ -364,16 +372,18 @@ namespace pkgxx {
         : std::runtime_error("")
         , command_error(std::move(ptu))
         , process_terminated_unexpectedly(std::move(ptu))
-        , st(st_)
-        , msg(
-            std::async(
-                std::launch::deferred,
-                [this]() {
-                    std::stringstream ss;
-                    ss << "Command \"" << cmd << "\" (pid " << pid << ") exited with status "
-                       << st.status << ". "
-                       << process_terminated_unexpectedly::what();
-                    return ss.str();
-                }).share()) {}
+        , st(st_) {}
 #endif
+
+    char const*
+    process_exited_for_failure::what() const noexcept {
+        if (!msg) {
+            std::stringstream ss;
+            ss << "Command \"" << cmd << "\" (pid " << pid << ") exited with status "
+               << st.status << ". "
+               << process_terminated_unexpectedly::what();
+            msg.emplace(ss.str());
+        }
+        return msg->c_str();
+    }
 }

@@ -2,7 +2,6 @@
 
 #include <filesystem>
 #include <functional>
-#include <future>
 #include <istream>
 #include <map>
 #include <optional>
@@ -195,9 +194,7 @@ namespace pkgxx {
 
         /// Obtain a string representation of the error.
         virtual char const*
-        what() const noexcept override {
-            return msg.get().c_str();
-        }
+        what() const noexcept override;
 
         /// A name or a path to the command.
         std::string cmd;
@@ -209,7 +206,7 @@ namespace pkgxx {
         std::map<std::string, std::string> env;
 
     private:
-        mutable std::shared_future<std::string> msg;
+        mutable std::optional<std::string> msg;
     };
 
     /** An error happened while trying to spawn a process. */
@@ -217,16 +214,15 @@ namespace pkgxx {
 #if !defined(DOXYGEN)
         failed_to_spawn_process(
             command_error&& ce,
-            std::string&& msg_);
+            std::string&& reason_);
 #endif
 
         virtual char const*
-        what() const noexcept override {
-            return msg.get().c_str();
-        }
+        what() const noexcept override;
 
     private:
-        mutable std::shared_future<std::string> msg;
+        std::string reason;
+        mutable std::optional<std::string> msg;
     };
 
     /** A child process terminated in an unexpected way. */
@@ -250,15 +246,13 @@ namespace pkgxx {
 #endif
 
         virtual char const*
-        what() const noexcept override {
-            return msg.get().c_str();
-        }
+        what() const noexcept override;
 
         /// The signal which caused the process to terminate.
         harness::signaled st;
 
     private:
-        mutable std::shared_future<std::string> msg;
+        mutable std::optional<std::string> msg;
     };
 
     /** A child process unexpectedly terminated for a reason other than
@@ -272,14 +266,12 @@ namespace pkgxx {
 #endif
 
         virtual char const*
-        what() const noexcept override {
-            return msg.get().c_str();
-        }
+        what() const noexcept override;
 
         /// The exit status of the process.
         harness::exited st;
 
     private:
-        mutable std::shared_future<std::string> msg;
+        mutable std::optional<std::string> msg;
     };
 }
