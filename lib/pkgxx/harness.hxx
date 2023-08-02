@@ -114,12 +114,12 @@ namespace pkgxx {
         }
 
         /** Wait until the spawned process terminates unless the \ref
-         * harness has been invalidated. */
-        ~harness() noexcept(false) {
-            if (_pid) {
-                wait();
-            }
-        }
+         * harness has been invalidated. If none of wait(), wait_exit(),
+         * wait_success() has been called, the destructor calls
+         * wait_success() and throws an exception if the process doesn't
+         * exit with status zero.
+         */
+        ~harness() noexcept(false);
 
         /** Obtain a reference to an output stream that corresponds to the
          * standard input of the child process, or throw an exception if

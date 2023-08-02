@@ -226,6 +226,12 @@ namespace pkgxx {
         }
     }
 
+    harness::~harness() noexcept(false) {
+        if (_pid && !_status) {
+            wait_success();
+        }
+    }
+
     harness::status const&
     harness::wait() {
         assert(_pid);
