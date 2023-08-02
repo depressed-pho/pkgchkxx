@@ -1,6 +1,6 @@
 # Release notes
 
-## 0.1.3 -- XXX
+## 0.1.3 -- 2023-08-02
 
 * Fix a segfault occuring when an external command exits with a non-zero
   status, reported by Oskar.
