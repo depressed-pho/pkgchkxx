@@ -392,6 +392,15 @@ namespace pkg_rr {
                 // Breadth-first search to increase concurrency.
                 pkgxx::nursery n(opts.concurrency);
                 for (auto const& base: to_scan) {
+                    // Note that packages in "scheduled" might not be
+                    // actually installed. This can happen when a
+                    // build-only dependency has been deinstalled after
+                    // building packages. It's perfectly okay, as we'll
+                    // later discover dependencies of such packages in the
+                    // "new depends" phase.
+                    if (!is_pkg_installed(base))
+                        continue;
+
                     n.start_soon(
                         // Don't need to move-capture 'base' because it
                         // is guaranteed to outlive the closure.

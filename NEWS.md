@@ -3,7 +3,9 @@
 ## 0.1.3 -- XXX
 
 * Fix a segfault occuring when an external command exits with a non-zero
-  status.
+  status, reported by Oskar.
+* Fix a bug in `pkgrrxx` where deinstalling build-only dependencies of
+  packages confuses the tool, reported by Oskar.
 
 ## 0.1.2 -- 2023-07-31
 
