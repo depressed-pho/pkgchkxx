@@ -8,6 +8,8 @@
   packages confuses the tool, reported by Oskar.
 * Fix a bug in `pkgrrxx -n` where dry-runs could hang up in the
   `Re-checking for unsafe installed package` phase.
+* Fix a bug in `pkgrrxx -n` where dry-runs attempt to set `automatic=YES`
+  on packages it doesn't actually install.
 
 ## 0.1.2 -- 2023-07-31
 

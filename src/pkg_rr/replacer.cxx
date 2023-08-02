@@ -763,7 +763,8 @@ namespace pkg_rr {
             run_make(base, path, {"install"}, make_vars);
             // If the package wasn't installed before we did, it's clear
             // that the user didn't explicitly ask to install it.
-            run_su({env.PKG_ADMIN.get(), "set", "automatic=YES", base});
+            if (!opts.dry_run)
+                run_su({env.PKG_ADMIN.get(), "set", "automatic=YES", base});
         }
         run_make(base, path, {"clean"}, opts.make_vars);
 
