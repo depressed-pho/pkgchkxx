@@ -586,7 +586,7 @@ namespace pkg_rr {
             log_out.exceptions(std::ios_base::badbit);
 
             pkgxx::harness make(
-                CFG_BMAKE, argv, std::nullopt, [](auto&) {},
+                CFG_BMAKE, argv, std::nullopt, [](auto&) {}, std::nullopt,
                 pkgxx::harness::fd_action::inherit,
                 pkgxx::harness::fd_action::pipe,
                 pkgxx::harness::fd_action::merge_with_stdout);
@@ -611,7 +611,7 @@ namespace pkg_rr {
         }
         else {
             pkgxx::harness make(
-                CFG_BMAKE, argv, std::nullopt, [](auto&) {},
+                CFG_BMAKE, argv, std::nullopt, [](auto&) {}, std::nullopt,
                 pkgxx::harness::fd_action::inherit,
                 pkgxx::harness::fd_action::inherit,
                 pkgxx::harness::fd_action::inherit);
@@ -639,7 +639,7 @@ namespace pkg_rr {
 
         return pkgxx::harness(
             pkgxx::shell, argv,
-            std::nullopt, [](auto&) {},
+            std::nullopt, [](auto&) {}, std::nullopt,
             pkgxx::harness::fd_action::pipe,
             pkgxx::harness::fd_action::inherit,
             pkgxx::harness::fd_action::inherit);

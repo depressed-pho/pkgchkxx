@@ -54,10 +54,12 @@ namespace pkgxx {
         std::vector<std::string> const& argv,
         std::optional<std::filesystem::path> const& cwd,
         std::function<void (std::map<std::string, std::string>&)> const& env_mod,
+        std::optional<dtor_action> da,
         fd_action stdin_action,
         fd_action stdout_action,
         fd_action stderr_action)
-        : _cmd(cmd)
+        : _da(da.value_or(dtor_action::wait_success))
+        , _cmd(cmd)
         , _argv(argv)
         , _cwd(cwd)
         , _env(cenviron()) {
@@ -226,9 +228,58 @@ namespace pkgxx {
         }
     }
 
+    harness::harness(harness&& other)
+        : _da(other._da)
+        , _pid(std::move(other._pid))
+        , _stdin(std::move(other._stdin))
+        , _stdout(std::move(other._stdout))
+        , _stderr(std::move(other._stderr))
+        , _status(std::move(other._status)) {
+
+        other._pid.reset();
+        other._stdin.reset();
+        other._stdout.reset();
+        other._stderr.reset();
+        other._status.reset();
+    }
+
     harness::~harness() noexcept(false) {
         if (_pid && !_status) {
-            wait_success();
+            switch (_da) {
+            case dtor_action::wait:
+                wait();
+                break;
+
+            case dtor_action::wait_success:
+                wait_success();
+                break;
+
+            case dtor_action::kill:
+                kill(SIGTERM);
+                wait();
+                break;
+
+            default:
+                assert(0 && "must not reach here");
+                std::abort();
+            }
+        }
+    }
+
+    void
+    harness::kill(int sig) {
+        assert(_pid);
+
+        if (!_status) {
+            if (::kill(*_pid, sig) == -1) {
+                if (errno == ESRCH) {
+                    // The process has already gone. This is not an error.
+                }
+                else {
+                    throw std::system_error(
+                        errno, std::generic_category(), "kill");
+                }
+            }
         }
     }
 

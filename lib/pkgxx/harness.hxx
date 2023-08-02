@@ -6,6 +6,7 @@
 #include <map>
 #include <optional>
 #include <ostream>
+#include <signal.h>
 #include <sstream>
 #include <string>
 #include <sys/types.h>
@@ -58,6 +59,18 @@ namespace pkgxx {
     /** RAII way of spawning child processes.
      */
     struct harness {
+        /** An enum class to specify what to do upon destructing a
+         * harness.
+         */
+        enum class dtor_action {
+            /** Call wait() on destruction. */
+            wait,
+            /** Call wait_success() on destruction. This is the default. */
+            wait_success,
+            /** Call kill(SIGTERM) and wait() on destruction. */
+            kill
+        };
+
         /** An enum class to specify what to do about a file descriptor.
          */
         enum class fd_action {
@@ -91,6 +104,7 @@ namespace pkgxx {
             std::vector<std::string> const& argv,
             std::optional<std::filesystem::path> const& cwd = std::nullopt,
             std::function<void (std::map<std::string, std::string>&)> const& env_mod = [](auto&) {},
+            std::optional<dtor_action> da = std::nullopt,
             fd_action stdin_action  = fd_action::pipe,
             fd_action stdout_action = fd_action::pipe,
             fd_action stderr_action = fd_action::inherit);
@@ -99,25 +113,14 @@ namespace pkgxx {
 
         /** Construct a \ref harness by moving a process out of another
          * instance. The instance \c other will become invalidated. */
-        harness(harness&& other)
-            : _pid(std::move(other._pid))
-            , _stdin(std::move(other._stdin))
-            , _stdout(std::move(other._stdout))
-            , _stderr(std::move(other._stderr))
-            , _status(std::move(other._status)) {
-
-            other._pid.reset();
-            other._stdin.reset();
-            other._stdout.reset();
-            other._stderr.reset();
-            other._status.reset();
-        }
+        harness(harness&& other);
 
         /** Wait until the spawned process terminates unless the \ref
          * harness has been invalidated. If none of wait(), wait_exit(),
-         * wait_success() has been called, the destructor calls
+         * wait_success() has been called, the destructor by default calls
          * wait_success() and throws an exception if the process doesn't
-         * exit with status zero.
+         * exit with status zero. This behavior is configurable with
+         * dtor_action passed to the constructor.
          */
         ~harness() noexcept(false);
 
@@ -148,6 +151,11 @@ namespace pkgxx {
             return _stderr.value();
         }
 
+        /** Send a signal to the spawned process.
+         */
+        void
+        kill(int sig = SIGTERM);
+
         /** Block until the spawned process terminates for any reason.
          */
         status const&
@@ -168,6 +176,8 @@ namespace pkgxx {
         wait_success();
 
     private:
+        dtor_action _da;
+
         // In
         std::string _cmd;
         std::vector<std::string> _argv;

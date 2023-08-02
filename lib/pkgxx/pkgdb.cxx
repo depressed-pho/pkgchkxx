@@ -5,7 +5,10 @@ namespace pkgxx {
         : _pkg_info(std::make_shared<pkgxx::harness>(
                         pkgxx::shell,
                         std::initializer_list<std::string>(
-                            {pkgxx::shell, "-s", "--", "-e", "*"}))) {
+                            {pkgxx::shell, "-s", "--", "-e", "*"}),
+                        std::nullopt,
+                        [](auto&){},
+                        pkgxx::harness::dtor_action::kill)) {
 
         _pkg_info->cin() << "exec " << PKG_INFO << " \"$@\"" << std::endl;
         _pkg_info->cin().close();
@@ -31,7 +34,10 @@ namespace pkgxx {
         : _pkg_info(std::make_shared<pkgxx::harness>(
                         pkgxx::shell,
                         std::initializer_list<std::string>(
-                            {pkgxx::shell, "-s", "--", "-Bq", pattern.string()}))) {
+                            {pkgxx::shell, "-s", "--", "-Bq", pattern.string()}),
+                        std::nullopt,
+                        [](auto&){},
+                        pkgxx::harness::dtor_action::kill)) {
 
         _pkg_info->cin() << "exec " << PKG_INFO << " \"$@\"" << std::endl;
         _pkg_info->cin().close();

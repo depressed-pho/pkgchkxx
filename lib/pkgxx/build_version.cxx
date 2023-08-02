@@ -69,6 +69,7 @@ namespace pkgxx {
             {shell, "-s", "--", "-q", "-b", name.string()},
             std::nullopt,
             [](auto&) {},
+            std::nullopt,
             harness::fd_action::pipe,
             harness::fd_action::close,
             harness::fd_action::close);

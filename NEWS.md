@@ -6,6 +6,8 @@
   status, reported by Oskar.
 * Fix a bug in `pkgrrxx` where deinstalling build-only dependencies of
   packages confuses the tool, reported by Oskar.
+* Fix a bug in `pkgrrxx -n` where dry-runs could hang up in the
+  `Re-checking for unsafe installed package` phase.
 
 ## 0.1.2 -- 2023-07-31
 
