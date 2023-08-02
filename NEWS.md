@@ -10,6 +10,8 @@
   `Re-checking for unsafe installed package` phase.
 * Fix a bug in `pkgrrxx -n` where dry-runs attempt to set `automatic=YES`
   on packages it doesn't actually install.
+* Fix a bug in `pkgrrxx -n` where dry-runs attempt to find packages that
+  depend on a package that isn't installed and fail.
 
 ## 0.1.2 -- 2023-07-31
 

@@ -804,7 +804,11 @@ namespace pkg_rr {
             }
         }
 
-        recheck_unsafe(base);
+        // If we are in the dry-run mode and the package isn't actually
+        // installed, we cannot run recheck_unsafe() because it will
+        // definitely fail.
+        if (!opts.dry_run || is_pkg_installed(base))
+            recheck_unsafe(base);
     }
 
     void
