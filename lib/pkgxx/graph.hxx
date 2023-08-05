@@ -28,10 +28,14 @@ namespace pkgxx {
         what() const noexcept override;
 #endif
 
+        /// Return a string representing the cycle.
+        std::string
+        cycle() const;
+
     private:
         std::vector<VertexT> _vertices;
         std::vector<EdgeT> _edges;
-        std::optional<std::string> _msg;
+        mutable std::optional<std::string> _msg;
     };
 
     /// A special case when EdgeT is void.
@@ -46,9 +50,13 @@ namespace pkgxx {
         what() const noexcept override;
 #endif
 
+        /// Return a string representing the cycle.
+        std::string
+        cycle() const;
+
     private:
         std::vector<VertexT> _vertices;
-        std::optional<std::string> _msg;
+        mutable std::optional<std::string> _msg;
     };
 
     /** A directed graph that is barely enough for topological sorting. The
@@ -164,10 +172,10 @@ namespace pkgxx {
         std::optional<
             std::conditional_t<
                 std::is_same_v<EdgeT, void>,
-                std::vector<vertex_reference_type>,
+                std::deque<vertex_reference_type>,
                 std::pair<
-                    std::vector<vertex_reference_type>,
-                    std::vector<edge_reference_type>
+                    std::deque<vertex_reference_type>,
+                    std::deque<edge_reference_type>
                     >
                 >
             >
@@ -217,10 +225,10 @@ namespace pkgxx {
         std::optional<
             std::conditional_t<
                 std::is_same_v<EdgeT, void>,
-                std::vector<vertex_reference_type>,
+                std::deque<vertex_reference_type>,
                 std::pair<
-                    std::vector<vertex_reference_type>,
-                    std::vector<edge_reference_type>
+                    std::deque<vertex_reference_type>,
+                    std::deque<edge_reference_type>
                     >
                 >
             >
@@ -239,41 +247,53 @@ namespace pkgxx {
     char const*
     not_a_dag<VertexT, EdgeT>::what() const noexcept {
         if (!_msg) {
-            std::stringstream ss;
-            ss << "found a cycle: ";
-            for (auto value = _vertices.begin(), edge = _edges.begin();
-                 value != _vertices.end();
-                 value++) {
-
-                ss << *value;
-                if (edge != _edges.end()) {
-                    ss << " -[" << *edge << "]-> ";
-                    edge++;
-                }
-            }
+            _msg = "found a cycle: " + cycle();
         }
         return _msg->c_str();
+    }
+
+    template <typename VertexT, typename EdgeT>
+    std::string
+    not_a_dag<VertexT, EdgeT>::cycle() const {
+        std::stringstream ss;
+        for (auto value = _vertices.begin(), edge = _edges.begin();
+             value != _vertices.end();
+             value++) {
+
+            ss << *value;
+            if (edge != _edges.end()) {
+                ss << " -[" << *edge << "]-> ";
+                edge++;
+            }
+        }
+        return ss.str();
     }
 
     template <typename VertexT>
     char const*
     not_a_dag<VertexT, void>::what() const noexcept {
         if (!_msg) {
-            std::stringstream ss;
-            bool is_first = true;
-
-            ss << "found a cycle: ";
-            for (auto const& value: _vertices) {
-                if (is_first) {
-                    is_first = false;
-                }
-                else {
-                    ss << " -> ";
-                }
-                ss << value;
-            }
+            _msg = "found a cycle: " + cycle();
         }
         return _msg->c_str();
+    }
+
+    template <typename VertexT>
+    std::string
+    not_a_dag<VertexT, void>::cycle() const {
+        std::stringstream ss;
+        bool is_first = true;
+
+        for (auto const& value: _vertices) {
+            if (is_first) {
+                is_first = false;
+            }
+            else {
+                ss << " -> ";
+            }
+            ss << value;
+        }
+        return ss.str();
     }
 #endif
 
@@ -562,7 +582,8 @@ namespace pkgxx {
                         // raise an exception.
                         if constexpr (std::is_same_v<EdgeT, void>) {
                             std::vector<VertexT> vertices;
-                            for (auto const& value: shortest_path_impl(out_id, id).value()) {
+                            auto const path = shortest_path_impl(out_id, id).value();
+                            for (auto const& value: path) {
                                 vertices.push_back(value);
                             }
                             auto out_v = _vertices.find(out_id);
@@ -573,17 +594,19 @@ namespace pkgxx {
                         else {
                             std::vector<VertexT> vertices;
                             std::vector<EdgeT> edges;
-                            auto path = shortest_path_impl(out_id, id).value();
+                            auto const path = shortest_path_impl(out_id, id).value();
                             for (auto const& value: path.first) {
                                 vertices.push_back(value);
                             }
                             for (auto const& edge: path.second) {
                                 edges.push_back(edge);
                             }
-                            auto out_v = _vertices.find(out_id);
-                            assert(out_v != _vertices.end());
-                            vertices.push_back(*(out_v->second.value));
-                            edges.push_back(out.second);
+                            if (id != out_id) {
+                                auto out_v = _vertices.find(out_id);
+                                assert(out_v != _vertices.end());
+                                vertices.push_back(*(out_v->second.value));
+                                edges.push_back(out.second);
+                            }
                             throw not_a_dag<VertexT, EdgeT>(std::move(vertices), std::move(edges));
                         }
                         break;
@@ -615,10 +638,10 @@ namespace pkgxx {
     std::optional<
             std::conditional_t<
                 std::is_same_v<EdgeT, void>,
-                std::vector<typename graph<VertexT, EdgeT, IsBidirectional>::vertex_reference_type>,
+                std::deque<typename graph<VertexT, EdgeT, IsBidirectional>::vertex_reference_type>,
                 std::pair<
-                    std::vector<typename graph<VertexT, EdgeT, IsBidirectional>::vertex_reference_type>,
-                    std::vector<typename graph<VertexT, EdgeT, IsBidirectional>::edge_reference_type>
+                    std::deque<typename graph<VertexT, EdgeT, IsBidirectional>::vertex_reference_type>,
+                    std::deque<typename graph<VertexT, EdgeT, IsBidirectional>::edge_reference_type>
                     >
                 >
             >
@@ -638,16 +661,26 @@ namespace pkgxx {
     std::optional<
             std::conditional_t<
                 std::is_same_v<EdgeT, void>,
-                std::vector<typename graph<VertexT, EdgeT, IsBidirectional>::vertex_reference_type>,
+                std::deque<typename graph<VertexT, EdgeT, IsBidirectional>::vertex_reference_type>,
                 std::pair<
-                    std::vector<typename graph<VertexT, EdgeT, IsBidirectional>::vertex_reference_type>,
-                    std::vector<typename graph<VertexT, EdgeT, IsBidirectional>::edge_reference_type>
+                    std::deque<typename graph<VertexT, EdgeT, IsBidirectional>::vertex_reference_type>,
+                    std::deque<typename graph<VertexT, EdgeT, IsBidirectional>::edge_reference_type>
                     >
                 >
             >
     graph<VertexT, EdgeT, IsBidirectional>::shortest_path_impl(vertex_id const& src, vertex_id const& dest) const {
         std::map<vertex_id, colour> visited;
-        typename decltype(shortest_path_impl(src, dest))::value_type path;
+        std::map<
+            vertex_id,
+            std::conditional_t<
+                std::is_same_v<EdgeT, void>,
+                vertex_id,
+                std::pair<
+                    vertex_id,
+                    typename graph<VertexT, EdgeT, IsBidirectional>::edge_reference_type
+                    >
+                >
+            > predecessor_of;
         std::deque<vertex_id> queue;
 
         for (auto const& [id, _v]: _vertices) {
@@ -655,7 +688,7 @@ namespace pkgxx {
         }
 
         auto const& go =
-            [&](vertex const& v) -> bool {
+            [&](vertex_id id, vertex const& v) -> bool {
                 for (auto const& out: v.outs) {
                     vertex_id out_id;
                     if constexpr (std::is_same_v<EdgeT, void>) {
@@ -665,49 +698,73 @@ namespace pkgxx {
                         out_id = out.first;
                     }
 
-                    if (out_id == dest) {
-                        // Found the final destination.
-                        if constexpr (std::is_same_v<EdgeT, void>) {
-                            path.push_back(std::cref(*(v.value)));
-                        }
-                        else {
-                            path.first.push_back(std::cref(*(v.value)));
-                            path.second.push_back(std::cref(out.second));
-                        }
-                        return true;
-                    }
-
                     auto c = visited.find(out_id);
                     assert(c != visited.end());
                     if (c->second == colour::white) {
                         c->second = colour::grey;
+                        if constexpr (std::is_same_v<EdgeT, void>) {
+                            predecessor_of[out_id] = id;
+                        }
+                        else {
+                            predecessor_of[out_id] = std::make_pair(id, out.second);
+                        }
                         queue.push_back(out_id);
+                    }
+
+                    if (out_id == dest) {
+                        // Found the final destination.
+                        return true;
                     }
                 }
                 return false;
             };
 
-        auto src_v = _vertices.find(src);
-        assert(src_v != _vertices.end());
-        if constexpr (std::is_same_v<EdgeT, void>) {
-            path.push_back(std::cref(*(src_v->second.value)));
-        }
-        else {
-            path.first.push_back(std::cref(*(src_v->second.value)));
-        }
-
-        if (go(src_v->second)) {
-            return path;
-        }
+        queue.push_back(src);
 
         while (!queue.empty()) {
-            auto id = queue.front();
+            vertex_id id = queue.front();
             queue.pop_front();
 
             auto it = _vertices.find(id);
             assert(it != _vertices.end());
 
-            if (go(it->second)) {
+            if (go(id, it->second)) {
+                // We found the final destination and we have a predecessor
+                // recorded for each vertex we have visited. Reconstruct a
+                // path starting from "src" to "dest" by visiting
+                // predecessors of "dest" in the reverse order.
+                typename decltype(shortest_path_impl(src, dest))::value_type path;
+                vertex_id id = dest;
+                while (true) {
+                    auto pred = predecessor_of.find(id);
+                    if (pred == predecessor_of.end()) {
+                        // There is no predecessor for "src".
+                        assert(id == src);
+                        break;
+                    }
+
+                    auto v = _vertices.find(id);
+                    assert(v != _vertices.end());
+
+                    if constexpr (std::is_same_v<EdgeT, void>) {
+                        path.push_front(std::cref(*(v->second.value)));
+                        id = pred->second;
+                    }
+                    else {
+                        path.first.push_front(std::cref(*(v->second.value)));
+                        path.second.push_front(pred->second.second);
+                        id = pred->second.first;
+                    }
+                }
+                auto src_v = _vertices.find(src);
+                assert(src_v != _vertices.end());
+                if constexpr (std::is_same_v<EdgeT, void>) {
+                    path.push_front(std::cref(*(src_v->second.value)));
+                }
+                else {
+                    path.first.push_front(std::cref(*(src_v->second.value)));
+                    assert(path.second.size() == path.first.size() + 1);
+                }
                 return path;
             }
         }

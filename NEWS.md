@@ -1,5 +1,11 @@
 # Release notes
 
+## 0.1.4 -- 2023-08-05
+
+* Fix a bug in dependency cycle detection. Previously it didn't only failed
+  to display a correct cycle but also derefenced an invalid pointer,
+  leading to a garbled output and possibly even a crash.
+
 ## 0.1.3 -- 2023-08-02
 
 * Fix a segfault occuring when an external command exits with a non-zero

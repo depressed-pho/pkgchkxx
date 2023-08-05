@@ -331,17 +331,29 @@ namespace pkg_rr {
         // here we tsort them so that packages that are going to be
         // replaced soon will appear at the end.
         out << label << "=[";
-        bool is_first = true;
-        for (auto const& base: pkgxx::reverse(topology.tsort(true))) {
-            if (auto it = todo.find(base); it != todo.end()) {
-                if (is_first) {
-                    is_first = false;
+        try {
+            bool is_first = true;
+            for (auto const& base: pkgxx::reverse(topology.tsort(true))) {
+                if (auto it = todo.find(base); it != todo.end()) {
+                    if (is_first) {
+                        is_first = false;
+                    }
+                    else {
+                        out << ' ';
+                    }
+                    out << it->first;
                 }
-                else {
-                    out << ' ';
-                }
-                out << it->first;
             }
+        }
+        catch (pkgxx::not_a_dag<pkgxx::pkgbase>& e) {
+            // We found a cycle in the dependency graph. Letting it go down
+            // the stack is not nice, because we are in the middle of
+            // printing package names in a single line.
+            out << std::endl;
+            abort([&](auto& out) {
+                      out << "Found a cycle in the dependency graph: "
+                          << e.cycle() << std::endl;
+                  });
         }
         out << ']' << std::endl;
     }
