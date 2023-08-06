@@ -1,5 +1,10 @@
 # Release notes
 
+## 0.1.5 -- 2023-08-06
+
+* Work around an issue where `FETCH_USING` is listed in `BOOTSTRAP_DEPENDS`
+  and creates a dependency cycle, reported by Oskar.
+
 ## 0.1.4 -- 2023-08-05
 
 * Fix a bug in dependency cycle detection. Previously it didn't only failed

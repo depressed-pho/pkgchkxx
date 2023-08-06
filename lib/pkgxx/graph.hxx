@@ -122,11 +122,15 @@ namespace pkgxx {
         std::enable_if_t<!std::is_same_v<EdgeT_, void>, void>
         add_edge(VertexT const& src, VertexT const& dest, EdgeT_ const& edge);
 
-        /** Remove an edge from the graph if it exists. Only available for
+        /** Remove an edge from the graph if it exists. */
+        void
+        remove_edge(VertexT const& src, VertexT const& dest);
+
+        /** Remove in-edges to a vertex if it exists. Only available for
          * bidirectional graphs. */
         template <bool IsBidi = IsBidirectional>
         std::enable_if_t<IsBidi, void>
-        remove_edge(VertexT const& src, VertexT const& dest);
+        remove_in_edges(VertexT const& src);
 
         /** Remove out-edges from a vertex if it exists. */
         void
@@ -380,23 +384,53 @@ namespace pkgxx {
     }
 
     template <typename VertexT, typename EdgeT, bool IsBidirectional>
-    template <bool IsBidi>
-    std::enable_if_t<IsBidi, void>
+    void
     graph<VertexT, EdgeT, IsBidirectional>::remove_edge(VertexT const& src, VertexT const& dest) {
-        static_assert(IsBidi == IsBidirectional, "can't explicitly specialise");
-
         if (auto src_id = _vertex_id_of.find(src); src_id != _vertex_id_of.end()) {
             auto src_v = _vertices.find(src_id->second);
             assert(src_v != _vertices.end());
 
             if (auto dest_id = _vertex_id_of.find(dest); dest_id != _vertex_id_of.end()) {
-                auto dest_v = _vertices.find(dest_id->second);
-                assert(dest_v != _vertices.end());
-
                 if (src_v->second.outs.erase(dest_id->second)) {
-                    dest_v->second.ins.erase(src_id->second);
+                    if constexpr (IsBidirectional) {
+                        auto dest_v = _vertices.find(dest_id->second);
+                        assert(dest_v != _vertices.end());
+
+                        dest_v->second.ins.erase(src_id->second);
+                    }
                     _tsort_cache.reset();
                 }
+            }
+        }
+    }
+
+    template <typename VertexT, typename EdgeT, bool IsBidirectional>
+    template <bool IsBidi>
+    std::enable_if_t<IsBidi, void>
+    graph<VertexT, EdgeT, IsBidirectional>::remove_in_edges(VertexT const& value) {
+        static_assert(IsBidi == IsBidirectional, "can't explicitly specialise");
+
+        if (auto dest_id = _vertex_id_of.find(value); dest_id != _vertex_id_of.end()) {
+            auto dest_v = _vertices.find(dest_id->second);
+            assert(dest_v != _vertices.end());
+
+            if (!dest_v->second.ins.empty()) {
+                for (auto src: dest_v->second.ins) {
+                    vertex_id src_id;
+                    if constexpr (std::is_same_v<EdgeT, void>) {
+                        src_id = src;
+                    }
+                    else {
+                        src_id = src.first;
+                    }
+
+                    auto src_v = _vertices.find(src_id);
+                    assert(src_v != _vertices.end());
+
+                    src_v->second.outs.erase(dest_id->second);
+                }
+                dest_v->second.ins.clear();
+                _tsort_cache.reset();
             }
         }
     }

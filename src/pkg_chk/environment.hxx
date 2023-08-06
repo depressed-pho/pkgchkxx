@@ -2,7 +2,6 @@
 
 #include <filesystem>
 #include <future>
-#include <optional>
 #include <set>
 #include <string>
 

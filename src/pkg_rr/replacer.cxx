@@ -444,6 +444,16 @@ namespace pkg_rr {
             to_scan = std::move(*(scheduled.lock()));
         }
 
+        // Now we have a graph of @blddep entries, which includes not only
+        // BUILD_DEPENDS and DEPENDS but also BOOTSTRAP_DEPENDS. The
+        // problem is that FETCH_USING also shows up in BOOTSTRAP_DEPENDS
+        // and creates cycles, so we must remove every edge that goes into
+        // it. Don't worry, if anything BUILD_DEPENDS or DEPENDS on it,
+        // such edges will be discovered later in the "new depends" phase.
+        if (auto const FETCH_USING = env.FETCH_USING.get(); FETCH_USING) {
+            depgraph.lock()->remove_in_edges(FETCH_USING.value());
+        }
+
         return std::move(*(depgraph.lock()));
     }
 

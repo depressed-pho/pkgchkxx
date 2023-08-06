@@ -206,8 +206,8 @@ namespace pkgxx {
 
     /// Obtain the set of \c \@blddep entries of an installed package. \c
     /// Name must either be a \ref pkgxx::pkgbase or \ref
-    /// pkgxx::pkgname. This includes \c BUILD_DEPENDS and \c DEPENDS but
-    /// not \c TOOL_DEPENDS.
+    /// pkgxx::pkgname. This includes \c BOOTSTRAP_DEPENDS, \c
+    /// BUILD_DEPENDS, and \c DEPENDS but not \c TOOL_DEPENDS.
     template <typename Name>
     inline std::set<pkgxx::pkgname>
     build_depends(std::string const& PKG_INFO, Name const& name) {
