@@ -96,10 +96,10 @@ namespace pkg_rr {
             std::map<std::string, std::string> const& vars) const;
 
         pkgxx::harness
-        spawn_su(std::vector<std::string> const& cmd) const;
+        spawn_su(std::string const& cmd) const;
 
         void
-        run_su(std::vector<std::string> const& cmd) const {
+        run_su(std::string const& cmd) const {
             spawn_su(cmd).wait_success();
         }
 

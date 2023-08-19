@@ -1,5 +1,10 @@
 # Release notes
 
+## 0.1.6 -- 2023-08-19
+
+* Fix a bug in `pkgrrxx` where invoking `pkg_admin` would always fail. The
+  bug was introduced in 0.1.5.
+
 ## 0.1.5 -- 2023-08-06
 
 * Work around an issue where `FETCH_USING` is listed in `BOOTSTRAP_DEPENDS`

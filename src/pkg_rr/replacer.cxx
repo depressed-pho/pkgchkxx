@@ -167,7 +167,8 @@ namespace pkg_rr {
                 // end up asking for password for nothing.
                 msg() << "Marking outdated packages as mismatched" << std::endl;
 
-                pkgxx::harness xargs = spawn_su({CFG_XARGS, env.PKG_ADMIN.get(), "set", "mismatch=YES"});
+                pkgxx::harness xargs =
+                    spawn_su(std::string(CFG_XARGS) + ' ' + env.PKG_ADMIN.get() + " set mismatch=YES");
                 for (auto const& [name, _]: result.MISMATCH_TODO) {
                     xargs.cin() << name << std::endl;
                 }
@@ -645,18 +646,18 @@ namespace pkg_rr {
     }
 
     pkgxx::harness
-    rolling_replacer::spawn_su(std::vector<std::string> const& cmd) const {
+    rolling_replacer::spawn_su(std::string const& cmd) const {
         std::vector<std::string> argv = {
             pkgxx::shell, "-c"
         };
         if (env.SU_CMD.get().empty()) {
-            argv.push_back("exec " + pkgxx::stringify_argv(cmd));
+            argv.push_back("exec " + cmd);
         }
         else {
             // SU_CMD expects that only a single argument is given. The
             // argument is interpreted as a POSIX shell script.
             argv.push_back("exec " + env.SU_CMD.get() + " \"$0\"");
-            argv.push_back(pkgxx::stringify_argv(cmd));
+            argv.push_back(cmd);
         }
 
         return pkgxx::harness(
@@ -786,7 +787,8 @@ namespace pkg_rr {
             // If the package wasn't installed before we did, it's clear
             // that the user didn't explicitly ask to install it.
             if (!opts.dry_run)
-                run_su({env.PKG_ADMIN.get(), "set", "automatic=YES", base});
+                run_su(env.PKG_ADMIN.get() + ' ' + pkgxx::stringify_argv(
+                           std::initializer_list<std::string> {"set", "automatic=YES", base}));
         }
         run_make(base, path, {"clean"}, opts.make_vars);
 
