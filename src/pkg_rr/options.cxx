@@ -102,8 +102,8 @@ namespace pkg_rr {
             case '?':
                 throw bad_options();
             default:
-		std::string msg = "Unhandled option: ";
-		msg += static_cast<char>(ch);
+                std::string msg = "Unhandled option: ";
+                msg += static_cast<char>(ch);
                 throw std::logic_error(msg);
             }
         }
@@ -122,7 +122,7 @@ namespace pkg_rr {
             << "    -s         Replace even if the ABIs are still compatible (\"strict\")" << std::endl
             << "    -u         Check for mismatched packages and mark them as so" << std::endl
             << "    -v         Be verbose" << std::endl
-            << "    -D VAR=VAL Passe given variables and values to make(1)" << std::endl
+            << "    -D VAR=VAL Pass given variables and values to make(1)" << std::endl
             << "    -L PATH    Log to path ({PATH}/{pkgdir}/{pkg})" << std::endl
             << "    -X PKG     Exclude PKG from being rebuilt" << std::endl
             << "    -x PKG     Exclude PKG from mismatch check" << std::endl

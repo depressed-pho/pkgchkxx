@@ -15,6 +15,17 @@ AM_INIT_AUTOMAKE([foreign])
 AM_MAINTAINER_MODE([disable])
 AM_SILENT_RULES([no])
 
+# Optional features.
+AC_ARG_ENABLE(
+    [fast-clean],
+    [AS_HELP_STRING(
+         [--disable-fast-clean],
+         [Run `make clean' instead of directly removing work directories])])
+AS_IF([test x"$enable_fast_clean" != x"no"],
+      [AC_DEFINE(
+           [ENABLE_FAST_CLEAN], [1],
+           [Define to remove work directories directly instead of running `make clean'])])
+
 # Precious variables.
 AX_COMMAND([bmake])
 AX_COMMAND([pkg_add])
@@ -78,6 +89,7 @@ AC_TYPE_SIZE_T
 AC_TYPE_SSIZE_T
 
 # Checks for library functions.
+AC_CHECK_FUNCS([atexit])
 AC_CHECK_FUNCS([dup2])
 AC_CHECK_FUNCS([strerror])
 AC_CHECK_FUNCS([uname])

@@ -24,9 +24,10 @@ namespace pkgxx {
                 void (std::string_view const&, std::string_view const&)
                 > const& var_logger = [](auto, auto) {});
 
-        std::shared_future<std::filesystem::path> MAKECONF;  ///< Path to mk.conf
-        std::shared_future<std::filesystem::path> PKG_PATH;  ///< For pkg_add(1)
-        std::shared_future<std::filesystem::path> PKGSRCDIR; ///< Base of pkgsrc tree
+        std::shared_future<std::filesystem::path> MAKECONF;        ///< Path to mk.conf
+        std::shared_future<std::filesystem::path> PKG_PATH;        ///< For pkg_add(1)
+        std::shared_future<std::filesystem::path> PKGSRCDIR;       ///< Base of pkgsrc tree
+        std::shared_future<std::filesystem::path> WRKDIR_BASENAME; ///< Directories to clean
 
     private:
         std::function<

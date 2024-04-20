@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <fstream>
 
+#include <pkgxx/config.h>
 #include <pkgxx/string_algo.hxx>
 
 #include "pkg_chk/check.hxx"
@@ -778,7 +779,7 @@ namespace pkg_rr {
         auto make_vars = make_vars_for_pkg(base);
         make_vars["PKGSRC_KEEP_BIN_PKGS"] = opts.just_replace ? "NO" : "YES";
 
-        run_make(base, path, {"clean"}, opts.make_vars);
+        clean(base, path);
         if (was_installed) {
             run_make(base, path, {"replace"}, make_vars);
         }
@@ -790,7 +791,7 @@ namespace pkg_rr {
                 run_su(env.PKG_ADMIN.get() + ' ' + pkgxx::stringify_argv(
                            std::initializer_list<std::string> {"set", "automatic=YES", base}));
         }
-        run_make(base, path, {"clean"}, opts.make_vars);
+        clean(base, path);
 
         if (!opts.dry_run) {
             // Sanity checks: see if the newly installed package has a
@@ -833,6 +834,23 @@ namespace pkg_rr {
         // definitely fail.
         if (!opts.dry_run || is_pkg_installed(base))
             recheck_unsafe(base);
+    }
+
+    void
+    rolling_replacer::clean(pkgxx::pkgbase const& base,
+                            pkgxx::pkgpath const& path) {
+#if ENABLE_FAST_CLEAN
+        msg() << "Cleaning " << base << std::endl;
+        // When WRKOBJDIR is set, ${WRKDIR_BASENAME} is just a symlink to a
+        // real directory, so both must be removed properly.
+        auto const& wrkdir = env.PKGSRCDIR.get() / path / env.WRKDIR_BASENAME.get();
+        if (fs::is_symlink(wrkdir)) {
+            fs::remove_all(fs::read_symlink(wrkdir));
+        }
+        fs::remove_all(wrkdir);
+#else
+        run_make(base, path, {"clean"}, opts.make_vars);
+#endif
     }
 
     void

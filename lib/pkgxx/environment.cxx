@@ -1,3 +1,4 @@
+#include <exception>
 #include <stdlib.h>
 
 #include "config.h"
@@ -102,6 +103,22 @@ namespace pkgxx {
                     _var_logger("PKGSRCDIR", vPKGSRCDIR.string());
                 }
                 return vPKGSRCDIR;
+            }).share();
+
+        // WRKDIR_BASENAME
+        WRKDIR_BASENAME = std::async(
+            std::launch::deferred,
+            [&]() {
+                fs::path vWRKDIR_BASENAME = cgetenv("WRKDIR_BASENAME");
+                if (vWRKDIR_BASENAME.empty()) {
+                    vWRKDIR_BASENAME = "work";
+                }
+                else if (vWRKDIR_BASENAME.filename() != vWRKDIR_BASENAME) {
+                    throw std::runtime_error(
+                        "WRKDIR_BASENAME must not contain directory separators");
+                }
+                _var_logger("WRKDIR_BASENAME", vWRKDIR_BASENAME.string());
+                return vWRKDIR_BASENAME;
             }).share();
     }
 }

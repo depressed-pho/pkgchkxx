@@ -115,6 +115,9 @@ namespace pkg_rr {
         void
         replace(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path);
 
+        void
+        clean(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path);
+
         template <typename Function>
         [[noreturn]] void
         abort(Function&& f) const {
