@@ -22,7 +22,6 @@ namespace pkg_rr {
             , _buf(std::in_place, out) {
 
             rdbuf(&_buf.value());
-            *this << "RR> ";
         }
 
         msg_logger(msg_logger&& l)
@@ -38,7 +37,7 @@ namespace pkg_rr {
         struct msg_buf: public std::streambuf {
             msg_buf(std::ostream& out)
                 : _out(out)
-                , _cont(false) {}
+                , _state(state::initial) {}
 
         protected:
             virtual int_type
@@ -48,8 +47,17 @@ namespace pkg_rr {
             xsputn(const char_type* s, std::streamsize count) override;
 
         private:
+            enum class state {
+                initial, // The next output sould follow "RR> "
+                newline, // The next output should follow "rr> "
+                general
+            };
+
+            void
+            print_prefix();
+
             std::ostream& _out;
-            bool _cont; // The next output should follow "rr> "
+            state _state;
         };
 
         std::optional<msg_buf> _buf;

@@ -5,6 +5,8 @@
 * Performance improvement: `pkgchkxx -s` no longer invokes `make update
   CLEANDEPENDS=yes` but now uses `make update
   DEPENDS_TARGET='package-install clean'`.
+* Fixed an issue where `RR> ` could be printed twice depending on how the
+  C++ compiler optimized the code.
 
 ## 0.1.6 -- 2023-08-19
 

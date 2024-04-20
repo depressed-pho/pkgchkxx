@@ -3,21 +3,29 @@
 #include "message.hxx"
 
 namespace pkg_rr {
+    void
+    msg_logger::msg_buf::print_prefix() {
+        switch (_state) {
+        case state::initial:
+            _out << "RR> ";
+            break;
+        case state::newline:
+            _out << "rr> ";
+            break;
+        default:
+            break;
+        }
+    }
+
     msg_logger::msg_buf::int_type
     msg_logger::msg_buf::overflow(int_type ch) {
         if (!traits_type::eq_int_type(ch, traits_type::eof())) {
             char_type const c = traits_type::to_char_type(ch);
 
-            if (_cont) {
-                _out << "rr> ";
-                _cont = false;
-            }
-
+            print_prefix();
             _out.put(c);
 
-            if (c == '\n') {
-                _cont = true;
-            }
+            _state = (c == '\n') ? state::newline : state::general;
         }
         return ch;
     }
@@ -29,18 +37,16 @@ namespace pkg_rr {
         while (true) {
             auto l_end = std::find(l_begin, s_end, '\n');
 
-            if (_cont) {
-                _out << "rr> ";
-                _cont = false;
-            }
+            print_prefix();
 
             _out.write(l_begin, s_end - l_begin);
 
             if (l_end == s_end) {
+                _state = state::general;
                 break;
             }
             else {
-                _cont = true;
+                _state = state::newline;
             }
         }
         return count;
