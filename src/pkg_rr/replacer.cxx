@@ -332,6 +332,7 @@ namespace pkg_rr {
         // We could simply list packages in the alphabetical order, but
         // here we tsort them so that packages that are going to be
         // replaced soon will appear at the end.
+        std::size_t num_pkgs = 0;
         out << label << "=[";
         try {
             bool is_first = true;
@@ -344,6 +345,7 @@ namespace pkg_rr {
                         out << ' ';
                     }
                     out << it->first;
+                    num_pkgs++;
                 }
             }
         }
@@ -357,7 +359,13 @@ namespace pkg_rr {
                           << e.cycle() << std::endl;
                   });
         }
-        out << ']' << std::endl;
+        out << ']';
+        if (num_pkgs > 0) {
+            out << " (" << num_pkgs << ' '
+                << (num_pkgs == 1 ? "package" : "packages")
+                << ')';
+        }
+        out << std::endl;
     }
 
     bool

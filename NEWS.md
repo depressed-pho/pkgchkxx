@@ -6,8 +6,11 @@
   CLEANDEPENDS=yes` but now uses `make update
   DEPENDS_TARGET='package-install clean'`.
 * Performance improvement: `pkgrrxx` by default now removes working
-  directories directly instead of running `make clean`. You can disable
-  this optimization with a configure option `--disable-fast-clean`.
+  directories directly instead of running `make clean`, which is slow. You
+  can disable this optimization with a configure option
+  `--disable-fast-clean`.
+* `pkgrrxx` now shows the number of entries in each non-empty TODO list, to
+  give the user some clue about the time it's going to take.
 * Fixed an issue where `RR> ` could be printed twice depending on how the
   C++ compiler optimized the code.
 
