@@ -1,6 +1,6 @@
 # Release notes
 
-## 0.1.7 -- not released yet
+## 0.2 -- not released yet
 
 * Performance improvement: `pkgchkxx -s` no longer invokes `make update
   CLEANDEPENDS=yes` but now uses `make update
