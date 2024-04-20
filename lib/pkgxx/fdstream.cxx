@@ -32,11 +32,11 @@ namespace pkgxx {
         else if (pptr() > pbase()) {
             // An overflow has happened either because the buffer became
             // full, or because it's being closed. Flush it now.
-            size_t const n_write = pptr() - pbase();
-            for (size_t n_remaining = n_write; n_remaining > 0; ) {
+            std::size_t const n_write = static_cast<std::size_t>(pptr() - pbase());
+            for (std::size_t n_remaining = n_write; n_remaining > 0; ) {
                 ssize_t const n_written = write(_fd, _write_buf->data(), n_write);
                 if (n_written > 0) {
-                    n_remaining -= n_written;
+                    n_remaining -= static_cast<std::size_t>(n_written);
                     continue;
                 }
                 else if (n_written == -1 && errno == EINTR) {

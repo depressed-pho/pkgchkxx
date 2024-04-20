@@ -53,7 +53,7 @@ namespace pkgxx {
 
                 it += 2;
                 for (; it != str.end() && is_ascii_digit(*it); it++) {
-                    _rev = _rev * 10 + (*it - '0');
+                    _rev = _rev * 10 + static_cast<unsigned>(*it - '0');
                 }
                 break;
             }

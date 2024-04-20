@@ -70,7 +70,9 @@ namespace pkgxx {
                 _bunzip2.avail_in = 0;
 
                 if (auto avail = _base->in_avail(); avail > 0) {
-                    auto const n_read = _base->sgetn(_bunzip2_in->data(), _bunzip2_in->size());
+                    std::streamsize const n_read = _base->sgetn(
+                        _bunzip2_in->data(),
+                        static_cast<std::streamsize>(_bunzip2_in->size()));
                     _bunzip2.avail_in = static_cast<unsigned>(n_read);
                 }
                 else {

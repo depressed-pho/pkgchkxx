@@ -38,7 +38,9 @@ namespace pkgxx {
                 _inflate.avail_in = 0;
 
                 if (auto avail = _base->in_avail(); avail > 0) {
-                    auto const n_read = _base->sgetn(_inflate_in->data(), _inflate_in->size());
+                    std::streamsize const n_read = _base->sgetn(
+                        _inflate_in->data(),
+                        static_cast<std::streamsize>(_inflate_in->size()));
                     _inflate.avail_in = static_cast<uInt>(n_read);
                 }
                 else {
