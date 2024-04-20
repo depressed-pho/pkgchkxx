@@ -275,7 +275,10 @@ namespace {
         else if (opts.build_from_source) {
             return run_cmd(
                 opts, env, CFG_BMAKE,
-                {"update", opts.no_clean ? "NOCLEAN=yes" : "CLEANDEPENDS=yes"},
+                {
+                    "update",
+                    opts.no_clean ? "NOCLEAN=yes" : "DEPENDS_TARGET=package-install clean"
+                },
                 true,
                 env.PKGSRCDIR.get() / path);
         }

@@ -1,5 +1,11 @@
 # Release notes
 
+## 0.1.7 -- not released yet
+
+* Performance improvement: `pkgchkxx -s` no longer invokes `make update
+  CLEANDEPENDS=yes` but now uses `make update
+  DEPENDS_TARGET='package-install clean'`.
+
 ## 0.1.6 -- 2023-08-19
 
 * Fix a bug in `pkgrrxx` where invoking `pkg_admin` would always fail. The
