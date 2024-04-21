@@ -91,7 +91,8 @@ namespace pkgxx {
                 }
             }
 
-            operator posix_spawn_file_actions_t const* () const {
+            posix_spawn_file_actions_t const*
+            c_ptr() const noexcept {
                 return &_fas;
             }
 
@@ -306,7 +307,7 @@ namespace pkgxx {
                 if (posix_spawnp(
                         &pid,
                         _cmd.c_str(),
-                        _fas ? *_fas : nullptr,
+                        _fas ? _fas->c_ptr() : nullptr,
                         nullptr, // attrp
                         const_cast<char* const*>(cargv.data()),
                         const_cast<char* const*>(cenvp.data())) != 0) {
@@ -317,7 +318,7 @@ namespace pkgxx {
                 if (posix_spawn(
                         &pid,
                         _cmd.c_str(),
-                        _fas ? *_fas : nullptr,
+                        _fas ? _fas->c_ptr() : nullptr,
                         nullptr, // attrp
                         const_cast<char* const*>(cargv.data()),
                         const_cast<char* const*>(cenvp.data())) != 0) {
