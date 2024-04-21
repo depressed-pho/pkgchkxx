@@ -55,6 +55,7 @@ AX_APPEND_COMPILE_FLAGS([ dnl
     -Werror=return-type dnl
     -Wnull-dereference dnl
     -Wuninitialized dnl
+    -Wno-pragmas dnl
 ], [], [-Werror])
 AC_LANG_POP([C++])
 
