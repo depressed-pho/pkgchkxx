@@ -95,8 +95,9 @@ namespace pkgxx {
                 return &_fas;
             }
 
+            template <typename Path>
             file_actions&
-            chdir(std::filesystem::path const& dir) {
+            chdir(Path&& dir) {
 #  if defined(HAVE_POSIX_SPAWN_FILE_ACTIONS_ADDCHDIR)
                 if (posix_spawn_file_actions_addchdir(&_fas, dir.c_str()) != 0) {
                     throw std::system_error(
@@ -143,9 +144,12 @@ namespace pkgxx {
 
 #else // defined(USE_POSIX_SPAWN)
         struct file_actions {
+            template <typename Path>
             file_actions&
-            chdir(std::filesystem::path const& dir) {
-                _fas.push_back(std::make_unique<fa_chdir>(dir));
+            chdir(Path&& dir) {
+                _fas.push_back(
+                    std::make_unique<fa_chdir>(
+                        std::forward<Path>(dir)));
                 return *this;
             }
 
@@ -177,8 +181,9 @@ namespace pkgxx {
             };
 
             struct fa_chdir: file_action {
-                fa_chdir(std::filesystem::path const& dir)
-                    : _dir(dir) {}
+                template <typename Path>
+                fa_chdir(Path&& dir)
+                    : _dir(std::forward<Path>(dir)) {}
 
                 virtual void
                 operator() () const override {
@@ -235,6 +240,12 @@ namespace pkgxx {
         spawn_base&
         spawn_base::chdir(std::filesystem::path const& dir) {
             fas().chdir(dir);
+            return *this;
+        }
+
+        spawn_base&
+        spawn_base::chdir(std::filesystem::path&& dir) {
+            fas().chdir(std::move(dir));
             return *this;
         }
 

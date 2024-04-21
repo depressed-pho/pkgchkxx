@@ -297,11 +297,11 @@ namespace pkg_chk {
                     _tenv.included_tags.insert(
                         PKGCHK_TAGS.get().begin(), PKGCHK_TAGS.get().end());
 
+                    using namespace na::literals;
                     pkgxx::harness pkg_config(
                         CFG_PKG_CONFIG,
                         {CFG_PKG_CONFIG, "--exists", "x11"},
-                        std::nullopt,
-                        [](auto& env) {
+                        "env_mod"_na = [](auto& env) {
                             std::string const libdir = CFG_PKG_CONFIG_LIBDIR;
                             if (!libdir.empty()) {
                                 env["PKG_CONFIG_LIBDIR"] = libdir;

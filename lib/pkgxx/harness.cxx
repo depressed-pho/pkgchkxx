@@ -10,15 +10,16 @@
 
 namespace pkgxx {
     harness::harness(
-        std::string const& cmd,
+        int,
+        std::filesystem::path const& cmd,
         std::vector<std::string> const& argv,
         std::optional<std::filesystem::path> const& cwd,
         std::function<void (std::map<std::string, std::string>&)> const& env_mod,
-        std::optional<dtor_action> da,
+        dtor_action da,
         fd_action stdin_action,
         fd_action stdout_action,
         fd_action stderr_action)
-        : _da(da.value_or(dtor_action::wait_success))
+        : _da(da)
         , _cmd(cmd)
         , _argv(argv)
         , _cwd(cwd)
@@ -240,7 +241,7 @@ namespace pkgxx {
 
 #if !defined(DOXYGEN)
     command_error::command_error(
-        std::string&& cmd_,
+        std::filesystem::path&& cmd_,
         std::vector<std::string>&& argv_,
         std::optional<std::filesystem::path>&& cwd_,
         std::map<std::string, std::string>&& env_)

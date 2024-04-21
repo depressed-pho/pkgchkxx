@@ -67,12 +67,9 @@ namespace pkgxx {
         harness pkg_info(
             shell,
             {shell, "-s", "--", "-q", "-b", name.string()},
-            std::nullopt,
-            [](auto&) {},
-            std::nullopt,
-            harness::fd_action::pipe,
-            harness::fd_action::close,
-            harness::fd_action::close);
+            "stdin_action"_na  = harness::fd_action::pipe,
+            "stdout_action"_na = harness::fd_action::close,
+            "stderr_action"_na = harness::fd_action::close);
         pkg_info.cin() << "exec " << PKG_INFO << " \"$@\"" << std::endl;
         pkg_info.cin().close();
 
@@ -107,7 +104,7 @@ namespace pkgxx {
         // "'/tmp/temp.XXXXXX' is up to date". This means we have to unlink
         // the temporary file and then reopen it after make(1) exits.
         fs::remove(tmp.path);
-        harness(CFG_BMAKE, argv, PKGSRCDIR / path).wait_success();
+        harness(CFG_BMAKE, argv, "cwd"_na = std::optional(PKGSRCDIR / path)).wait_success();
 
         std::ifstream in(tmp.path, std::ios_base::in);
         if (!in) {

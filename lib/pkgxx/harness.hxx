@@ -15,6 +15,13 @@
 #include <variant>
 #include <vector>
 
+// We know what we are doing! Just don't warn us about these!
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wgnu-string-literal-operator-template"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#include <named-parameters.hpp>
+#pragma GCC diagnostic pop
+
 #include <pkgxx/fdstream.hxx>
 
 namespace pkgxx {
@@ -56,6 +63,10 @@ namespace pkgxx {
         return ss.str();
     }
 
+    // I'm not comfortable with bringing it in this scope, but what else
+    // can we do?
+    using namespace na::literals;
+
     /** RAII way of spawning child processes.
      */
     struct harness {
@@ -94,21 +105,40 @@ namespace pkgxx {
         };
         /** A status of a terminated process. */
         using status = std::variant<exited, signaled>;
+        /** Environment */
+        using env_t = std::map<std::string, std::string>;
 
         /** Spawn a child process. The command \c cmd should either be a
          * path to an executable file or a name of command found in the
          * environment variable \c PATH.
          */
+        template <typename... Args>
         harness(
-            std::string const& cmd,
+            std::filesystem::path const& cmd,
             std::vector<std::string> const& argv,
-            std::optional<std::filesystem::path> const& cwd = std::nullopt,
-            std::function<void (std::map<std::string, std::string>&)> const& env_mod = [](auto&) {},
-            std::optional<dtor_action> da = std::nullopt,
-            fd_action stdin_action  = fd_action::pipe,
-            fd_action stdout_action = fd_action::pipe,
-            fd_action stderr_action = fd_action::inherit);
+            Args&&... args)
+            : harness(
+                0, cmd, argv,
+                na::get("cwd"_na           = std::nullopt             , std::forward<Args>(args)...),
+                na::get("env_mod"_na       = [](env_t&) {}            , std::forward<Args>(args)...),
+                na::get("dtor_action"_na   = dtor_action::wait_success, std::forward<Args>(args)...),
+                na::get("stdin_action"_na  = fd_action::pipe          , std::forward<Args>(args)...),
+                na::get("stdout_action"_na = fd_action::pipe          , std::forward<Args>(args)...),
+                na::get("stderr_action"_na = fd_action::inherit       , std::forward<Args>(args)...)) {}
 
+    private:
+        harness(
+            int, // dummy parameter to avoid conflicting with the other ctor
+            std::filesystem::path const& cmd,
+            std::vector<std::string> const& argv,
+            std::optional<std::filesystem::path> const& cwd,
+            std::function<void (env_t&)> const& env_mod,
+            dtor_action da,
+            fd_action stdin_action,
+            fd_action stdout_action,
+            fd_action stderr_action);
+
+    public:
         harness(harness const&) = delete;
 
         /** Construct a \ref harness by moving a process out of another
@@ -179,7 +209,7 @@ namespace pkgxx {
         dtor_action _da;
 
         // In
-        std::string _cmd;
+        std::filesystem::path _cmd;
         std::vector<std::string> _argv;
         std::optional<std::filesystem::path> _cwd;
         std::map<std::string, std::string> _env;
@@ -196,7 +226,7 @@ namespace pkgxx {
     struct command_error: virtual std::runtime_error {
 #if !defined(DOXYGEN)
         command_error(
-            std::string&& cmd_,
+            std::filesystem::path&& cmd_,
             std::vector<std::string>&& argv_,
             std::optional<std::filesystem::path>&& cwd_,
             std::map<std::string, std::string>&& env_);
@@ -207,7 +237,7 @@ namespace pkgxx {
         what() const noexcept override;
 
         /// A name or a path to the command.
-        std::string cmd;
+        std::filesystem::path cmd;
         /// A vector of arguments to the command.
         std::vector<std::string> argv;
         /// The working directory for the command.

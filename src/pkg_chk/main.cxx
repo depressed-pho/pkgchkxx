@@ -63,13 +63,16 @@ namespace {
         msg(opts) << std::endl;
 
         if (!opts.dry_run) {
+            using namespace na::literals;
             std::vector<std::string> argv = {pkgxx::shell, "-s", "--"};
             argv.insert(argv.end(), args.begin(), args.end());
             pkgxx::harness prog(
-                pkgxx::shell, argv, cwd, env_mod, std::nullopt,
-                pkgxx::harness::fd_action::pipe,
-                pkgxx::harness::fd_action::pipe,
-                pkgxx::harness::fd_action::merge_with_stdout);
+                pkgxx::shell, argv,
+                "cwd"_na           = cwd,
+                "env_mod"_na       = env_mod,
+                "stdin_action"_na  = pkgxx::harness::fd_action::pipe,
+                "stdout_action"_na = pkgxx::harness::fd_action::pipe,
+                "stderr_action"_na = pkgxx::harness::fd_action::merge_with_stdout);
             prog.cin() << "exec " << cmd << " \"$@\"" << std::endl;
             prog.cin().close();
 

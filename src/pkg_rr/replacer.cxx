@@ -617,11 +617,12 @@ namespace pkg_rr {
             }
             log_out.exceptions(std::ios_base::badbit);
 
+            using namespace na::literals;
             pkgxx::harness make(
-                CFG_BMAKE, argv, std::nullopt, [](auto&) {}, std::nullopt,
-                pkgxx::harness::fd_action::inherit,
-                pkgxx::harness::fd_action::pipe,
-                pkgxx::harness::fd_action::merge_with_stdout);
+                CFG_BMAKE, argv,
+                "stdin_action"_na  = pkgxx::harness::fd_action::inherit,
+                "stdout_action"_na = pkgxx::harness::fd_action::pipe,
+                "stderr_action"_na = pkgxx::harness::fd_action::merge_with_stdout);
 
             std::array<char, 1024> buf;
             using traits = std::decay_t<decltype(make.cin())>::traits_type;
@@ -642,11 +643,12 @@ namespace pkg_rr {
             }
         }
         else {
+            using namespace na::literals;
             pkgxx::harness make(
-                CFG_BMAKE, argv, std::nullopt, [](auto&) {}, std::nullopt,
-                pkgxx::harness::fd_action::inherit,
-                pkgxx::harness::fd_action::inherit,
-                pkgxx::harness::fd_action::inherit);
+                CFG_BMAKE, argv,
+                "stdin_action"_na  = pkgxx::harness::fd_action::inherit,
+                "stdout_action"_na = pkgxx::harness::fd_action::inherit,
+                "stderr_action"_na = pkgxx::harness::fd_action::inherit);
 
             if (make.wait_exit().status != 0) {
                 throw replace_failed("Command failed: " + pkgxx::stringify_argv(argv));
@@ -669,12 +671,12 @@ namespace pkg_rr {
             argv.push_back(cmd);
         }
 
+        using namespace na::literals;
         return pkgxx::harness(
             pkgxx::shell, argv,
-            std::nullopt, [](auto&) {}, std::nullopt,
-            pkgxx::harness::fd_action::pipe,
-            pkgxx::harness::fd_action::inherit,
-            pkgxx::harness::fd_action::inherit);
+            "stdin_action"_na  = pkgxx::harness::fd_action::pipe,
+            "stdout_action"_na = pkgxx::harness::fd_action::inherit,
+            "stderr_action"_na = pkgxx::harness::fd_action::inherit);
     }
 
     std::pair<
@@ -747,10 +749,17 @@ namespace pkg_rr {
                     n.start_soon(
                         [&]() {
                             auto make_vars = opts.make_vars;
+                            // Okay capturing structured bindings is a
+                            // C++20 extension and we're still at
+                            // C++17. But both GCC and Clang support it. Do
+                            // not complain!
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wc++20-extensions"
                             make_vars["PKGNAME_REQD"] = dep_pattern.string();
                             auto const& dep_base
                                 = pkgxx::extract_pkgmk_var<pkgxx::pkgbase>(
                                     env.PKGSRCDIR.get() / dep_path, "PKGBASE", make_vars);
+#pragma GCC diagnostic pop
                             if (dep_base.has_value()) {
                                 pattern_to_base_cache.emplace(dep, *dep_base);
                                 resolved_deps.lock()->emplace(*dep_base, dep_path);

@@ -37,6 +37,9 @@ namespace pkgxx {
             chdir(std::filesystem::path const& dir);
 
             spawn_base&
+            chdir(std::filesystem::path&& dir);
+
+            spawn_base&
             close_fd(int fd);
 
             spawn_base&

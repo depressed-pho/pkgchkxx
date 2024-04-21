@@ -79,7 +79,7 @@ namespace pkgxx {
             for (auto const& [var, value]: assignments) {
                 argv.push_back(var + '=' + value);
             }
-            harness make(CFG_BMAKE, argv, pkgdir);
+            harness make(CFG_BMAKE, argv, "cwd"_na = std::optional(pkgdir));
 
             make.cin()
                 << ".PHONY: x" << std::endl

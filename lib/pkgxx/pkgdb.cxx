@@ -2,13 +2,11 @@
 
 namespace pkgxx {
     installed_pkgname_iterator::installed_pkgname_iterator(std::string const& PKG_INFO)
-        : _pkg_info(std::make_shared<pkgxx::harness>(
+        : _pkg_info(std::make_shared<harness>(
                         pkgxx::shell,
                         std::initializer_list<std::string>(
                             {pkgxx::shell, "-s", "--", "-e", "*"}),
-                        std::nullopt,
-                        [](auto&){},
-                        pkgxx::harness::dtor_action::kill)) {
+                        "dtor_action"_na = harness::dtor_action::kill)) {
 
         _pkg_info->cin() << "exec " << PKG_INFO << " \"$@\"" << std::endl;
         _pkg_info->cin().close();
@@ -31,13 +29,11 @@ namespace pkgxx {
     build_info_iterator::build_info_iterator(
         std::string const& PKG_INFO,
         pkgxx::pkgpattern const& pattern)
-        : _pkg_info(std::make_shared<pkgxx::harness>(
+        : _pkg_info(std::make_shared<harness>(
                         pkgxx::shell,
                         std::initializer_list<std::string>(
                             {pkgxx::shell, "-s", "--", "-Bq", pattern.string()}),
-                        std::nullopt,
-                        [](auto&){},
-                        pkgxx::harness::dtor_action::kill)) {
+                        "dtor_action"_na = harness::dtor_action::kill)) {
 
         _pkg_info->cin() << "exec " << PKG_INFO << " \"$@\"" << std::endl;
         _pkg_info->cin().close();
