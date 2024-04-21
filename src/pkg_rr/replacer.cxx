@@ -785,6 +785,8 @@ namespace pkg_rr {
 
     void
     rolling_replacer::replace(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path) {
+        clean(base, path);
+
         bool const was_installed = is_pkg_installed(base);
         if (was_installed) {
             msg() << "Replacing " << base << std::endl;
@@ -796,7 +798,6 @@ namespace pkg_rr {
         auto make_vars = make_vars_for_pkg(base);
         make_vars["PKGSRC_KEEP_BIN_PKGS"] = opts.just_replace ? "NO" : "YES";
 
-        clean(base, path);
         if (was_installed) {
             run_make(base, path, {"replace"}, make_vars);
         }
@@ -808,6 +809,7 @@ namespace pkg_rr {
                 run_su(env.PKG_ADMIN.get() + ' ' + pkgxx::stringify_argv(
                            std::initializer_list<std::string> {"set", "automatic=YES", base}));
         }
+
         clean(base, path);
 
         if (!opts.dry_run) {
@@ -861,10 +863,17 @@ namespace pkg_rr {
         // When WRKOBJDIR is set, ${WRKDIR_BASENAME} is just a symlink to a
         // real directory, so both must be removed properly.
         auto const& wrkdir = env.PKGSRCDIR.get() / path / env.WRKDIR_BASENAME.get();
-        if (fs::is_symlink(wrkdir)) {
-            fs::remove_all(fs::read_symlink(wrkdir));
+        try {
+            if (fs::is_symlink(wrkdir)) {
+                fs::remove_all(fs::read_symlink(wrkdir));
+            }
+            fs::remove_all(wrkdir);
         }
-        fs::remove_all(wrkdir);
+        catch (fs::filesystem_error&) {
+            // But this will fail when WRKDIR has non-writable
+            // directories. Fall back to "make clean" when that happens.
+            run_make(base, path, {"clean"}, opts.make_vars);
+        }
 #else
         run_make(base, path, {"clean"}, opts.make_vars);
 #endif
