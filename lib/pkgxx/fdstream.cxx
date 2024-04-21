@@ -14,12 +14,37 @@ namespace pkgxx {
     fdstreambuf*
     fdstreambuf::close() {
         if (_fd >= 0) {
-            overflow(traits_type::eof());
+            sync();
             ::close(_fd);
             _fd = -1;
         }
         return this;
     }
+
+#if !defined(DOXYGEN)
+    int
+    fdstreambuf::sync() {
+        if (pbase() != nullptr && pptr() > pbase()) {
+            std::size_t const n_write = static_cast<std::size_t>(pptr() - pbase());
+            for (std::size_t n_remaining = n_write; n_remaining > 0; ) {
+                ssize_t const n_written = write(_fd, _write_buf->data(), n_write);
+                if (n_written > 0) {
+                    n_remaining -= static_cast<std::size_t>(n_written);
+                    continue;
+                }
+                else if (n_written == -1 && errno == EINTR) {
+                    continue;
+                }
+                else {
+                    return -1;
+                }
+            }
+            setp(_write_buf->data(),
+                 _write_buf->data() + _write_buf->size());
+        }
+        return 0;
+    }
+#endif
 
 #if !defined(DOXYGEN)
     fdstreambuf::int_type

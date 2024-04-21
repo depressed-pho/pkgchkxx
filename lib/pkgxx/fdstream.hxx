@@ -30,6 +30,9 @@ namespace pkgxx {
 
     protected:
 #if !defined(DOXYGEN)
+        virtual int
+        sync() override;
+
         virtual int_type
         overflow(int_type ch = traits_type::eof()) override;
 

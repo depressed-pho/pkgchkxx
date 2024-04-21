@@ -9,6 +9,8 @@
   directories directly instead of running `make clean`, which is slow. You
   can disable this optimization with a configure option
   `--disable-fast-clean`.
+* Performance improvement: Tools now use `posix_spawn(3)` on platforms
+  where it exists, and fall back to `fork` & `exec` where it doesn't.
 * `pkgrrxx` now shows the number of entries in each non-empty TODO list, to
   give the user some clue about the time it's going to take.
 * Fixed an issue where `RR> ` could be printed twice depending on how the

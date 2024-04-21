@@ -1,52 +1,12 @@
-#include "config.h"
-
-#include <array>
 #include <cassert>
 #include <cerrno>
-#include <fcntl.h>
 #include <iostream>
-#include <string.h>
 #include <sys/wait.h>
 #include <system_error>
 #include <unistd.h>
 
 #include "harness.hxx"
-
-extern "C" {
-    extern char** environ;
-}
-
-namespace {
-    std::array<int, 2>
-    cpipe(bool set_cloexec = false) {
-        std::array<int, 2> fds;
-        if (pipe(fds.data()) != 0) {
-            throw std::system_error(errno, std::generic_category(), "pipe");
-        }
-        if (set_cloexec) {
-            if (fcntl(fds[0], F_SETFD, FD_CLOEXEC) == -1) {
-                throw std::system_error(errno, std::generic_category(), "fcntl");
-            }
-            if (fcntl(fds[1], F_SETFD, FD_CLOEXEC) == -1) {
-                throw std::system_error(errno, std::generic_category(), "fcntl");
-            }
-        }
-        return fds;
-    }
-
-    std::map<std::string, std::string>
-    cenviron() {
-        std::map<std::string, std::string> env_map;
-        for (char** ep = environ; *ep; ep++) {
-            std::string const es = *ep;
-            auto const equal = es.find('=');
-            if (equal != std::string::npos) {
-                env_map.emplace(es.substr(0, equal), es.substr(equal + 1));
-            }
-        }
-        return env_map;
-    }
-}
+#include "spawn.hxx"
 
 namespace pkgxx {
     harness::harness(
@@ -65,12 +25,7 @@ namespace pkgxx {
         , _env(cenviron()) {
 
         env_mod(_env);
-        std::vector<std::string> envp;
-        for (auto const& [name, value]: _env) {
-            envp.emplace_back(name + "=" + value);
-        }
 
-        auto const msg_fds    = cpipe(true);
         auto const stdin_fds  = stdin_action  == fd_action::pipe
             ? std::make_optional(cpipe(true))
             : std::nullopt;
@@ -81,150 +36,85 @@ namespace pkgxx {
             ? std::make_optional(cpipe(true))
             : std::nullopt;
 
-#if defined(HAVE_VFORK)
-        _pid = vfork();
-#else
-        _pid = fork();
-#endif
-        if (*_pid == 0) {
-            close(msg_fds[0]);
-            switch (stdin_action) {
-            case fd_action::inherit:
-                break;
-            case fd_action::close:
-                close(STDIN_FILENO);
-                break;
-            case fd_action::pipe:
-                dup2((*stdin_fds)[0], STDIN_FILENO);
-                break;
-            default:
-                std::string const err = "Invalid fd_action for stdin\n";
-                write(msg_fds[1], err.c_str(), err.size());
-                _exit(1);
-            }
-            switch (stdout_action) {
-            case fd_action::inherit:
-                break;
-            case fd_action::close:
-                close(STDOUT_FILENO);
-                break;
-            case fd_action::pipe:
-                dup2((*stdout_fds)[1], STDOUT_FILENO);
-                break;
-            default:
-                std::string const err = "Invalid fd_action for stdout\n";
-                write(msg_fds[1], err.c_str(), err.size());
-                _exit(1);
-            }
-            switch (stderr_action) {
-            case fd_action::inherit:
-                break;
-            case fd_action::close:
-                close(STDERR_FILENO);
-                break;
-            case fd_action::pipe:
-                dup2((*stderr_fds)[1], STDERR_FILENO);
-                break;
-            case fd_action::merge_with_stdout:
-                dup2(STDOUT_FILENO, STDERR_FILENO);
-                break;
-            default:
-                std::string const err = "Invalid fd_action for stderr\n";
-                write(msg_fds[1], err.c_str(), err.size());
-                _exit(1);
-            }
+        spawnp s(cmd, argv);
+        s.environ(_env);
 
-            if (cwd) {
-                // We can't use posix_spawn(3) because of this.
-                if (chdir(cwd->c_str()) != 0) {
-                    std::string const err
-                        = "Cannot chdir to " + cwd->string() + ": " + strerror(errno) + "\n";
-                    write(msg_fds[1], err.c_str(), err.size());
-                    _exit(1);
-                }
-            }
-
-            std::vector<char const*> cargv;
-            cargv.reserve(argv.size() + 1);
-            for (auto const& arg: argv) {
-                cargv.push_back(arg.c_str());
-            }
-            cargv.push_back(nullptr);
-
-            std::vector<char const*> cenvp;
-            cenvp.reserve(envp.size() + 1);
-            for (auto const& env: envp) {
-                cenvp.push_back(env.c_str());
-            }
-            cenvp.push_back(nullptr);
-
-            #ifdef HAVE_EXECVPE
-            if (execvpe(
-                    cmd.c_str(),
-                    const_cast<char* const*>(cargv.data()),
-                    const_cast<char* const*>(cenvp.data())) != 0) {
-            #else
-            environ = const_cast<char **>(cenvp.data());
-            if (execvp(
-                    cmd.c_str(),
-                    const_cast<char* const*>(cargv.data())) != 0) {
-            #endif
-                std::string const err
-                    = "Cannot exec " + cmd + ": " + strerror(errno) + "\n";
-                write(msg_fds[1], err.c_str(), err.size());
-            }
-
-            _exit(1);
+        if (cwd) {
+            s.chdir(*cwd);
         }
-        else if (*_pid > 0) {
-            close(msg_fds[1]);
-            if (stdin_fds) {
-                close((*stdin_fds)[0]);
-            }
-            if (stdout_fds) {
-                close((*stdout_fds)[1]);
-            }
-            if (stderr_fds) {
-                close((*stderr_fds)[1]);
-            }
 
-            // The child will write an error message to this pipe if it
-            // fails to exec.
-            fdistream msg_in(msg_fds[0]);
-            std::string msg;
-            std::getline(msg_in, msg);
-            if (!msg.empty()) {
-                throw failed_to_spawn_process(
-                    command_error(
-                        std::move(_cmd),
-                        std::move(_argv),
-                        std::move(_cwd),
-                        std::move(_env)),
-                    std::move(msg));
-            }
-
-            if (stdin_fds) {
-                _stdin.emplace((*stdin_fds)[1]);
-                _stdin->exceptions(std::ios_base::badbit);
-            }
-            if (stdout_fds) {
-                _stdout.emplace((*stdout_fds)[0]);
-                _stdout->exceptions(std::ios_base::badbit);
-            }
-            if (stderr_fds) {
-                _stderr.emplace((*stderr_fds)[0]);
-                _stderr->exceptions(std::ios_base::badbit);
-            }
+        switch (stdin_action) {
+        case fd_action::inherit:
+            break;
+        case fd_action::close:
+            s.close_fd(STDIN_FILENO);
+            break;
+        case fd_action::pipe:
+            s.dup_fd((*stdin_fds)[0], STDIN_FILENO);
+            break;
+        default:
+            assert(0 && "must not reach here");
+            std::abort();
         }
-        else {
-            throw std::system_error(
-                errno, std::generic_category(),
-#if defined(HAVE_VFORK)
-                "vfork"
-#else
-                "fork"
-#endif
-                );
+
+        switch (stdout_action) {
+        case fd_action::inherit:
+            break;
+        case fd_action::close:
+            s.close_fd(STDOUT_FILENO);
+            break;
+        case fd_action::pipe:
+            s.dup_fd((*stdout_fds)[1], STDOUT_FILENO);
+            break;
+        default:
+            assert(0 && "must not reach here");
+            std::abort();
+        }
+
+        switch (stderr_action) {
+        case fd_action::inherit:
+            break;
+        case fd_action::close:
+            s.close_fd(STDERR_FILENO);
+            break;
+        case fd_action::pipe:
+            s.dup_fd((*stderr_fds)[1], STDERR_FILENO);
+            break;
+        case fd_action::merge_with_stdout:
+            s.dup_fd(STDOUT_FILENO, STDERR_FILENO);
+            break;
+        default:
+            assert(0 && "must not reach here");
+            std::abort();
+        }
+
+        try {
+            _pid = s();
+        }
+        catch (std::exception& e) {
+            throw failed_to_spawn_process(
+                command_error(
+                    std::move(_cmd),
+                    std::move(_argv),
+                    std::move(_cwd),
+                    std::move(_env)),
+                e.what());
+        }
+
+        if (stdin_fds) {
+            close((*stdin_fds)[0]);
+            _stdin.emplace((*stdin_fds)[1]);
+            _stdin->exceptions(std::ios_base::badbit);
+        }
+        if (stdout_fds) {
+            close((*stdout_fds)[1]);
+            _stdout.emplace((*stdout_fds)[0]);
+            _stdout->exceptions(std::ios_base::badbit);
+        }
+        if (stderr_fds) {
+            close((*stderr_fds)[1]);
+            _stderr.emplace((*stderr_fds)[0]);
+            _stderr->exceptions(std::ios_base::badbit);
         }
     }
 
