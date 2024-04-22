@@ -1,6 +1,6 @@
 # Release notes
 
-## 0.2 -- not released yet
+## 0.2 -- 2023-04-22
 
 * Performance improvement: `pkgchkxx -s` no longer invokes `make update
   CLEANDEPENDS=yes` but now uses `make update
