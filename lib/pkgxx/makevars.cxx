@@ -57,6 +57,26 @@ namespace pkgxx {
     }
 
     std::optional<
+        std::optional<std::string>>
+    extract_mkconf_var(
+        std::filesystem::path const& makeconf,
+        std::string const& var,
+        std::map<std::string, std::string> const& assignments) {
+
+        if (auto value_of = extract_mkconf_vars(makeconf, {var}, assignments); value_of) {
+            if (auto it = value_of->find(var); it != value_of->end()) {
+                return std::make_optional(std::move(it->second));
+            }
+            else {
+                return {};
+            }
+        }
+        else {
+            return {};
+        }
+    }
+
+    std::optional<
         std::map<std::string, std::string>>
     extract_pkgmk_vars(
         std::filesystem::path const& pkgdir,

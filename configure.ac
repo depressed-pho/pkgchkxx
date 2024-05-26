@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.71])
-AC_INIT([pkgchkxx], [0.2], [pkgsrc-users@NetBSD.org])
+AC_INIT([pkgchkxx], [0.2.1], [pkgsrc-users@NetBSD.org])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([lib/pkgxx/pkgname.hxx])
 AC_CONFIG_HEADERS([lib/pkgxx/config.h])

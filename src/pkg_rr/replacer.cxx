@@ -859,19 +859,43 @@ namespace pkg_rr {
     rolling_replacer::clean(pkgxx::pkgbase const& base,
                             pkgxx::pkgpath const& path) {
 #if ENABLE_FAST_CLEAN
+        // "make clean" is slow because invoking "make" is slow. Do what it
+        // does, but in C++.
         msg() << "Cleaning " << base << std::endl;
-        // When WRKOBJDIR is set, ${WRKDIR_BASENAME} is just a symlink to a
-        // real directory, so both must be removed properly.
-        auto const& wrkdir = env.PKGSRCDIR.get() / path / env.WRKDIR_BASENAME.get();
+
+        // The definition of BUILD_DIR changes depending on whether
+        // WRKOBJDIR is defined. See mk/bsd.prefs.mk
+        auto const& PKGSRCDIR       = env.PKGSRCDIR.get();
+        auto const& WRKOBJDIR       = env.WRKOBJDIR.get();
+        auto const& WRKDIR_BASENAME = env.WRKDIR_BASENAME.get();
+        auto const& BUILD_DIR
+            = WRKOBJDIR.empty() ? PKGSRCDIR / path : WRKOBJDIR / path;
+
+        // mk/bsd.prefs.mk defines WRKDIR with "?=". Hope nobody overrides
+        // it...
+        auto const& WRKDIR = BUILD_DIR / WRKDIR_BASENAME;
+
+        // Do what mk/bsd.pkg.clean.mk (su-do-clean) does.
         try {
-            if (fs::is_symlink(wrkdir)) {
-                fs::remove_all(fs::read_symlink(wrkdir));
+            fs::remove_all(WRKDIR);
+            if (!WRKOBJDIR.empty()) {
+                // This directory is supposed to be empty.
+                fs::remove(BUILD_DIR);
+
+                // Ignore errors from rmdir(2). This directory can
+                // legitimately be non-empty.
+                std::error_code ec;
+                fs::remove(BUILD_DIR.parent_path(), ec);
+
+                // When ${CREATE_WRKDIR_SYMLINK} is set to YES, a symlink
+                // to WRKDIR is created. Remove it.
+                fs::remove(PKGSRCDIR / path / WRKDIR_BASENAME);
             }
-            fs::remove_all(wrkdir);
         }
         catch (fs::filesystem_error&) {
             // But this will fail when WRKDIR has non-writable
-            // directories. Fall back to "make clean" when that happens.
+            // directories. Fall back to "make clean" when that happens. It
+            // should now how to handle it.
             run_make(base, path, {"clean"}, opts.make_vars);
         }
 #else

@@ -9,13 +9,24 @@ namespace pkgxx {
     /** Extract a set of variables from a given mk.conf. 'vars' is a
      * sequence of variables to extract. Returns a map from variable names
      * to their value which is possibly empty, or std::nullopt_t if the
-     * mk.conf doesn't exist.
+     * mk.conf doesn't exist. 'assignments' is a set of variables to assign
+     * while querying the mk.conf.
      */
     std::optional<
         std::map<std::string, std::string>>
     extract_mkconf_vars(
         std::filesystem::path const& makeconf,
         std::vector<std::string> const& vars,
+        std::map<std::string, std::string> const& assignments = {});
+
+    /** A special case of extract_mkconf_vars() where just one variable is
+     * to be extracted.
+     */
+    std::optional<
+        std::optional<std::string>>
+    extract_mkconf_var(
+        std::filesystem::path const& makeconf,
+        std::string const& var,
         std::map<std::string, std::string> const& assignments = {});
 
     /** Extract a set of variables from a Makefile in an absolute path to a

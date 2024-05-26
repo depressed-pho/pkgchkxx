@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <functional>
 #include <future>
+#include <optional>
 #include <string_view>
 
 namespace pkgxx {
@@ -27,6 +28,7 @@ namespace pkgxx {
         std::shared_future<std::filesystem::path> MAKECONF;        ///< Path to mk.conf
         std::shared_future<std::filesystem::path> PKG_PATH;        ///< For pkg_add(1)
         std::shared_future<std::filesystem::path> PKGSRCDIR;       ///< Base of pkgsrc tree
+        std::shared_future<std::filesystem::path> WRKOBJDIR;       ///< Root of object tree; maybe empty
         std::shared_future<std::filesystem::path> WRKDIR_BASENAME; ///< Directories to clean
 
     private:

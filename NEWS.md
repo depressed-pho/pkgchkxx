@@ -1,6 +1,11 @@
 # Release notes
 
-## 0.2 -- 2023-04-22
+## 0.2.1 -- 2024-05-26
+
+* Fix a bug in 0.2 where defining `${WRKOBJDIR}` in `mk.conf` makes
+  `pkgrrxx` fail to clean `WRKDIR` (#4).
+
+## 0.2 -- 2024-04-22
 
 * Performance improvement: `pkgchkxx -s` no longer invokes `make update
   CLEANDEPENDS=yes` but now uses `make update
