@@ -397,7 +397,7 @@ namespace pkgxx {
 #    if defined(HAVE__NSGETENVIRON)
                     *_NSGetEnviron() = const_cast<char **>(cenvp.data());
 #    else
-                    environ = const_cast<char **>(cenvp.data());
+                    ::environ = const_cast<char **>(cenvp.data());
 #    endif
                     if (execvp(
                             _cmd.c_str(),
@@ -420,7 +420,7 @@ namespace pkgxx {
 #    if defined(HAVE__NSGETENVIRON)
                     *_NSGetEnviron() = const_cast<char **>(cenvp.data());
 #    else
-                    environ = const_cast<char **>(cenvp.data());
+                    ::environ = const_cast<char **>(cenvp.data());
 #    endif
                     if (execv(
                             _cmd.c_str(),
