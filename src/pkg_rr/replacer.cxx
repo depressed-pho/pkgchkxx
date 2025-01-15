@@ -895,7 +895,7 @@ namespace pkg_rr {
         catch (fs::filesystem_error&) {
             // But this will fail when WRKDIR has non-writable
             // directories. Fall back to "make clean" when that happens. It
-            // should now how to handle it.
+            // should know how to deal with it.
             run_make(base, path, {"clean"}, opts.make_vars);
         }
 #else
