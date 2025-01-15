@@ -6,7 +6,6 @@
 #include <condition_variable>
 #include <deque>
 #include <istream>
-#include <memory>
 #include <mutex>
 #include <set>
 #include <thread>
@@ -38,7 +37,7 @@ namespace pkgxx {
 
                 void
                 push_back(std::string const& arg) {
-                    _parent._harnesses[_next_child]->cin() << arg << '\0';
+                    _parent._harnesses[_next_child].cin() << arg << '\0';
                     _next_child = (_next_child + 1) % _parent._harnesses.size();
                 }
 
@@ -66,17 +65,18 @@ namespace pkgxx {
                 argv.insert(argv.end(), cmd.begin(), cmd.end());
 
                 for (unsigned int i = 0; i < concurrency; i++) {
-                    auto xargs = std::make_shared<harness>(CFG_XARGS, argv);
-                    _harnesses.push_back(xargs);
+                    harness& xargs = _harnesses.emplace_back(CFG_XARGS, argv);
 
-                    auto parser = std::make_unique<std::thread>(
-                        [this, &parse, xargs]() {
+                    std::thread parser(
+                        [this, &parse, &xargs]() {
+                            // Capturing xargs is fine because it is
+                            // guaranteed to outlive this lambda.
                             try {
                                 // Don't lock the mutex while parsing the
                                 // stdout of the commands. That would
                                 // prevent the parallelisation which is the
                                 // whole point of this entire machinery.
-                                auto result = parse(xargs->cout());
+                                auto result = parse(xargs.cout());
 
                                 lock_t lk_(_mtx);
                                 _running_parsers.erase(std::this_thread::get_id());
@@ -91,14 +91,14 @@ namespace pkgxx {
                             }
                             _finished.notify_one();
                         });
-                    _running_parsers.insert(parser->get_id());
+                    _running_parsers.insert(parser.get_id());
                     _parsers.push_back(std::move(parser));
                 }
             }
 
             virtual ~xargs_nursery() {
                 for (auto& p: _parsers) {
-                    p->join();
+                    p.join();
                 }
             }
 
@@ -115,9 +115,20 @@ namespace pkgxx {
 
                 while (!_running_parsers.empty()) {
                     _finished.wait(lk);
+
+                    // The parser thread might have thrown an exception at
+                    // this point, i.e. _ex might be set to non-empty
+                    // now. We can rethrow it now, but we don't, because
+                    // ~xargs_nursery() still needs to join all the
+                    // threads.
                 }
 
-                return std::move(_result);
+                if (_ex) {
+                    std::rethrow_exception(_ex);
+                }
+                else {
+                    return std::move(_result);
+                }
             }
 
         private:
@@ -126,13 +137,13 @@ namespace pkgxx {
                 lock_t lk(_mtx);
 
                 for (auto& child: _harnesses) {
-                    child->cin().close();
+                    child.cin().close();
                 }
             }
 
             mutex_t _mtx;
-            std::vector<std::shared_ptr<harness>> _harnesses;
-            std::vector<std::unique_ptr<std::thread>> _parsers;
+            std::vector<harness> _harnesses;
+            std::vector<std::thread> _parsers;
             std::set<std::thread::id> _running_parsers;
             result_type _result;
             std::exception_ptr _ex;

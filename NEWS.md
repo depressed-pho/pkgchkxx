@@ -8,6 +8,8 @@
   to install their newer versions. This was broken from the beginning of
   `pkgchkxx` and it's a good thing that nobody bothered to use this mode
   (as opposed to `pkgrrxx`).
+* Fix a potential issue where encountering an error condition could make
+  programs die with SIGABRT instead of exitting gracefully.
 
 ## 0.2.1 -- 2024-05-26
 

@@ -3,6 +3,7 @@
 #include <array>
 #include <filesystem>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <sys/types.h>
@@ -13,6 +14,12 @@ namespace pkgxx {
     namespace detail {
         // This is an incomplete type whose definition is in spawn.cxx
         struct file_actions;
+
+        // We need a custom deleter for the incomplete file_actions because
+        // otherwise we can't have a constructor template for spawn_base.
+        struct file_actions_deleter {
+            void operator() (file_actions* fas);
+        };
 
         struct spawn_base {
         protected:
@@ -59,9 +66,8 @@ namespace pkgxx {
             std::optional<
                 std::map<std::string, std::string>
                 > _env;
-            // This can't be unique_ptr because then our constructor has to
-            // be defined in spawn.cxx, which we don't want to do.
-            mutable std::shared_ptr<file_actions> _fas;
+            // mutable because we want our fas() to be const.
+            mutable std::unique_ptr<file_actions, file_actions_deleter> _fas;
         };
     }
 

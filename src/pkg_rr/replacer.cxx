@@ -248,7 +248,7 @@ namespace pkg_rr {
                     // to replicate the logic just for our dry-run.
                     n.start_soon(
                         [&, unsafe_pkg = std::move(unsafe_pkg)]() {
-                            auto build_info  = pkgxx::build_info(PKG_INFO, unsafe_pkg.base);
+                            auto build_info  = pkgxx::build_info(PKG_INFO, unsafe_pkg);
                             auto unsafe_path = build_info.find("PKGPATH");
                             assert(unsafe_path != build_info.end());
                             unsafe_pkgs.lock()->emplace(unsafe_pkg.base, unsafe_path->second);
@@ -258,7 +258,7 @@ namespace pkg_rr {
                     n.start_soon(
                         [&, unsafe_pkg = std::move(unsafe_pkg)]() {
                             std::optional<pkgxx::pkgpath> unsafe_path;
-                            for (auto const& [var, value]: pkgxx::build_info(PKG_INFO, unsafe_pkg.base)) {
+                            for (auto const& [var, value]: pkgxx::build_info(PKG_INFO, unsafe_pkg)) {
                                 if (var == "PKGPATH") {
                                     unsafe_path.emplace(value);
                                 }

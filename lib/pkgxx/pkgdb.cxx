@@ -1,81 +1,30 @@
+#include "harness.hxx"
 #include "pkgdb.hxx"
 
 namespace pkgxx {
-    installed_pkgname_iterator::installed_pkgname_iterator(std::string const& PKG_INFO)
-        : _pkg_info(std::make_shared<harness>(
-                        pkgxx::shell,
-                        std::initializer_list<std::string>(
-                            {pkgxx::shell, "-s", "--", "-e", "*"}),
-                        "dtor_action"_na = harness::dtor_action::kill)) {
+    namespace detail {
+        std::map<std::string, std::string>
+        build_info(std::string const& PKG_INFO, pkgxx::pkgpattern const& pat) {
+            harness pkg_info(shell, {shell, "-s", "--", "-Bq", pat.string()});
 
-        _pkg_info->cin() << "exec " << PKG_INFO << " \"$@\"" << std::endl;
-        _pkg_info->cin().close();
+            pkg_info.cin() << "exec " << PKG_INFO << " \"$@\"" << std::endl;
+            pkg_info.cin().close();
 
-        ++(*this);
-    }
-
-    installed_pkgname_iterator&
-    installed_pkgname_iterator::operator++ () {
-        std::string line;
-        if (std::getline(_pkg_info->cout(), line) && !line.empty()) {
-            _current.emplace(line);
-        }
-        else {
-            _current.reset();
-        }
-        return *this;
-    }
-
-    build_info_iterator::build_info_iterator(
-        std::string const& PKG_INFO,
-        pkgxx::pkgpattern const& pattern)
-        : _pkg_info(std::make_shared<harness>(
-                        pkgxx::shell,
-                        std::initializer_list<std::string>(
-                            {pkgxx::shell, "-s", "--", "-Bq", pattern.string()}),
-                        "dtor_action"_na = harness::dtor_action::kill)) {
-
-        _pkg_info->cin() << "exec " << PKG_INFO << " \"$@\"" << std::endl;
-        _pkg_info->cin().close();
-
-        ++(*this);
-    }
-
-    build_info_iterator&
-    build_info_iterator::operator++ () {
-        while (true) {
-            if (std::getline(_pkg_info->cout(), _current_line)) {
-                if (auto equal = _current_line.find('='); equal != std::string::npos) {
-                    auto const line_v = std::string_view(_current_line);
-                    _current.emplace(
-                        line_v.substr(0, equal),
-                        line_v.substr(equal + 1));
-                    break;
+            std::map<std::string, std::string> ret;
+            for (std::string line; std::getline(pkg_info.cout(), line); ) {
+                if (auto equal = line.find('='); equal != std::string::npos) {
+                    ret.emplace(
+                        line.substr(0, equal),
+                        line.substr(equal + 1));
                 }
                 else {
                     // Not a variable definition. Skip this line.
                     continue;
                 }
             }
-            else {
-                _current.reset();
-                break;
-            }
+            return ret;
         }
-        return *this;
-    }
 
-    build_info::const_iterator
-    build_info::find(std::string_view const& var) const {
-        for (auto it = begin(); it != end(); it++) {
-            if (it->first == var) {
-                return it;
-            }
-        }
-        return end();
-    }
-
-    namespace detail {
         bool
         is_pkg_installed(std::string const& PKG_INFO, pkgxx::pkgpattern const& pat) {
             pkgxx::harness pkg_info(
@@ -122,5 +71,19 @@ namespace pkgxx {
             }
             return ret;
         }
+    }
+
+    std::set<pkgxx::pkgname>
+    installed_pkgnames(std::string const& PKG_INFO) {
+        harness pkg_info(shell, {shell, "-s", "--", "-e", "*"});
+
+        pkg_info.cin() << "exec " << PKG_INFO << " \"$@\"" << std::endl;
+        pkg_info.cin().close();
+
+        std::set<pkgxx::pkgname> ret;
+        for (std::string line; std::getline(pkg_info.cout(), line); ) {
+            ret.emplace(line);
+        }
+        return ret;
     }
 }

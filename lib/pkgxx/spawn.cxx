@@ -84,10 +84,16 @@ namespace pkgxx {
                 }
             }
 
-            ~file_actions() noexcept(false) {
+            ~file_actions() {
                 if (posix_spawn_file_actions_destroy(&_fas) != 0) {
+                    // It is tempting to mark this destructor
+                    // noexcept(false), but we can't. Doing so would make
+                    // std::unique_ptr<file_actions> ill-formed.
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Wterminate"
                     throw std::system_error(
                         errno, std::generic_category(), "posix_spawn_file_actions_destroy");
+#  pragma GCC diagnostic pop
                 }
             }
 
@@ -237,6 +243,11 @@ namespace pkgxx {
                 > _fas;
         };
 #endif // defined(USE_POSIX_SPAWN)
+
+        void
+        file_actions_deleter::operator() (file_actions* fas) {
+            delete fas;
+        }
 
         spawn_base&
         spawn_base::chdir(std::filesystem::path const& dir) {
@@ -458,7 +469,7 @@ namespace pkgxx {
         file_actions&
         spawn_base::fas() const {
             if (!_fas) {
-                _fas = std::make_shared<file_actions>();
+                _fas.reset(new file_actions());
             }
             return *_fas;
         }
