@@ -13,7 +13,7 @@ LT_INIT
 # Automake options.
 AM_INIT_AUTOMAKE([foreign])
 AM_MAINTAINER_MODE([disable])
-AM_SILENT_RULES([no])
+AM_SILENT_RULES([yes])
 
 # Optional features.
 AC_ARG_ENABLE(

@@ -6,7 +6,7 @@ CLEANFILES = $(man_MANS)
 EXTRA_DIST = $(man_MANS:=.in)
 
 $(man_MANS): %: %.in Makefile
-	$(SED) < $< > $@ \
+	$(AM_V_GEN)$(SED) < $< > $@ \
 		-e 's|[@]MAKECONF@|$(sysconfdir)/mk.conf|g' \
 		-e 's|[@]PREFIX@|$(prefix)|g' \
 		-e 's|[@]PKGCHKXX@|'`echo pkgchkxx | sed '@program_transform_name@'`'|g' \
@@ -23,8 +23,14 @@ Doxyfile: Doxyfile.in Makefile
 CLEANFILES+= stamp-doxygen
 all-local: stamp-doxygen
 stamp-doxygen: Doxyfile $(top_srcdir)/*/*/*.?xx
-	$(DOXYGEN) Doxyfile
-	touch $@
+	@if ! $(AM_V_P); then \
+		echo "  DOXYGEN"; \
+		DOXYGEN_QUIET=YES $(DOXYGEN) Doxyfile; \
+	else \
+		echo $(DOXYGEN) Doxyfile; \
+		DOXYGEN_QUIET=NO $(DOXYGEN) Doxyfile; \
+	fi
+	$(AM_V_at)touch $@
 
 install-data-local: install-api-doc
 .PHONY: install-api-doc
