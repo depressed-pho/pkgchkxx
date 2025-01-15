@@ -1,5 +1,14 @@
 # Release notes
 
+## 0.2.2 -- not released yet
+
+* Fix an issue where `pkgchkxx -u -q` scans and prints outdated packages
+  twice, reported by @pfr-dev [#5]
+* Fix an issue where `pkgchkxx -u` deletes outdated packages but then fails
+  to install their newer versions. This was broken from the beginning of
+  `pkgchkxx` and it's a good thing that nobody bothered to use this mode
+  (as opposed to `pkgrrxx`).
+
 ## 0.2.1 -- 2024-05-26
 
 * Fix compilation on Linux (Fedora 40), patch by @bsiegert [#3]

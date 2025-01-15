@@ -116,19 +116,6 @@ namespace {
         }
     }
 
-    void
-    delete_pkgs(
-        pkg_chk::options const& opts,
-        pkg_chk::environment const& env,
-        std::map<pkgxx::pkgname, pkgxx::pkgpath> const& pkgs) {
-
-        for (auto const& [name, _path]: pkgs) {
-            if (pkgxx::is_pkg_installed(env.PKG_INFO.get(), name)) {
-                run_cmd_su(opts, env, env.PKG_DELETE.get(), {"-r", name.string()}, true);
-            }
-        }
-    }
-
     std::set<pkgxx::pkgpath>
     pkgpaths_to_check(pkg_chk::options const& opts, pkg_chk::environment const& env) {
         std::set<pkgxx::pkgpath> pkgpaths;
@@ -192,11 +179,26 @@ namespace {
     };
 
     void
+    delete_pkgs(
+        pkg_chk::options const& opts,
+        pkg_chk::environment const& env,
+        std::map<pkgxx::pkgname, pkgxx::pkgpath> const& pkgs,
+        checker& chk) {
+
+        for (auto const& [name, _path]: pkgs) {
+            if (pkgxx::is_pkg_installed(env.PKG_INFO.get(), name)) {
+                run_cmd_su(opts, env, env.PKG_DELETE.get(), {"-r", name.string()}, true);
+                chk.mark_as_deleted(name);
+            }
+        }
+    }
+
+    void
     delete_and_recheck(
         pkg_chk::options const& opts,
         pkg_chk::environment const& env,
         std::set<pkgxx::pkgpath> const& pkgpaths,
-        checker const& chk,
+        checker& chk,
         checker::result& res) {
 
         std::set<pkgxx::pkgpath> update_conf;
@@ -227,7 +229,7 @@ namespace {
         }
         if (opts.delete_mismatched || opts.update) {
             if (!res.MISMATCH_TODO.empty()) {
-                delete_pkgs(opts, env, res.MISMATCH_TODO);
+                delete_pkgs(opts, env, res.MISMATCH_TODO, chk);
                 msg(opts) << "Rechecking packages after deletions" << std::endl;
             }
             std::set<pkgxx::pkgpath> recheck_paths = pkgpaths;
@@ -300,8 +302,14 @@ namespace {
             return;
         }
 
-        checker const chk(opts, env);
+        checker chk(opts, env);
         checker::result res = chk.run(pkgpaths);
+        if (opts.list_ver_diffs) {
+            // This isn't really what the original pkg_chk -q does, but
+            // should be the right thing according to its man page. We
+            // believe it's a bug in the original code.
+            return;
+        }
         if (!res.MISMATCH_TODO.empty() ||
             (opts.update && fs::exists(env.PKGCHK_UPDATE_CONF.get()))) {
 

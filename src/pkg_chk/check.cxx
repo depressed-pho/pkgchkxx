@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <cassert>
+#include <iterator>
 #include <thread>
 
 #include <pkgxx/makevars.hxx>
@@ -42,16 +44,6 @@ namespace pkg_chk {
                         ret.insert(name);
                     }
                     return ret;
-                }).share())
-        , _installed_pkgpaths(
-            std::async(
-                std::launch::deferred,
-                [this]() {
-                    std::set<pkgxx::pkgpath> ret;
-                    for (auto const& [_name, vars]: _installed_pkg_summary.get()) {
-                        ret.insert(vars.PKGPATH);
-                    }
-                    return ret;
                 }).share()) {}
 
     checker_base::result
@@ -79,7 +71,9 @@ namespace pkg_chk {
                         for (pkgxx::pkgname const& name: latest_pkgnames) {
                             if (auto installed = installed_pkgnames.lower_bound(
                                     pkgxx::pkgname(name.base, pkgxx::pkgversion()));
-                                installed != installed_pkgnames.end() && installed->base == name.base) {
+                                installed != installed_pkgnames.end() &&
+                                installed->base == name.base &&
+                                !_deleted_pkgnames.count(name)) {
 
                                 if (installed->version == name.version) {
                                     // The latest PKGNAME turned out to be
@@ -181,7 +175,18 @@ namespace pkg_chk {
 
     checker_base::result
     checker_base::run() const {
-        return run(_installed_pkgpaths.get());
+        std::set<pkgxx::pkgpath> pkgpaths;
+        for (auto const& [name, vars]: _installed_pkg_summary.get()) {
+            if (!_deleted_pkgnames.count(name)) {
+                pkgpaths.insert(vars.PKGPATH);
+            }
+        }
+        return run(pkgpaths);
+    }
+
+    void
+    checker_base::mark_as_deleted(pkgxx::pkgname const& name) {
+        _deleted_pkgnames.insert(name);
     }
 
     source_checker_base::source_checker_base(
@@ -242,7 +247,10 @@ namespace pkg_chk {
             auto const& pm = _installed_pkgpaths_with_pkgnames.get();
             if (auto installed_pkgnames = pm.find(path); installed_pkgnames != pm.end()) {
                 for (auto const& installed_pkgname: installed_pkgnames->second) {
-                    if (installed_pkgname.base != default_pkgname->base) {
+                    if (_deleted_pkgnames.count(installed_pkgname)) {
+                        continue;
+                    }
+                    else if (installed_pkgname.base != default_pkgname->base) {
                         // We found a non-default PKGBASE but spawning
                         // make(1) takes seriously long. It's really
                         // tempting to cheat by making up a PKGNAME by
@@ -299,16 +307,6 @@ namespace pkg_chk {
                 std::launch::deferred,
                 [this]() {
                     return pkgxx::pkgmap(_bin_pkg_summary.get());
-                }).share())
-        , _installed_pkgbases(
-            std::async(
-                std::launch::deferred,
-                [this]() {
-                    std::set<pkgxx::pkgbase> ret;
-                    for (auto const& [name, _vars]: _installed_pkg_summary.get()) {
-                        ret.insert(name.base);
-                    }
-                    return ret;
                 }).share()) {}
 
     std::set<pkgxx::pkgname>
@@ -336,10 +334,15 @@ namespace pkg_chk {
             if (_update || _delete_mismatched) {
                 // We need to enumerate only PKGBASEs that are already
                 // installed, otherwise -a would install every single
-                // PKGNAME that the PKGPATH provides.
-                auto const& installed_pkgbases = _installed_pkgbases.get();
+                // package that the PKGPATH provides.
+                auto const& installed_pkgnames = _installed_pkgnames.get();
                 for (auto const& [base, sum]: pkgbases->second) {
-                    if (installed_pkgbases.find(base) != installed_pkgbases.end()) {
+                    if (auto installed = installed_pkgnames.lower_bound(
+                            pkgxx::pkgname(base, pkgxx::pkgversion()));
+                        installed != installed_pkgnames.end() &&
+                        installed->base == base &&
+                        !_deleted_pkgnames.count(*installed)) {
+
                         auto latest = sum.rbegin();
                         assert(latest != sum.rend());
 

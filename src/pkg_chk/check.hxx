@@ -36,6 +36,13 @@ namespace pkg_chk {
         result
         run() const;
 
+        /// Mark a package as deleted. If you intend to re-invoke run()
+        /// after deleting some packages, make sure to mark them as
+        /// deleted. Otherwise subsequent call of run() may use a stale
+        /// cache and return a wrong result.
+        void
+        mark_as_deleted(pkgxx::pkgname const& name);
+
     protected:
         /// Return the set of latest PKGNAMEs provided by a given PKGPATH.
         virtual std::set<pkgxx::pkgname>
@@ -73,7 +80,8 @@ namespace pkg_chk {
         std::shared_future<std::string>              _PKG_INFO;
         std::shared_future<pkgxx::summary>           _installed_pkg_summary;
         std::shared_future<std::set<pkgxx::pkgname>> _installed_pkgnames;
-        std::shared_future<std::set<pkgxx::pkgpath>> _installed_pkgpaths;
+
+        std::set<pkgxx::pkgname> _deleted_pkgnames;
     };
 
     /// Obtains data from source.
@@ -119,11 +127,10 @@ namespace pkg_chk {
         std::optional<std::filesystem::path>
         binary_package_file_of(pkgxx::pkgname const& name) const;
 
-        std::shared_future<std::filesystem::path>    _PACKAGES;
-        std::shared_future<std::string>              _PKG_SUFX;
-        std::shared_future<pkgxx::summary>           _bin_pkg_summary;
-        std::shared_future<pkgxx::pkgmap>            _bin_pkg_map;
-        std::shared_future<std::set<pkgxx::pkgbase>> _installed_pkgbases;
+        std::shared_future<std::filesystem::path> _PACKAGES;
+        std::shared_future<std::string>           _PKG_SUFX;
+        std::shared_future<pkgxx::summary>        _bin_pkg_summary;
+        std::shared_future<pkgxx::pkgmap>         _bin_pkg_map;
     };
 
     /// Obtains data from either source or binary, configurable at run
