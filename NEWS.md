@@ -1,6 +1,6 @@
 # Release notes
 
-## 0.2.2 -- not released yet
+## 0.2.2 -- 2025-01-16
 
 * Fix an issue where `pkgchkxx -u -q` scans and prints outdated packages
   twice, reported by @pfr-dev [#5]
