@@ -1,5 +1,13 @@
 # Release notes
 
+## 0.2.3 -- 2025-01-16
+
+* Gave up on the `fast-clean` option. `pkgrrxx` previously attempted to
+  simulate what `make clean` does instead of just running it, because
+  running `make` is slow. But it turned out to be a losing battle due to
+  subtlety around `${WRKOBJDIR}` so we just run `make clean` now. Issue
+  reported by @schmonz [#6]
+
 ## 0.2.2 -- 2025-01-16
 
 * Fix an issue where `pkgchkxx -u -q` scans and prints outdated packages

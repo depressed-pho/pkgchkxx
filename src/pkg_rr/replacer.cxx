@@ -858,49 +858,15 @@ namespace pkg_rr {
     void
     rolling_replacer::clean(pkgxx::pkgbase const& base,
                             pkgxx::pkgpath const& path) {
-#if ENABLE_FAST_CLEAN
-        // "make clean" is slow because invoking "make" is slow. Do what it
-        // does, but in C++.
-        msg() << "Cleaning " << base << std::endl;
 
-        // The definition of BUILD_DIR changes depending on whether
-        // WRKOBJDIR is defined. See mk/bsd.prefs.mk
-        auto const& PKGSRCDIR       = env.PKGSRCDIR.get();
-        auto const& WRKOBJDIR       = env.WRKOBJDIR.get();
-        auto const& WRKDIR_BASENAME = env.WRKDIR_BASENAME.get();
-        auto const& BUILD_DIR
-            = WRKOBJDIR.empty() ? PKGSRCDIR / path : WRKOBJDIR / path;
-
-        // mk/bsd.prefs.mk defines WRKDIR with "?=". Hope nobody overrides
-        // it...
-        auto const& WRKDIR = BUILD_DIR / WRKDIR_BASENAME;
-
-        // Do what mk/bsd.pkg.clean.mk (su-do-clean) does.
-        try {
-            fs::remove_all(WRKDIR);
-            if (!WRKOBJDIR.empty()) {
-                // This directory is supposed to be empty.
-                fs::remove(BUILD_DIR);
-
-                // Ignore errors from rmdir(2). This directory can
-                // legitimately be non-empty.
-                std::error_code ec;
-                fs::remove(BUILD_DIR.parent_path(), ec);
-
-                // When ${CREATE_WRKDIR_SYMLINK} is set to YES, a symlink
-                // to WRKDIR is created. Remove it.
-                fs::remove(PKGSRCDIR / path / WRKDIR_BASENAME);
-            }
-        }
-        catch (fs::filesystem_error&) {
-            // But this will fail when WRKDIR has non-writable
-            // directories. Fall back to "make clean" when that happens. It
-            // should know how to deal with it.
-            run_make(base, path, {"clean"}, opts.make_vars);
-        }
-#else
+        // "make clean" is slow because invoking "make" is slow. It's
+        // tempting to simulate what it does in C++. However, doing it
+        // properly is suprisingly hard because there are so many
+        // controlling knobs (e.g. WRKOBJDIR, WRKDIR_BASENAME, ...) so
+        // don't even think of that. We have tried in the past, and failed
+        // twice. Also don't forget that packages may define
+        // {pre,post}-clean targets.
         run_make(base, path, {"clean"}, opts.make_vars);
-#endif
     }
 
     void

@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.71])
-AC_INIT([pkgchkxx], [0.2.2], [pkgsrc-users@NetBSD.org])
+AC_INIT([pkgchkxx], [0.2.3], [pkgsrc-users@NetBSD.org])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([lib/pkgxx/pkgname.hxx])
 AC_CONFIG_HEADERS([lib/pkgxx/config.h])
@@ -16,15 +16,6 @@ AM_MAINTAINER_MODE([disable])
 AM_SILENT_RULES([yes])
 
 # Optional features.
-AC_ARG_ENABLE(
-    [fast-clean],
-    [AS_HELP_STRING(
-         [--disable-fast-clean],
-         [Run `make clean' instead of directly removing work directories])])
-AS_IF([test x"$enable_fast_clean" != x"no"],
-      [AC_DEFINE(
-           [ENABLE_FAST_CLEAN], [1],
-           [Define to remove work directories directly instead of running `make clean'])])
 
 # Precious variables.
 AX_COMMAND([bmake])

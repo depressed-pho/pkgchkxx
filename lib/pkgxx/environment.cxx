@@ -104,35 +104,5 @@ namespace pkgxx {
                 }
                 return vPKGSRCDIR;
             }).share();
-
-        // WRKOBJDIR
-        WRKOBJDIR = std::async(
-            std::launch::deferred,
-            [&]() {
-                fs::path vWRKOBJDIR = cgetenv("WRKOBJDIR");
-                if (vWRKOBJDIR.empty()) {
-                    if (auto v = pkgxx::extract_mkconf_var(MAKECONF.get(), "WRKOBJDIR").value(); v) {
-                        vWRKOBJDIR = v.value();
-                    }
-                }
-                _var_logger("WRKOBJDIR", vWRKOBJDIR.string());
-                return vWRKOBJDIR;
-            }).share();
-
-        // WRKDIR_BASENAME
-        WRKDIR_BASENAME = std::async(
-            std::launch::deferred,
-            [&]() {
-                fs::path vWRKDIR_BASENAME = cgetenv("WRKDIR_BASENAME");
-                if (vWRKDIR_BASENAME.empty()) {
-                    vWRKDIR_BASENAME = "work";
-                }
-                else if (vWRKDIR_BASENAME.filename() != vWRKDIR_BASENAME) {
-                    throw std::runtime_error(
-                        "WRKDIR_BASENAME must not contain directory separators");
-                }
-                _var_logger("WRKDIR_BASENAME", vWRKDIR_BASENAME.string());
-                return vWRKDIR_BASENAME;
-            }).share();
     }
 }
