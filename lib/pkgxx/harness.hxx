@@ -1,5 +1,6 @@
 #pragma once
 
+#include <exception>
 #include <filesystem>
 #include <functional>
 #include <istream>
@@ -128,7 +129,7 @@ namespace pkgxx {
 
     private:
         harness(
-            int, // dummy parameter to avoid conflicting with the other ctor
+            int, // a dummy parameter to avoid conflicting with the other ctor
             std::filesystem::path const& cmd,
             std::vector<std::string> const& argv,
             std::optional<std::filesystem::path> const& cwd,

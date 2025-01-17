@@ -1,8 +1,10 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 
 #include <pkgxx/config.h>
+#include <pkgxx/progress_bar.hxx>
 #include <pkgxx/string_algo.hxx>
 
 #include "pkg_chk/check.hxx"
@@ -29,14 +31,32 @@ namespace {
             , _opts(opts) {}
 
     protected:
+        virtual void total(std::size_t num) const override {
+            _pb = std::make_unique<pkgxx::progress_bar>(num);
+        }
+
+        virtual void progress() const override {
+            (*_pb)++;
+        }
+
+        virtual void done() const override {
+            _pb.reset();
+        }
+
         virtual void
         atomic_msg(std::function<void (std::ostream&)> const& f) const override {
-            pkg_rr::atomic_msg(f);
+            _pb->message([&](auto& out) {
+                auto out_ = pkg_rr::msg(out);
+                f(out_);
+            });
         }
 
         virtual void
         atomic_warn(std::function<void (std::ostream&)> const& f) const override {
-            pkg_rr::atomic_warn(f);
+            _pb->message([&](auto& out) {
+                auto out_ = pkg_rr::warn(out);
+                f(out_);
+            });
         }
 
         virtual void
@@ -46,10 +66,13 @@ namespace {
 
         virtual void
         fatal(std::function<void (std::ostream&)> const& f) const override {
-            pkg_rr::fatal(f);
+            _pb->message([&](auto& out) {
+                pkg_rr::fatal(f, out);
+            });
         }
 
         pkg_rr::options const& _opts;
+        mutable std::unique_ptr<pkgxx::progress_bar> _pb;
     };
 
     std::optional<pkgxx::pkgbase>
@@ -133,12 +156,14 @@ namespace pkg_rr {
             }
             catch (replace_failed const& e) {
                 FAILED.push_back(base);
-                auto const& cb = [&](auto& out) { out << e.what() << std::endl; };
+
                 if (opts.continue_on_errors) {
-                    atomic_error(cb);
+                    error() << e.what() << std::endl;
                 }
                 else {
-                    abort(cb);
+                    abort([&](auto& out) {
+                        out << e.what() << std::endl;
+                    });
                 }
             }
 
@@ -302,26 +327,21 @@ namespace pkg_rr {
 
     void
     rolling_replacer::dump_todo() const {
+        auto out = verbose(opts);
+
         if (opts.just_fetch) {
-            atomic_verbose(
-                opts,
-                [&](auto& out) {
-                    out << "Packages to fetch:" << std::endl;
-                    dump_todo(out, "MISMATCH_TODO", MISMATCH_TODO);
-                    dump_todo(out, "MISSING_TODO" , MISSING_TODO );
-                });
+            out << "Packages to fetch:" << std::endl;
+            dump_todo(out, "MISMATCH_TODO", MISMATCH_TODO);
+            dump_todo(out, "MISSING_TODO" , MISSING_TODO );
         }
         else {
-            atomic_verbose(
-                opts,
-                [&](auto& out) {
-                    out << "Packages to rebuild:" << std::endl;
-                    dump_todo(out, "MISMATCH_TODO", MISMATCH_TODO);
-                    dump_todo(out, "REBUILD_TODO" , REBUILD_TODO );
-                    dump_todo(out, "MISSING_TODO" , MISSING_TODO );
-                    dump_todo(out, "UNSAFE_TODO"  , UNSAFE_TODO  );
-                });
+            out << "Packages to rebuild:" << std::endl;
+            dump_todo(out, "MISMATCH_TODO", MISMATCH_TODO);
+            dump_todo(out, "REBUILD_TODO" , REBUILD_TODO );
+            dump_todo(out, "MISSING_TODO" , MISSING_TODO );
+            dump_todo(out, "UNSAFE_TODO"  , UNSAFE_TODO  );
         }
+
         vsleep(opts, 2s);
     }
 

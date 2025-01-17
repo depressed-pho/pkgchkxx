@@ -1,5 +1,10 @@
 # Release notes
 
+## 0.2.4 -- not released yet
+
+* `pkgrrxx -u` now displays a progress bar while checking for outdated
+  packages, if `stderr` is a tty.
+
 ## 0.2.3 -- 2025-01-16
 
 * Gave up on the `fast-clean` option. `pkgrrxx` previously attempted to

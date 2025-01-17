@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <cassert>
+#include <cstdlib>
 #include <iterator>
 #include <thread>
 
@@ -48,6 +49,8 @@ namespace pkg_chk {
 
     checker_base::result
     checker_base::run(std::set<pkgxx::pkgpath> const& pkgpaths) const {
+        total(pkgpaths.size());
+
         // This is the slowest part of pkg_chk. For each package we need to
         // extract variables from package Makefiles unless we are using
         // binary packages. Luckily for us each check is independent of
@@ -64,6 +67,7 @@ namespace pkg_chk {
                         auto const latest_pkgnames = find_latest_pkgnames(path);
                         if (latest_pkgnames.empty()) {
                             res.lock()->MISSING_DONE.insert(path);
+                            progress();
                             return;
                         }
 
@@ -165,9 +169,12 @@ namespace pkg_chk {
                                 res.lock()->MISSING_TODO.emplace(name, path);
                             }
                         }
+                        progress();
                     });
             }
         }
+        done();
+
         // The nursery has to be destroyed before this std::move() happens,
         // otherwise we would return an empty result.
         return std::move(*res.lock());
@@ -235,6 +242,7 @@ namespace pkg_chk {
                 [&](auto& out) {
                     out << "Unable to extract PKGNAME for " << path << std::endl;
                 });
+            std::terminate(); // Should not reach here.
         }
 
         // We search non-default PKGNAMEs only when -u or -r is given,

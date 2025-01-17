@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <filesystem>
 #include <functional>
 #include <future>
@@ -58,6 +59,16 @@ namespace pkg_chk {
         is_binary_available(pkgxx::pkgname const&) const {
             return false;
         }
+
+        /// Report the total number of packages to check. Called at the
+        /// beginning of \c run().
+        virtual void total(std::size_t) const {}
+
+        /// Report that one package have been checked.
+        virtual void progress() const {}
+
+        /// Report that a check has been completed.
+        virtual void done() const {}
 
         virtual void
         atomic_msg(std::function<void (std::ostream&)> const& f) const = 0;

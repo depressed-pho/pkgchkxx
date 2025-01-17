@@ -1,7 +1,6 @@
 #pragma once
 
 #include <iostream>
-#include <mutex>
 #include <thread>
 #include <optional>
 #include <type_traits>
@@ -9,10 +8,6 @@
 #include "options.hxx"
 
 namespace pkg_rr {
-    namespace detail {
-        inline std::recursive_mutex message_mutex;
-    }
-
     struct msg_logger: public std::ostream {
         msg_logger()
             : std::ostream(nullptr) {}
@@ -64,64 +59,42 @@ namespace pkg_rr {
     };
 
     inline msg_logger
-    msg() {
-        return msg_logger(std::cout);
-    }
-
-    template <typename Function>
-    inline void
-    atomic_msg(Function&& f) {
-        static_assert(std::is_invocable_v<Function&&, std::ostream&>);
-
-        std::lock_guard<std::recursive_mutex> lk(detail::message_mutex);
-        f(std::cout);
+    msg(std::ostream& out = std::cerr) {
+        return msg_logger(out);
     }
 
     inline msg_logger
-    warn() {
-        auto out = msg();
-        out << "WARNING: ";
-        return out;
-    }
-
-    template <typename Function>
-    void
-    atomic_warn(Function&& f) {
-        static_assert(std::is_invocable_v<Function&&, std::ostream&>);
-
-        std::lock_guard<std::recursive_mutex> lk(detail::message_mutex);
-        auto l = warn();
-        f(l);
-    }
-
-    template <typename Function>
-    inline void
-    atomic_error(Function&& f) {
-        static_assert(std::is_invocable_v<Function&&, std::ostream&>);
-
-        std::lock_guard<std::recursive_mutex> lk(detail::message_mutex);
-        std::cout << "*** ";
-        f(std::cout);
+    warn(std::ostream& out = std::cerr) {
+        auto out_ = msg(out);
+        out_ << "WARNING: ";
+        return out_;
     }
 
     inline msg_logger
-    verbose(pkg_rr::options const& opts, unsigned level = 1) {
+    error(std::ostream& out = std::cerr) {
+        auto out_ = msg(out);
+        out_ << "*** ";
+        return out_;
+    }
+
+    template <typename Function>
+    [[noreturn]] inline void
+    fatal(Function&& f, std::ostream& out = std::cerr) {
+        static_assert(std::is_invocable_v<Function&&, std::ostream&>);
+
+        auto out_ = error(out);
+        f(out_);
+        std::exit(1);
+    }
+
+    inline msg_logger
+    verbose(pkg_rr::options const& opts, unsigned level = 1, std::ostream& out = std::cerr) {
         if (opts.verbose >= level) {
-            return msg_logger(std::cout);
+            return msg_logger(out);
         }
         else {
             return msg_logger();
         }
-    }
-
-    template <typename Function>
-    inline void
-    atomic_verbose(pkg_rr::options const& opts, Function&& f, unsigned level = 1) {
-        static_assert(std::is_invocable_v<Function&&, std::ostream&>);
-
-        std::lock_guard<std::recursive_mutex> lk(detail::message_mutex);
-        auto out = verbose(opts, level);
-        f(out);
     }
 
     inline void
@@ -129,10 +102,10 @@ namespace pkg_rr {
         pkg_rr::options const& opts,
         std::string_view const& var,
         std::string_view const& value,
-        unsigned level = 2) {
+        unsigned level = 2,
+        std::ostream& out = std::cerr) {
 
-        std::lock_guard<std::recursive_mutex> lk(detail::message_mutex);
-        verbose(opts, level)
+        verbose(opts, level, out)
             << "Variable: " << var << " = " << (value.empty() ? "(empty)" : value) << std::endl;
     }
 
@@ -145,16 +118,5 @@ namespace pkg_rr {
         if (opts.verbose >= level) {
             std::this_thread::sleep_for(duration);
         }
-    }
-
-    template <typename Function>
-    [[noreturn]] inline void
-    fatal(Function&& f) {
-        static_assert(std::is_invocable_v<Function&&, std::ostream&>);
-
-        std::lock_guard<std::recursive_mutex> lk(detail::message_mutex);
-        std::cout << "*** ";
-        f(std::cout);
-        std::exit(1);
     }
 }

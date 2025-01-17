@@ -146,7 +146,7 @@ namespace pkg_chk {
 
     template <typename Function>
     void
-    atomic_fatal_later(pkg_chk::options const& opts, Function&& f) {
+    fatal_later(pkg_chk::options const& opts, Function&& f) {
         static_assert(std::is_invocable_v<Function&&, std::ostream&>);
 
         std::lock_guard<std::mutex> lk(detail::message_mutex);
