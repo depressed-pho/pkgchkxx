@@ -73,13 +73,23 @@ AX_ZLIB
 
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h])
+AC_CHECK_HEADERS([signal.h])
 AC_CHECK_HEADERS([spawn.h])
+AC_CHECK_HEADERS([sys/types.h])
 AC_CHECK_HEADERS([unistd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
 AC_TYPE_PID_T
 AC_TYPE_SIZE_T
 AC_TYPE_SSIZE_T
+AC_CHECK_DECLS([SIG_BLOCK], [], [], [#include <signal.h>])
+AC_CHECK_DECLS([SIG_UNBLOCK], [], [], [#include <signal.h>])
+AC_CHECK_TYPES([struct sigaction], [], [], [
+    #if defined(HAVE_SYS_TYPES_H)
+    #  include <sys/types.h>
+    #endif
+    #include <sys/signal.h>
+])
 
 # Checks for library functions.
 AC_CHECK_FUNCS([_NSGetEnviron])
@@ -87,12 +97,18 @@ AC_CHECK_FUNCS([atexit])
 AC_CHECK_FUNCS([dup2])
 AC_CHECK_FUNCS([execve])
 AC_CHECK_FUNCS([execvpe])
+AC_CHECK_FUNCS([getpid])
+AC_CHECK_FUNCS([kill])
 AC_CHECK_FUNCS([posix_spawn])
 AC_CHECK_FUNCS([posix_spawnp])
 AC_CHECK_FUNCS([posix_spawn_file_actions_addchdir])
 AC_CHECK_FUNCS([posix_spawn_file_actions_addchdir_np])
 AC_CHECK_FUNCS([posix_spawn_file_actions_addclose])
 AC_CHECK_FUNCS([posix_spawn_file_actions_adddup2])
+AC_CHECK_FUNCS([sigemptyset])
+AC_CHECK_FUNCS([sigaddset])
+AC_CHECK_FUNCS([sigprocmask])
+AC_CHECK_FUNCS([sigwait])
 AC_CHECK_FUNCS([strerror])
 AC_CHECK_FUNCS([uname])
 AC_CHECK_FUNCS([vfork])
