@@ -19,9 +19,10 @@
 #pragma GCC diagnostic pop
 
 namespace pkgxx {
-    // I'm not comfortable with bringing it in this scope, but what else
+    // I'm not comfortable with bringing these in this scope, but what else
     // can we do?
     using namespace na::literals;
+    using namespace std::literals::chrono_literals;
 
     /** A text-based progress bar to be displayed iff stderr is a tty,
      * based on the algorithm described in
@@ -48,7 +49,10 @@ namespace pkgxx {
                 na::get("decay_p"_na      = 0.1        , std::forward<Args>(args)...),
                 na::get("show_percent"_na = true       , std::forward<Args>(args)...),
                 na::get("show_ETA"_na     = true       , std::forward<Args>(args)...),
-                na::get("bar_style"_na    = bar_style{}, std::forward<Args>(args)...)) {}
+                static_cast<bar_style const&>(
+                    na::get("bar_style"_na   = bar_style{}, std::forward<Args>(args)...)),
+                static_cast<std::chrono::steady_clock::duration const&>(
+                    na::get("redraw_rate"_na = 100ms      , std::forward<Args>(args)...))) {}
 
         ~progress_bar();
 
@@ -83,10 +87,11 @@ namespace pkgxx {
             double decay_p,
             bool show_percent,
             bool show_ETA,
-            bar_style style);
+            bar_style const& style,
+            std::chrono::steady_clock::duration const& redraw_rate);
 
         void
-        redraw();
+        redraw(bool force = false);
 
         void
         redraw(std::initializer_list<std::string> const& postfix);
@@ -115,11 +120,15 @@ namespace pkgxx {
         bool _show_percent;
         bool _show_ETA;
         bar_style _style;
+        std::chrono::steady_clock::duration _redraw_rate;
         fdostream _out;
         // std::nullopt if stderr is not a tty.
         std::optional<std::size_t> _term_width;
 
         std::chrono::steady_clock::time_point _last_updated;
+        std::optional<
+            std::chrono::steady_clock::time_point
+            > _last_redrew;
         std::optional<double> _slowness_EST; // in seconds
         std::size_t _total;
         std::size_t _done;

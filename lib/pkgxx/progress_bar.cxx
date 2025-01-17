@@ -19,11 +19,13 @@ namespace pkgxx {
         double decay_p,
         bool show_percent,
         bool show_ETA,
-        bar_style style)
+        bar_style const& style,
+        std::chrono::steady_clock::duration const& redraw_rate)
         : _decay_p(decay_p)
         , _show_percent(show_percent)
         , _show_ETA(show_ETA)
         , _style(std::move(style))
+        , _redraw_rate(redraw_rate)
         , _out(STDERR_FILENO, false)
         , _term_width(term_width(_out))
         , _last_updated(std::chrono::steady_clock::now())
@@ -46,7 +48,7 @@ namespace pkgxx {
                 [this](int) {
                     lock_t lk(_mtx);
                     _term_width = term_width(_out);
-                    redraw();
+                    redraw(true);
                 });
         }
 #endif
@@ -104,9 +106,17 @@ namespace pkgxx {
     }
 
     void
-    progress_bar::redraw() {
+    progress_bar::redraw(bool force) {
         if (!_term_width) {
             return;
+        }
+
+        auto const now = std::chrono::steady_clock::now();
+        if (!force && _last_redrew) {
+            auto const elapsed = now - *_last_redrew;
+            if (elapsed < _redraw_rate) {
+                return;
+            }
         }
 
         if (_show_percent) {
@@ -127,6 +137,8 @@ namespace pkgxx {
                 redraw({});
             }
         }
+
+        _last_redrew = now;
     }
 
     void
