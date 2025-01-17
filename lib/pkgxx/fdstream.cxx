@@ -4,8 +4,9 @@
 #include "fdstream.hxx"
 
 namespace pkgxx {
-    fdstreambuf::fdstreambuf(int fd)
-        : _fd(fd) {}
+    fdstreambuf::fdstreambuf(int fd, bool owned)
+        : _fd(fd)
+        , _owned(owned) {}
 
     fdstreambuf::~fdstreambuf() {
         close();
@@ -15,7 +16,9 @@ namespace pkgxx {
     fdstreambuf::close() {
         if (_fd >= 0) {
             sync();
-            ::close(_fd);
+            if (_owned) {
+                ::close(_fd);
+            }
             _fd = -1;
         }
         return this;

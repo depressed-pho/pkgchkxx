@@ -16,17 +16,28 @@ namespace pkgxx {
      */
     struct fdstreambuf: public std::streambuf {
         /** Construct a stream buffer reading data from / writing data to a
-         * file descriptor. The fd will be owned by the buffer, i.e. when
-         * it's destructed the fd will also be closed. */
-        fdstreambuf(int fd);
+         * file descriptor. By default the fd will be owned by the buffer,
+         * i.e. when it's destructed the fd will also be closed.
+         */
+        fdstreambuf(int fd, bool owned = true);
 
         virtual
         ~fdstreambuf();
 
-        /** Explicitly close the file descriptor. The fd will be
-         * automatically closed when the buffer is destructed. */
+        /** Explicitly close the file descriptor but only if it's
+         * owned. The fd will be automatically closed when the buffer is
+         * destructed.
+         */
         fdstreambuf*
         close();
+
+        /** Return the file descriptor, or \c std::nullopt if it's been
+         * closed.
+         */
+        std::optional<int>
+        fd() const {
+            return _fd >= 0 ? std::make_optional(_fd) : std::nullopt;
+        }
 
     protected:
 #if !defined(DOXYGEN)
@@ -48,6 +59,7 @@ namespace pkgxx {
         using buffer_t = std::array<char_type, buf_size>;
 
         int _fd;
+        bool _owned;
         std::optional<buffer_t> _read_buf;
         std::optional<buffer_t> _write_buf;
     };
@@ -56,11 +68,11 @@ namespace pkgxx {
      */
     struct fdostream: public std::ostream {
         /** Construct an output stream writing data to a file
-         * descriptor. The fd will be owned by the stream, i.e. when it's
-         * destructed the fd will also be closed. */
-        fdostream(int fd)
+         * descriptor. By default the fd will be owned by the stream,
+         * i.e. when it's destructed the fd will also be closed. */
+        fdostream(int fd, bool owned = true)
             : std::ostream(nullptr)
-            , _buf(std::make_unique<fdstreambuf>(fd)) {
+            , _buf(std::make_unique<fdstreambuf>(fd, owned)) {
 
             rdbuf(_buf.get());
         }
@@ -80,13 +92,22 @@ namespace pkgxx {
             close();
         }
 
-        /** Explicitly close the file descriptor. The fd will be
-         * automatically closed when the stream is destructed. */
+        /** Explicitly close the file descriptor but only if it's
+         * owned. The fd will be automatically closed when the stream is
+         * destructed. */
         void
         close() {
             if (_buf) {
                 _buf->close();
             }
+        }
+
+        /** Return the file descriptor, or \c std::nullopt if it's been
+         * closed.
+         */
+        std::optional<int>
+        fd() const {
+            return _buf ? _buf->fd() : std::nullopt;
         }
 
     private:
@@ -97,11 +118,11 @@ namespace pkgxx {
      */
     struct fdistream: public std::istream {
         /** Construct an input stream reading data from a file
-         * descriptor. The fd will be owned by the stream, i.e. when it's
-         * destructed the fd will also be closed. */
-        fdistream(int fd)
+         * descriptor. By default the fd will be owned by the stream,
+         * i.e. when it's destructed the fd will also be closed. */
+        fdistream(int fd, bool owned = true)
             : std::istream(nullptr)
-            , _buf(std::make_unique<fdstreambuf>(fd)) {
+            , _buf(std::make_unique<fdstreambuf>(fd, owned)) {
 
             rdbuf(_buf.get());
         }
@@ -121,13 +142,22 @@ namespace pkgxx {
             close();
         }
 
-        /** Explicitly close the file descriptor. The fd will be
-         * automatically closed when the stream is destructed. */
+        /** Explicitly close the file descriptor but only if it's
+         * owned. The fd will be automatically closed when the stream is
+         * destructed. */
         void
         close() {
             if (_buf) {
                 _buf->close();
             }
+        }
+
+        /** Return the file descriptor, or \c std::nullopt if it's been
+         * closed.
+         */
+        std::optional<int>
+        fd() const {
+            return _buf ? _buf->fd() : std::nullopt;
         }
 
     private:
@@ -139,11 +169,11 @@ namespace pkgxx {
      */
     struct fdstream: public std::iostream {
         /** Construct a stream reading data from / writing data to a file
-         * descriptor. The fd will be owned by the stream, i.e. when it's
-         * destructed the fd will also be closed. */
-        fdstream(int fd)
+         * descriptor. By default the fd will be owned by the stream,
+         * i.e. when it's destructed the fd will also be closed. */
+        fdstream(int fd, bool owned = true)
             : std::iostream(nullptr)
-            , _buf(std::make_unique<fdstreambuf>(fd)) {
+            , _buf(std::make_unique<fdstreambuf>(fd, owned)) {
 
             rdbuf(_buf.get());
         }
@@ -163,13 +193,21 @@ namespace pkgxx {
             close();
         }
 
-        /** Explicitly close the file descriptor. The fd will be
-         * automatically closed when the stream is destructed. */
+        /** Explicitly close the file descriptor if it's owned. The fd will
+         * be automatically closed when the stream is destructed. */
         void
         close() {
             if (_buf) {
                 _buf->close();
             }
+        }
+
+        /** Return the file descriptor, or \c std::nullopt if it's been
+         * closed.
+         */
+        std::optional<int>
+        fd() const {
+            return _buf ? _buf->fd() : std::nullopt;
         }
 
     private:
