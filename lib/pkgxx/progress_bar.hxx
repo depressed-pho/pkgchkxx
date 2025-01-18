@@ -52,7 +52,7 @@ namespace pkgxx {
                 static_cast<bar_style const&>(
                     na::get("bar_style"_na   = bar_style{}, std::forward<Args>(args)...)),
                 static_cast<std::chrono::steady_clock::duration const&>(
-                    na::get("redraw_rate"_na = 100ms      , std::forward<Args>(args)...))) {}
+                    na::get("redraw_rate"_na = 200ms      , std::forward<Args>(args)...))) {}
 
         ~progress_bar();
 
