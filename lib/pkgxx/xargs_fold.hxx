@@ -14,6 +14,7 @@
 
 #include <pkgxx/config.h>
 #include <pkgxx/harness.hxx>
+#include <pkgxx/permissive_shared_ptr.hxx>
 
 namespace pkgxx {
     namespace detail {
@@ -37,7 +38,7 @@ namespace pkgxx {
 
                 void
                 push_back(std::string const& arg) {
-                    _parent._harnesses[_next_child].cin() << arg << '\0';
+                    _parent._harnesses[_next_child]->cin() << arg << '\0';
                     _next_child = (_next_child + 1) % _parent._harnesses.size();
                 }
 
@@ -65,18 +66,32 @@ namespace pkgxx {
                 argv.insert(argv.end(), cmd.begin(), cmd.end());
 
                 for (unsigned int i = 0; i < concurrency; i++) {
-                    harness& xargs = _harnesses.emplace_back(CFG_XARGS, argv);
+                    _harnesses.push_back(make_permissive_shared<harness>(CFG_XARGS, argv));
 
                     std::thread parser(
-                        [this, &parse, &xargs]() {
-                            // Capturing xargs is fine because it is
-                            // guaranteed to outlive this lambda.
+                        [this, &parse, i]() {
                             try {
+                                // We cannot bring the harness from outside
+                                // of this lambda, because then the
+                                // destructor of the lambda itself becomes
+                                // noexcept(false), which violates the
+                                // expectation of std::thread.
+                                permissive_shared_ptr<harness> xargs;
+                                {
+                                    lock_t lk_(_mtx);
+                                    xargs = _harnesses[i];
+                                }
+
                                 // Don't lock the mutex while parsing the
                                 // stdout of the commands. That would
                                 // prevent the parallelisation which is the
                                 // whole point of this entire machinery.
-                                auto result = parse(xargs.cout());
+                                auto result = parse(xargs->cout());
+                                // But this is technically unsafe because
+                                // we are touching the harness from two
+                                // threads. This is fine only because we
+                                // don't actually mutate the state of
+                                // harness once it's created.
 
                                 lock_t lk_(_mtx);
                                 _running_parsers.erase(std::this_thread::get_id());
@@ -96,7 +111,7 @@ namespace pkgxx {
                 }
             }
 
-            virtual ~xargs_nursery() {
+            ~xargs_nursery() {
                 for (auto& p: _parsers) {
                     p.join();
                 }
@@ -137,12 +152,12 @@ namespace pkgxx {
                 lock_t lk(_mtx);
 
                 for (auto& child: _harnesses) {
-                    child.cin().close();
+                    child->cin().close();
                 }
             }
 
             mutex_t _mtx;
-            std::vector<harness> _harnesses;
+            std::vector<permissive_shared_ptr<harness>> _harnesses;
             std::vector<std::thread> _parsers;
             std::set<std::thread::id> _running_parsers;
             result_type _result;

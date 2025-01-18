@@ -4,6 +4,9 @@
 
 * `pkgrrxx -u` now displays a progress bar while checking for outdated
   packages, if `stderr` is a tty.
+* Fix an issue where `pkgchkxx -u` can access invalidated memory and then
+  crash. The bug was introduced at version 0.2.2. Reported by @ryoon [#9]
+  and @0323pin [#10].
 
 ## 0.2.3 -- 2025-01-16
 

@@ -14,6 +14,7 @@ libpkgxx_la_SOURCES = \
 	mutex_guard.hxx \
 	nursery.cxx nursery.hxx \
 	ordered.hxx \
+	permissive_shared_ptr.hxx \
 	pkgdb.cxx pkgdb.hxx \
 	pkgname.cxx pkgname.hxx \
 	pkgpath.cxx pkgpath.hxx \
