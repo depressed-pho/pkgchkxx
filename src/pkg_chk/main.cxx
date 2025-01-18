@@ -52,7 +52,7 @@ namespace {
         }
 
         std::time_t const now = std::time(nullptr);
-        msg(opts) << std::put_time(std::localtime(&now), "%R")
+        msg(opts) << std::put_time(std::localtime(&now), "%R ")
                   << cmd;
         for (auto const& arg: args) {
             msg(opts) << ' ' << arg;

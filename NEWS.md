@@ -7,6 +7,8 @@
 * Fix an issue where `pkgchkxx -u` can access invalidated memory and then
   crash. The bug was introduced at version 0.2.2. Reported by @ryoon [#9]
   and @0323pin [#10].
+* Fix the formatting of `pkgchkxx` displaying commands to run. There was a
+  space missing between time and command.
 
 ## 0.2.3 -- 2025-01-16
 
