@@ -1,6 +1,6 @@
 # Release notes
 
-## 0.2.4 -- not released yet
+## 0.2.4 -- 2025-01-18
 
 * `pkgrrxx -u` now displays a progress bar while checking for outdated
   packages, if `stderr` is a tty.
