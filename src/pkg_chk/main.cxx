@@ -15,6 +15,7 @@
 #include <pkgxx/config.h>
 #include <pkgxx/graph.hxx>
 #include <pkgxx/harness.hxx>
+#include <pkgxx/nursery.hxx>
 #include <pkgxx/pkgdb.hxx>
 #include <pkgxx/pkgpath.hxx>
 #include <pkgxx/todo.hxx>
@@ -185,10 +186,34 @@ namespace {
         std::map<pkgxx::pkgname, pkgxx::pkgpath> const& pkgs,
         checker& chk) {
 
+        auto const& PKG_INFO   = env.PKG_INFO.get();
+        auto const& PKG_DELETE = env.PKG_DELETE.get();
+
         for (auto const& [name, _path]: pkgs) {
-            if (pkgxx::is_pkg_installed(env.PKG_INFO.get(), name)) {
-                run_cmd_su(opts, env, env.PKG_DELETE.get(), {"-r", name.string()}, true);
-                chk.mark_as_deleted(name);
+            if (pkgxx::is_pkg_installed(PKG_INFO, name)) {
+                run_cmd_su(opts, env, PKG_DELETE, {"-r", name.string()}, true);
+
+                // With -n we don't actually delete packages but we still
+                // need to simulate the effect of "pkg_delete -r".
+                if (opts.dry_run) {
+                    auto const& delete_r =
+                        [&PKG_INFO, &chk, &opts](auto const& delete_r, auto const& name) {
+                            // Mark it as deleted, but it's not
+                            // enough. pkg_delete -r would delete
+                            // everything that transitively depend on it.
+
+                            if (!chk.mark_as_deleted(name)) {
+                                // But it's already marked as deleted.
+                                return;
+                            }
+
+                            pkgxx::nursery n(opts.concurrency);
+                            for (auto const& broken_pkg: pkgxx::who_requires(PKG_INFO, name)) {
+                                delete_r(delete_r, broken_pkg);
+                            }
+                        };
+                    delete_r(delete_r, name);
+                }
             }
         }
     }

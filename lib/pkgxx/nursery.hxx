@@ -50,7 +50,9 @@ namespace pkgxx {
          * others will be discarded.
          *
          * You may create a nested \ref nursery in the task, but the
-         * concurrency isn't coordinated with the parent \ref nursery.
+         * concurrency isn't coordinated with the parent \ref nursery. You
+         * may not call \ref start_soon() of a \ref nursery from within its
+         * own task.
          *
          * This is a memory barrier. Whatever memory values the thread
          * calling this function can also be seen by the child task.

@@ -77,7 +77,7 @@ namespace pkg_chk {
                                     pkgxx::pkgname(name.base, pkgxx::pkgversion()));
                                 installed != installed_pkgnames.end() &&
                                 installed->base == name.base &&
-                                !_deleted_pkgnames.count(name)) {
+                                !_deleted_pkgnames.count(*installed)) {
 
                                 if (installed->version == name.version) {
                                     // The latest PKGNAME turned out to be
@@ -191,9 +191,10 @@ namespace pkg_chk {
         return run(pkgpaths);
     }
 
-    void
+    bool
     checker_base::mark_as_deleted(pkgxx::pkgname const& name) {
-        _deleted_pkgnames.insert(name);
+        auto const& [_, inserted] = _deleted_pkgnames.insert(name);
+        return inserted;
     }
 
     source_checker_base::source_checker_base(

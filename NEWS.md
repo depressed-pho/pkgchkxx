@@ -9,6 +9,8 @@
   and @0323pin [#10].
 * Fix the formatting of `pkgchkxx` displaying commands to run. There was a
   space missing between time and command.
+* Fix `pkgchkxx -un` not simulating the effect of `pkg_delete -r`. The same
+  issue exists in the original `pkg_chk` but it'd be nice to fix it.
 
 ## 0.2.3 -- 2025-01-16
 

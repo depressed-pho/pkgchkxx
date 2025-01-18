@@ -40,8 +40,9 @@ namespace pkg_chk {
         /// Mark a package as deleted. If you intend to re-invoke run()
         /// after deleting some packages, make sure to mark them as
         /// deleted. Otherwise subsequent call of run() may use a stale
-        /// cache and return a wrong result.
-        void
+        /// cache and return a wrong result. Return false if the package
+        /// was already marked as deleted, true otherwise.
+        bool
         mark_as_deleted(pkgxx::pkgname const& name);
 
     protected:
