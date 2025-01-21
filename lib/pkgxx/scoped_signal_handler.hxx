@@ -23,6 +23,12 @@ namespace pkgxx {
          * exceptions. However, throwing an exception from the handler
          * immediately terminates the entire process via \c
          * std::terminate().
+         *
+         * If you value portability you should avoid handling \c SIGUSR1
+         * using this functionality. On platforms where \c sigwaitinfo(2)
+         * or \c sigqueue(2) is missing, \c scoped_signal_handler
+         * internally uses \c SIGUSR1 and it will never make it to
+         * user-defined handlers.
          */
         scoped_signal_handler(
             std::initializer_list<int> const& signals,

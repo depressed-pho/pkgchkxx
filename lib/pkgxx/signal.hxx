@@ -1,5 +1,7 @@
 #pragma once
 
+#include <pkgxx/config.h>
+
 #include <cassert>
 #include <cstdlib>
 #include <functional>
@@ -15,9 +17,11 @@
 namespace pkgxx {
     /** A wrapper for sigset_t */
     struct csigset {
-        struct iterator
-            : public equality_comparable<iterator>
-            , public std::iterator<std::bidirectional_iterator_tag, int> {
+        struct iterator : public equality_comparable<iterator> {
+            using iterator_category = std::bidirectional_iterator_tag;
+            using value_type        = int;
+            using pointer           = value_type*;
+            using reference         = value_type&;
 
             bool
             operator== (iterator const& other) const noexcept;
@@ -190,7 +194,7 @@ namespace pkgxx {
             // No support for getting handlers atm.
 
         private:
-            friend class csigaction;
+            friend struct csigaction;
 
             handler_wrapper(parent_type& ref)
                 : _ref(ref) {}
@@ -273,15 +277,40 @@ namespace pkgxx {
         sigval value;
     };
 
-    /** A wrapper for sigwaitinfo(2). */
+    constexpr bool
+    is_sigwaitinfo_available() {
+#if defined(HAVE_SIGWAITINFO)
+        return true;
+#else
+        return false;
+#endif
+    }
+
+    constexpr bool
+    is_sigqueue_available() {
+#if defined(HAVE_SIGQUEUE)
+        return true;
+#else
+        return false;
+#endif
+    }
+
+    /** A wrapper for sigwaitinfo(2). If the system lacks this syscall,
+     * this function emulates it via sigwait(2) and always returns \ref
+     * csiginfo_base with only \ref csiginfo_base::signo being filled.
+     */
     std::unique_ptr<csiginfo_base>
     csigwaitinfo(csigset const& set);
 
-    /** A wrapper for sigqueue(2). */
+    /** A wrapper for sigqueue(2). If the system lacks this syscall, this
+     * function emulates it via kill(2), ignoring \c int_value.
+     */
     void
     csigqueue(pid_t const pid, int const signo, int const int_value);
 
-    /** A wrapper for sigqueue(2). */
+    /** A wrapper for sigqueue(2). If the system lacks this syscall, this
+     * function emulates it via kill(2), ignoring \c ptr_value.
+     */
     void
     csigqueue(pid_t const pid, int const signo, void* const ptr_value);
 }

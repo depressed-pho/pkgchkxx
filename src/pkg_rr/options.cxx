@@ -61,7 +61,7 @@ namespace pkg_rr {
                 break;
             case 'j':
                 if (int const n = std::atoi(optarg); n > 0) {
-                    concurrency = n;
+                    concurrency = static_cast<unsigned>(n);
                 }
                 else {
                     std::cerr << argv[0] << ": option -j takes a positive integer" << std::endl;

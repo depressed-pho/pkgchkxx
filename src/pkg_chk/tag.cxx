@@ -1,3 +1,5 @@
+#include <optional>
+
 #include <pkgxx/string_algo.hxx>
 
 #include "tag.hxx"
@@ -5,11 +7,18 @@
 namespace pkg_chk {
     tagset::tagset(std::string_view const& tags) {
         if (!tags.empty()) {
-            std::string::size_type last_sep = -1;
+            std::optional<std::string::size_type> last_sep;
             while (true) {
-                auto const next_sep = tags.find_first_of(',', last_sep + 1);
+                auto const next_sep =
+                    last_sep ? tags.find_first_of(',', *last_sep + 1)
+                             : tags.find_first_of(',');
                 if (next_sep == std::string::npos) {
-                    emplace(tags.substr(last_sep + 1));
+                    if (last_sep) {
+                        emplace(tags.substr(*last_sep + 1));
+                    }
+                    else {
+                        emplace(tags);
+                    }
                     break;
                 }
                 else {

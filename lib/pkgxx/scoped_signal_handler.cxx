@@ -223,13 +223,20 @@ namespace pkgxx {
                 // interrupt the sigwait call above. See comments in
                 // notify_waiter().
                 if (info->signo == SIGUSR1) {
-                    if (csiginfo_queued* const queued =
+                    if (is_sigwaitinfo_available() && is_sigqueue_available()) {
+                        if (csiginfo_queued* const queued =
                             dynamic_cast<csiginfo_queued*>(info.get());
-                        queued &&
-                        queued->pid == getpid() &&
-                        queued->value.sival_ptr == this) {
+                            queued &&
+                            queued->pid == getpid() &&
+                            queued->value.sival_ptr == this) {
 
-                        // It's most likely us that sent this signal.
+                            // It's most likely us that sent this signal.
+                            continue;
+                        }
+                    }
+                    else {
+                        // Dammit. We must absorb the signal
+                        // unconditionally.
                         continue;
                     }
                 }

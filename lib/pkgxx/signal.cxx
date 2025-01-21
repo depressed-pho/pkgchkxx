@@ -243,11 +243,20 @@ namespace pkgxx {
     csigwaitinfo(csigset const& set) {
         siginfo_t si;
 
+#if defined(HAVE_SIGWAITINFO)
         if (sigwaitinfo(set.get(), &si) == -1) {
             // -1 is the only error it returns. On success it returns a
             // -signal number.
             throw std::system_error(errno, std::generic_category(), "sigwaitinfo");
         }
+#else
+        // But some OSes annoyingly lack sigwaitinfo(2).
+        if (sigwait(set.get(), &si.si_signo) != 0) {
+            throw std::system_error(errno, std::generic_category(), "sigwait");
+        }
+        si.si_errno = 0;
+        si.si_code  = 0;
+#endif
 
         switch (si.si_code) {
         case SI_QUEUE:
@@ -260,20 +269,32 @@ namespace pkgxx {
     }
 
     void
-    csigqueue(pid_t const pid, int const signo, int const int_value) {
+    csigqueue(pid_t const pid, int const signo, [[maybe_unused]] int const int_value) {
+#if defined(HAVE_SIGQUEUE)
         sigval sv;
         sv.sival_int = int_value;
         if (sigqueue(pid, signo, sv) != 0) {
             throw std::system_error(errno, std::generic_category(), "sigqueue");
         }
+#else
+        if (kill(pid, signo) != 0) {
+            throw std::system_error(errno, std::generic_category(), "kill");
+        }
+#endif
     }
 
     void
-    csigqueue(pid_t const pid, int const signo, void* const ptr_value) {
+    csigqueue(pid_t const pid, int const signo, [[maybe_unused]] void* const ptr_value) {
+#if defined(HAVE_SIGQUEUE)
         sigval sv;
         sv.sival_ptr = ptr_value;
         if (sigqueue(pid, signo, sv) != 0) {
             throw std::system_error(errno, std::generic_category(), "sigqueue");
         }
+#else
+        if (kill(pid, signo) != 0) {
+            throw std::system_error(errno, std::generic_category(), "kill");
+        }
+#endif
     }
 }
