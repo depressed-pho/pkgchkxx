@@ -97,7 +97,7 @@ namespace pkgxx {
         std::shared_ptr<scoped_signal_service>
         scoped_signal_service::instance() {
             // Initialization of static local variables is guaranteed to be
-            // thread-safe since C++11.
+            // thread-safe as of C++11.
             static std::mutex mtx;
             static std::weak_ptr<scoped_signal_service> wp;
 
