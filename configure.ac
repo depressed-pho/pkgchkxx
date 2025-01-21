@@ -83,8 +83,10 @@ AC_CHECK_HEADERS([unistd.h])
 AC_TYPE_PID_T
 AC_TYPE_SIZE_T
 AC_TYPE_SSIZE_T
+AC_CHECK_DECLS([_SC_NSIG], [], [], [#include <unistd.h>])
 AC_CHECK_DECLS([SIG_BLOCK], [], [], [#include <signal.h>])
 AC_CHECK_DECLS([SIG_UNBLOCK], [], [], [#include <signal.h>])
+AC_CHECK_DECLS([SIGUSR1], [], [], [#include <signal.h>])
 AC_CHECK_DECLS([SIGWINCH], [], [], [#include <signal.h>])
 AC_CHECK_DECLS([TIOCGWINSZ], [], [], [#include <sys/ioctl.h>])
 AC_CHECK_TYPES([struct sigaction], [], [], [
@@ -113,9 +115,12 @@ AC_CHECK_FUNCS([posix_spawn_file_actions_addclose])
 AC_CHECK_FUNCS([posix_spawn_file_actions_adddup2])
 AC_CHECK_FUNCS([sigemptyset])
 AC_CHECK_FUNCS([sigaddset])
+AC_CHECK_FUNCS([sigismember])
 AC_CHECK_FUNCS([sigprocmask])
-AC_CHECK_FUNCS([sigwait])
+AC_CHECK_FUNCS([sigqueue])
+AC_CHECK_FUNCS([sigwaitinfo])
 AC_CHECK_FUNCS([strerror])
+AC_CHECK_FUNCS([sysconf])
 AC_CHECK_FUNCS([uname])
 AC_CHECK_FUNCS([vfork])
 AC_FUNC_FORK

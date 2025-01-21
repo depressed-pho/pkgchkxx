@@ -21,6 +21,7 @@ libpkgxx_la_SOURCES = \
 	pkgpattern.cxx pkgpattern.hxx \
 	progress_bar.cxx progress_bar.hxx \
 	scoped_signal_handler.cxx scoped_signal_handler.hxx \
+	signal.hxx signal.cxx \
 	spawn.cxx spawn.hxx \
 	stream.hxx \
 	string_algo.hxx \

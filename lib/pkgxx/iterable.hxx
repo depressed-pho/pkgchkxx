@@ -4,7 +4,7 @@ namespace pkgxx {
     namespace detail {
         template <typename T>
         struct reversion_wrapper {
-            T iterable;
+            T& iterable;
         };
 
         template <typename T>
@@ -21,6 +21,6 @@ namespace pkgxx {
     /** \c std::ranges::reverse_view for non-C++20 compilers. */
     template <typename T>
     detail::reversion_wrapper<T> reverse(T&& iterable) {
-        return { std::forward<T>(iterable) };
+        return { iterable };
     }
 }

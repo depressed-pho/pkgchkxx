@@ -1,19 +1,28 @@
 #pragma once
 
-#include <atomic>
 #include <functional>
 #include <initializer_list>
-#include <map>
-#include <signal.h>
-#include <thread>
+#include <unordered_set>
 
 namespace pkgxx {
+    namespace detail {
+        struct scoped_signal_service;
+    }
+
+    /** POSIX signal handlers but contained in a scope.
+     */
     struct scoped_signal_handler {
         /** Register a handler for a set of signals. Each time a signal
          * arrives, the handler function will be called in a signal-safe
          * context (but in a separate thread). This is achieved using
          * sigprocmask(2) and sigwait(2) so the global signal handlers
-         * won't be affected or called. \c signals must not be empty.
+         * won't be affected or called.
+         *
+         * The handler function can do whatever it wants to do. It can
+         * allocate memory, block on mutexes, and can even throw
+         * exceptions. However, throwing an exception from the handler
+         * immediately terminates the entire process via \c
+         * std::terminate().
          */
         scoped_signal_handler(
             std::initializer_list<int> const& signals,
@@ -24,15 +33,10 @@ namespace pkgxx {
         ~scoped_signal_handler();
 
     private:
-        void
-        thread_main();
+        friend struct detail::scoped_signal_service;
 
-    private:
+        std::unordered_set<int> _signals;
         std::function<void (int)> _handler;
-        std::atomic<bool> _terminate;
-        std::map<int, struct sigaction> _saved_sigacts;
-        sigset_t _sigset;
-        int _any_signum;
-        std::thread _thr;
+        std::shared_ptr<detail::scoped_signal_service> _service;
     };
 }

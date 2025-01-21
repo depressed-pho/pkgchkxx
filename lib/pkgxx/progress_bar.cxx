@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 #include <iomanip>
+#include <signal.h>
 #include <sstream>
 #if defined(HAVE_SYS_IOCTL_H)
 #  include <sys/ioctl.h>
@@ -11,6 +12,7 @@
 #include <unistd.h>
 
 #include "progress_bar.hxx"
+#include "scoped_signal_handler.hxx"
 
 namespace pkgxx {
     progress_bar::progress_bar(
@@ -39,7 +41,7 @@ namespace pkgxx {
             throw std::runtime_error(
                 "decay_p must be positive and should not be greater than 1");
         }
-#if defined(HAVE_DECL_SIGWINCH)
+#if HAVE_DECL_SIGWINCH
         if (_term_width) {
             // SIGWINCH exists everywhere in practice, but it's
             // nevertheless non-standard.
