@@ -5,6 +5,8 @@ EXTRA_DIST = \
 	NEWS.md \
 	README.md
 
+ACLOCAL_AMFLAGS = -I m4
+
 # Let "make distcheck" use variables supplied to ./configure
 DISTCHECK_CONFIGURE_FLAGS = \
 	CC="${CC}" \
