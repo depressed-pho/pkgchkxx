@@ -1,5 +1,7 @@
 # -*- autoconf -*-
 AC_DEFUN([AX_LIBFETCH], [
+    AC_REQUIRE([AX_LIB_SOCKET_NSL])
+
     AC_ARG_WITH(
         [libfetch-prefix],
         [AS_HELP_STRING([--with-libfetch-prefix], [path to libfetch installation directory])])

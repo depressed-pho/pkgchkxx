@@ -1,5 +1,9 @@
 # Release notes
 
+## 0.2.5 -- not released yet
+
+* Fixed build on Illumos.
+
 ## 0.2.4 -- 2025-01-18
 
 * `pkgrrxx -u` now displays a progress bar while checking for outdated

@@ -249,7 +249,7 @@ namespace pkgxx {
     }
 
     std::optional<std::size_t>
-    progress_bar::term_width(fdostream const& _out) {
+    progress_bar::term_width([[maybe_unused]] fdostream const& _out) {
 #if defined(HAVE_ISATTY) && defined(HAVE_IOCTL) && defined(TIOCGWINSZ) && \
     defined(HAVE_STRUCT_WINSIZE_WS_COL)
         if (auto fd = _out.fd(); isatty(*fd)) {
@@ -258,6 +258,18 @@ namespace pkgxx {
                 return ws.ws_col;
             }
         }
+#else
+        // Dangit, this platform doesn't have TIOCGWINSZ. It's probably
+        // Illumos.
+        //
+        // We could open the controlling terminal device, temporarily turn
+        // off ICANON and ECHO, move the cursor to the rightmost column,
+        // request the cursor position to tty, read a response from tty,
+        // and then parse it. But this complicates matter a lot, like damn
+        // fucking a LOT. We can't bear with the complexity in this already
+        // suboptimal case. No operating systems relevant today lack
+        // TIOCGWINSZ after all.
+#  warning Platform does not support ioctl(TIOCGWINSZ). Progress bar cannot be displayed.
 #endif
         return std::nullopt;
     }

@@ -19,6 +19,10 @@ namespace pkgxx {
     struct csigset {
         struct iterator : public equality_comparable<iterator> {
             using iterator_category = std::bidirectional_iterator_tag;
+            /// Difference doesn't make sense for this iterator but we
+            /// still need to define it, otherwise std::iterator_traits
+            /// won't recognize this as an iterator.
+            using difference_type   = void;
             using value_type        = int;
             using pointer           = value_type*;
             using reference         = value_type&;

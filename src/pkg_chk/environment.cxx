@@ -20,9 +20,9 @@ using namespace std::literals;
 namespace fs = std::filesystem;
 
 namespace {
-    utsname
+    struct utsname
     cuname() {
-        utsname un;
+        struct utsname un;
         if (uname(&un) != 0) {
             throw std::system_error(errno, std::generic_category(), "uname");
         }
