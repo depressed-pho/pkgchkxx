@@ -344,14 +344,32 @@ namespace pkgxx {
              */
             auto const msg_fds = cpipe(true);
 
+            // It's unsafe to allocate memory after fork()ing, so do it
+            // before that.
+            fdistream msg_in(msg_fds[0]);
+            fdostream msg_out(msg_fds[1]);
+
+            std::vector<char const*> cargv;
+            cargv.reserve(_argv.size() + 1);
+            for (auto const& arg: _argv) {
+                cargv.push_back(arg.c_str());
+            }
+            cargv.push_back(nullptr);
+
+            std::vector<char const*> cenvp;
+            cenvp.reserve(envp.size() + 1);
+            for (auto const& env: envp) {
+                cenvp.push_back(env.c_str());
+            }
+            cenvp.push_back(nullptr);
+
 #  if defined(HAVE_VFORK)
             pid_t const pid = vfork();
 #  else
             pid_t const pid = fork();
 #  endif
             if (pid == 0) {
-                close(msg_fds[0]);
-                fdostream msg_out(msg_fds[1]);
+                msg_in.close();
 
                 if (_fas) {
                     try {
@@ -369,20 +387,6 @@ namespace pkgxx {
                         _exit(1);
                     }
                 }
-
-                std::vector<char const*> cargv;
-                cargv.reserve(_argv.size() + 1);
-                for (auto const& arg: _argv) {
-                    cargv.push_back(arg.c_str());
-                }
-                cargv.push_back(nullptr);
-
-                std::vector<char const*> cenvp;
-                cenvp.reserve(envp.size() + 1);
-                for (auto const& env: envp) {
-                    cenvp.push_back(env.c_str());
-                }
-                cenvp.push_back(nullptr);
 
                 if (_is_file) {
 #  if defined(HAVE_EXECVPE)
@@ -435,8 +439,7 @@ namespace pkgxx {
                 _exit(1);
             }
             else if (pid > 0) {
-                close(msg_fds[1]);
-                fdistream msg_in(msg_fds[0]);
+                msg_out.close();
 
                 // The child will write errno and a string message to this
                 // pipe if it fails to exec.

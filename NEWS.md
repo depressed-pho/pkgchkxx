@@ -3,6 +3,8 @@
 ## 0.2.5 -- not released yet
 
 * Fixed build on Illumos.
+* Fixed a stability issue on systems that lack `posix_spawn(3)`. It could
+  sometimes deadlock because of `malloc(3)` after `fork(2)`.
 
 ## 0.2.4 -- 2025-01-18
 
