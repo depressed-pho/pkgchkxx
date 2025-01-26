@@ -1,6 +1,6 @@
 # Release notes
 
-## 0.2.5 -- not released yet
+## 0.2.5 -- 2025-01-26
 
 * Fixed build on Illumos.
 * Fixed a stability issue on systems that lack `posix_spawn(3)`. It could
