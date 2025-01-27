@@ -33,9 +33,9 @@ namespace pkgxx {
     struct progress_bar {
         struct bar_style {
             char begin = '[';
-            char fill  = '=';
+            char fill  = ':';
             char bg    = ' ';
-            char tip   = '>';
+            char tip   = ':';
             char end   = ']';
         };
 
