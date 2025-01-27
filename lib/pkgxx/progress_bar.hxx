@@ -1,15 +1,18 @@
 #pragma once
 
+#include <cassert>
 #include <chrono>
 #include <cstddef>
+#include <functional>
 #include <initializer_list>
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <ostream>
 #include <type_traits>
 
-#include <pkgxx/fdstream.hxx>
 #include <pkgxx/scoped_signal_handler.hxx>
+#include <pkgxx/tty.hxx>
 
 // We know what we are doing! Just don't warn us about these!
 #pragma GCC diagnostic push
@@ -24,8 +27,7 @@ namespace pkgxx {
     using namespace na::literals;
     using namespace std::literals::chrono_literals;
 
-    /** A text-based progress bar to be displayed iff stderr is a tty,
-     * based on the algorithm described in
+    /** A text-based progress bar, based on the algorithm described in
      * https://stackoverflow.com/a/42009090
      *
      * Instances of this class are thread-safe.
@@ -40,15 +42,19 @@ namespace pkgxx {
         };
 
         /** Creating an instance of \c progress_bar displays a progress
-         * bar. "decay_p" is ignored when "show_ETA" is false.
+         * bar. "decay_p" is ignored when "show_ETA" is false. \c "output"
+         * is defaulted to stderr, and if it's not a \ref ttystream the
+         * progress bar will not be actually drawn.
          */
         template <typename... Args>
         progress_bar(std::size_t total, Args&&... args)
             : progress_bar(
                 0, total,
-                na::get("decay_p"_na      = 0.1        , std::forward<Args>(args)...),
-                na::get("show_percent"_na = true       , std::forward<Args>(args)...),
-                na::get("show_ETA"_na     = true       , std::forward<Args>(args)...),
+                static_cast<std::optional<std::reference_wrapper<std::ostream>> const&>(
+                    na::get("output"_na = std::nullopt, std::forward<Args>(args)...)),
+                na::get("decay_p"_na      = 0.1 , std::forward<Args>(args)...),
+                na::get("show_percent"_na = true, std::forward<Args>(args)...),
+                na::get("show_ETA"_na     = true, std::forward<Args>(args)...),
                 static_cast<bar_style const&>(
                     na::get("bar_style"_na   = bar_style{}, std::forward<Args>(args)...)),
                 static_cast<std::chrono::steady_clock::duration const&>(
@@ -72,11 +78,11 @@ namespace pkgxx {
             static_assert(std::is_invocable_v<F, std::ostream&>);
             static_assert(std::is_same_v<void, std::invoke_result_t<F, std::ostream&>>);
 
-            if (_term_width) {
-                _out << '\r'    // Move cursor to column 0.
-                     << "\e[K"; // Erase from cursor to the end of line.
+            if (should_draw()) {
+                tty() << tty::move_x(0)
+                      << tty::erase_line_from_cursor;
             }
-            f(_out);
+            f(_output);
             redraw();
         }
 
@@ -84,11 +90,37 @@ namespace pkgxx {
         progress_bar(
             int, // a dummy parameter to avoid conflicting with the public ctor
             std::size_t total,
+            std::optional<std::reference_wrapper<std::ostream>> const& output,
             double decay_p,
             bool show_percent,
             bool show_ETA,
             bar_style const& style,
             std::chrono::steady_clock::duration const& redraw_rate);
+
+        static std::unique_ptr<std::ostream>
+        default_output();
+
+        /** Return a nullptr if the output stream is not actually a
+         * \ref ttystream.
+         */
+        ttystream*
+        ttyp() {
+            return dynamic_cast<ttystream*>(&_output);
+        }
+
+        /** Abort if ttyp() returns nullptr. */
+        ttystream&
+        tty() {
+            auto const ptr = ttyp();
+            assert(ptr);
+            return *ptr;
+        }
+
+        /** Should we actually draw a progress bar? */
+        bool
+        should_draw() const {
+            return _term_size.has_value();
+        }
 
         void
         redraw(bool force = false);
@@ -108,22 +140,20 @@ namespace pkgxx {
         std::string
         format_ETA() const;
 
-        static std::optional<std::size_t>
-        term_width(fdostream const& _out);
-
     private:
         using mutex_t = std::recursive_mutex;
         using lock_t  = std::lock_guard<mutex_t>;
 
         mutable mutex_t _mtx;
+        std::unique_ptr<std::ostream> _stderr; // non-null if "output"_na was omitted.
+        std::ostream& _output;
         double _decay_p;
         bool _show_percent;
         bool _show_ETA;
         bar_style _style;
         std::chrono::steady_clock::duration _redraw_rate;
-        fdostream _out;
         // std::nullopt if stderr is not a tty.
-        std::optional<std::size_t> _term_width;
+        std::optional<dimension<std::size_t>> _term_size;
 
         std::chrono::steady_clock::time_point _last_updated;
         std::optional<

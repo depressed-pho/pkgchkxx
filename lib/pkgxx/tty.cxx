@@ -18,18 +18,29 @@ namespace pkgxx {
 #endif
     }
 
-    std::optional<dimension<std::size_t>>
-    term_size(int const fd) {
+    ttystream::ttystream(int fd, bool owned)
+        : fdstream(fd, owned) {
+
         if (!cisatty(fd)) {
+            throw not_a_tty(fd);
+        }
+    }
+
+    std::optional<dimension<std::size_t>>
+    ttystream::size() const {
+        if (!fd()) {
             return std::nullopt;
         }
 
 #if defined(HAVE_IOCTL) && defined(TIOCGWINSZ) && defined(HAVE_STRUCT_WINSIZE)
         struct winsize ws;
-        if (ioctl(fd, TIOCGWINSZ, &ws) != 0) {
+        if (ioctl(*fd(), TIOCGWINSZ, &ws) != 0) {
             throw std::system_error(errno, std::generic_category(), "ioctl(TIOCGWINSZ)");
         }
-        return dimension<std::size_t> {ws.ws_col, ws.ws_row};
+        return dimension<std::size_t> {
+            .width  = ws.ws_col,
+            .height = ws.ws_row
+        };
 
 #else
         // Dangit, this platform doesn't have TIOCGWINSZ. It's probably
@@ -44,5 +55,29 @@ namespace pkgxx {
         // TIOCGWINSZ after all.
         return std::nullopt;
 #endif
+    }
+
+    namespace tty {
+        namespace detail {
+            ttystream&
+            operator<< (ttystream& tty, move_to const& m) {
+                if (m.y) {
+                    tty << "\e[" << *m.y + 1 << ';' << m.x + 1 << 'H';
+                }
+                else if (m.x > 0) {
+                    tty << "\e[" << m.x + 1 << 'F';
+                }
+                else {
+                    tty << '\r';
+                }
+                return tty;
+            }
+        }
+
+        ttystream&
+        erase_line_from_cursor(ttystream& tty) {
+            tty << "\e[K";
+            return tty;
+        }
     }
 }

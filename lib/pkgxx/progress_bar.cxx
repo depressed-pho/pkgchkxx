@@ -1,6 +1,5 @@
 #include "config.h"
 
-#include <cassert>
 #include <cmath>
 #include <cstring>
 #include <iomanip>
@@ -16,18 +15,20 @@ namespace pkgxx {
     progress_bar::progress_bar(
         int,
         std::size_t total,
+        std::optional<std::reference_wrapper<std::ostream>> const& output,
         double decay_p,
         bool show_percent,
         bool show_ETA,
         bar_style const& style,
         std::chrono::steady_clock::duration const& redraw_rate)
-        : _decay_p(decay_p)
+        : _stderr(output ? nullptr : default_output())
+        , _output(output ? output->get() : *_stderr)
+        , _decay_p(decay_p)
         , _show_percent(show_percent)
         , _show_ETA(show_ETA)
         , _style(std::move(style))
         , _redraw_rate(redraw_rate)
-        , _out(STDERR_FILENO, false)
-        , _term_width(term_width(_out))
+        , _term_size(ttyp() ? ttyp()->size() : std::nullopt)
         , _last_updated(std::chrono::steady_clock::now())
         , _total(total)
         , _done(0)
@@ -40,14 +41,14 @@ namespace pkgxx {
                 "decay_p must be positive and should not be greater than 1");
         }
 #if HAVE_DECL_SIGWINCH
-        if (_term_width) {
+        if (_term_size) {
             // SIGWINCH exists everywhere in practice, but it's
             // nevertheless non-standard.
             _winch_handler = std::make_unique<scoped_signal_handler>(
                 std::initializer_list<int> {SIGWINCH},
                 [this](int) {
                     lock_t lk(_mtx);
-                    _term_width = term_width(_out);
+                    _term_size = tty().size();
                     redraw(true);
                 });
         }
@@ -60,10 +61,10 @@ namespace pkgxx {
         // be a race condition.
         _winch_handler.reset();
 
-        if (_term_width) {
-            _out << '\r'   // Move cursor to column 0.
-                 << "\e[K" // Erase from cursor to the end of line.
-                 << std::flush;
+        if (should_draw()) {
+            tty() << tty::move_x(0)
+                  << tty::erase_line_from_cursor
+                  << std::flush;
         }
     }
 
@@ -105,9 +106,19 @@ namespace pkgxx {
         return *this;
     }
 
+    std::unique_ptr<std::ostream>
+    progress_bar::default_output() {
+        if (auto const fd = STDERR_FILENO; cisatty(fd)) {
+            return std::make_unique<ttystream>(fd, false);
+        }
+        else {
+            return std::make_unique<fdostream>(fd, false);
+        }
+    }
+
     void
     progress_bar::redraw(bool force) {
-        if (!_term_width) {
+        if (!should_draw()) {
             return;
         }
 
@@ -143,15 +154,15 @@ namespace pkgxx {
 
     void
     progress_bar::redraw(std::initializer_list<std::string> const& postfix) {
-        assert(_term_width);
+        assert(_term_size);
 
-        std::size_t bar_width = *_term_width;
+        std::size_t bar_width = _term_size->width;
         for (auto const& elem: postfix) {
             if (bar_width < 1 + elem.length()) {
                 // The terminal is too narrow.
-                _out << '\r'   // Move cursor to column 0.
-                     << "\e[K" // Erase from cursor to the end of line.
-                     << std::flush;
+                tty() << tty::move_x(0)
+                      << tty::erase_line_from_cursor
+                      << std::flush;
                 return;
             }
             else {
@@ -160,12 +171,12 @@ namespace pkgxx {
         }
 
         std::string const bar = format_bar(bar_width);
-        _out << '\r' // Move cursor to column 0.
-             << bar; // But don't erase the line. Just overwrite it.
+        tty() << tty::move_x(0)
+              << bar; // No need to erase the line. We can just overwrite it.
         for (auto const& elem: postfix) {
-            _out << ' ' << elem;
+            tty() << ' ' << elem;
         }
-        _out << std::flush;
+        tty() << std::flush;
     }
 
     double
@@ -243,17 +254,6 @@ namespace pkgxx {
         else {
             // We have no data to estimate the remaining time.
             return std::string(std::strlen("(ETA: HH:MM)"), ' ');
-        }
-    }
-
-    std::optional<std::size_t>
-    progress_bar::term_width([[maybe_unused]] fdostream const& _out) {
-        // THINKME: We could do something better in C++20...
-        if (auto const& dim = term_size(*_out.fd()); dim.has_value()) {
-            return dim->width;
-        }
-        else {
-            return std::nullopt;
         }
     }
 }
