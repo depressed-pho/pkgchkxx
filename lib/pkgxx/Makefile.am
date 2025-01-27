@@ -28,6 +28,7 @@ libpkgxx_la_SOURCES = \
 	summary.hxx summary.cxx \
 	tempfile.cxx tempfile.hxx \
 	todo.cxx todo.hxx \
+	tty.cxx tty.hxx \
 	unwrap.hxx \
 	wwwstream.cxx wwwstream.hxx \
 	xargs_fold.hxx

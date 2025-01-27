@@ -95,7 +95,7 @@ AC_CHECK_TYPES([struct sigaction], [], [], [
     #endif
     #include <sys/signal.h>
 ])
-AC_CHECK_MEMBERS([struct winsize.ws_col], [], [], [#include <sys/ioctl.h>])
+AC_CHECK_TYPES([struct winsize], [], [], [#include <sys/ioctl.h>])
 
 # Checks for library functions.
 AC_CHECK_FUNCS([_NSGetEnviron])
