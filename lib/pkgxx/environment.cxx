@@ -8,10 +8,14 @@
 namespace fs = std::filesystem;
 
 namespace pkgxx {
-    std::string
+    std::optional<std::string>
     cgetenv(std::string const& name) {
-        char const* const value = getenv(name.c_str());
-        return value ? value : "";
+        if (char const* const value = getenv(name.c_str()); value) {
+            return value;
+        }
+        else {
+            return std::nullopt;
+        }
     }
 
     environment::environment(
@@ -22,7 +26,7 @@ namespace pkgxx {
 
         // Hide PKG_PATH to avoid breakage in 'make' calls.
         {
-            std::string const path = cgetenv("PKG_PATH");
+            std::string const path = cgetenv("PKG_PATH").value_or("");
             std::promise<fs::path> p;
             p.set_value(path);
             PKG_PATH = p.get_future();
@@ -37,7 +41,7 @@ namespace pkgxx {
                 //
                 // Lazy evaluation with std::async(std::launch::deferred).
                 //
-                fs::path vMAKECONF = cgetenv("MAKECONF");
+                fs::path vMAKECONF = cgetenv("MAKECONF").value_or("");
                 if (vMAKECONF.empty()) {
                     std::initializer_list<fs::path> const candidates = {
 #if defined(CFG_MAKECONF)
@@ -64,8 +68,8 @@ namespace pkgxx {
         PKGSRCDIR = std::async(
             std::launch::deferred,
             [&]() {
-                fs::path vPKGSRCDIR = cgetenv("PKGSRCDIR");
-                fs::path vLOCALBASE = cgetenv("LOCALBASE");
+                fs::path vPKGSRCDIR = cgetenv("PKGSRCDIR").value_or("");
+                fs::path vLOCALBASE = cgetenv("LOCALBASE").value_or("");
 
                 if (vPKGSRCDIR.empty()) {
                     std::vector<std::string> vars = {

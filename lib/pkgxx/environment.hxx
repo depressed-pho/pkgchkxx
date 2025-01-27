@@ -8,7 +8,7 @@
 
 namespace pkgxx {
     /** C++ wrapper for POSIX getenv(3) */
-    std::string
+    std::optional<std::string>
     cgetenv(std::string const& name);
 
     /** Values from the environment such as various Makefiles. Most of such
