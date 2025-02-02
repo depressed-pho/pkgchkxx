@@ -30,6 +30,7 @@ libpkgxx_la_SOURCES = \
 	todo.cxx todo.hxx \
 	tty.cxx tty.hxx \
 	unwrap.hxx \
+	value_or_ref.hxx \
 	wwwstream.cxx wwwstream.hxx \
 	xargs_fold.hxx
 

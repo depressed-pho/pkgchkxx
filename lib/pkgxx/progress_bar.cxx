@@ -21,8 +21,7 @@ namespace pkgxx {
         bool show_ETA,
         bar_style const& style,
         std::chrono::steady_clock::duration const& redraw_rate)
-        : _stderr(output ? nullptr : default_output())
-        , _output(output ? output->get() : *_stderr)
+        : _output(output ? value_or_ref(output->get()) : default_output())
         , _decay_p(decay_p)
         , _show_percent(show_percent)
         , _show_ETA(show_ETA)
@@ -106,13 +105,15 @@ namespace pkgxx {
         return *this;
     }
 
-    std::unique_ptr<std::ostream>
+    value_or_ref<std::ostream>
     progress_bar::default_output() {
         if (auto const fd = STDERR_FILENO; cisatty(fd)) {
-            return std::make_unique<ttystream>(fd, false);
+            return value_or_ref<std::ostream>(
+                std::in_place_type_t<ttystream>(), fd, "owned"_na = false);
         }
         else {
-            return std::make_unique<fdostream>(fd, false);
+            return value_or_ref<std::ostream>(
+                std::in_place_type_t<fdostream>(), fd, false);
         }
     }
 

@@ -13,6 +13,7 @@
 
 #include <pkgxx/scoped_signal_handler.hxx>
 #include <pkgxx/tty.hxx>
+#include <pkgxx/value_or_ref.hxx>
 
 // We know what we are doing! Just don't warn us about these!
 #pragma GCC diagnostic push
@@ -82,7 +83,7 @@ namespace pkgxx {
                 tty() << tty::move_x(0)
                       << tty::erase_line_from_cursor;
             }
-            f(_output);
+            f(*_output);
             redraw();
         }
 
@@ -97,7 +98,7 @@ namespace pkgxx {
             bar_style const& style,
             std::chrono::steady_clock::duration const& redraw_rate);
 
-        static std::unique_ptr<std::ostream>
+        static value_or_ref<std::ostream>
         default_output();
 
         /** Return a nullptr if the output stream is not actually a
@@ -105,7 +106,7 @@ namespace pkgxx {
          */
         ttystream*
         ttyp() {
-            return dynamic_cast<ttystream*>(&_output);
+            return dynamic_cast<ttystream*>(_output.get());
         }
 
         /** Abort if ttyp() returns nullptr. */
@@ -145,14 +146,13 @@ namespace pkgxx {
         using lock_t  = std::lock_guard<mutex_t>;
 
         mutable mutex_t _mtx;
-        std::unique_ptr<std::ostream> _stderr; // non-null if "output"_na was omitted.
-        std::ostream& _output;
+        value_or_ref<std::ostream> _output;
         double _decay_p;
         bool _show_percent;
         bool _show_ETA;
         bar_style _style;
         std::chrono::steady_clock::duration _redraw_rate;
-        // std::nullopt if stderr is not a tty.
+        // std::nullopt if _output is not a tty.
         std::optional<dimension<std::size_t>> _term_size;
 
         std::chrono::steady_clock::time_point _last_updated;
