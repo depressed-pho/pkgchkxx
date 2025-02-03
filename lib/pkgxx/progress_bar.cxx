@@ -185,9 +185,9 @@ namespace pkgxx {
             }
         }
 
-        std::string const bar = format_bar(bar_width);
-        tty() << tty::move_x(0)
-              << bar; // No need to erase the line. We can just overwrite it.
+        // No need to erase the line. We can just overwrite it.
+        tty() << tty::move_x(0);
+        render_bar(bar_width);
         for (auto const& elem: postfix) {
             tty() << ' ' << elem;
         }
@@ -204,33 +204,30 @@ namespace pkgxx {
         }
     }
 
-    std::string
-    progress_bar::format_bar(std::size_t width) const {
+    void
+    progress_bar::render_bar(std::size_t width) {
         if (width < 2) {
             // The terminal is too narrow.
-            return "";
+            return;
         }
 
         std::size_t const prog =
             static_cast<std::size_t>(
                 std::floor(progress() * static_cast<double>(width - 2)));
 
-        std::string bar;
-        bar.resize(width);
-        bar.push_back(_style.begin);
+        tty() << _style.begin_sty(_style.begin);
         for (std::size_t i = 0; i < width - 2; i++) {
             if (i < prog) {
-                bar.push_back(_style.fill);
+                tty() << _style.fill_sty(_style.fill);
             }
             else if (i == prog) {
-                bar.push_back(_style.tip);
+                tty() << _style.tip_sty(_style.tip);
             }
             else {
-                bar.push_back(_style.bg);
+                tty() << _style.bg_sty(_style.bg);
             }
         }
-        bar.push_back(_style.end);
-        return bar;
+        tty() << _style.end_sty(_style.end);
     }
 
     std::string

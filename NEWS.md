@@ -1,5 +1,10 @@
 # Release notes
 
+## 0.2.6 -- not released yet
+
+* `pkgrrxx` now uses colours in its output if `stderr` is a tty and the
+  environment variable `NO_COLOR` is not defined.
+
 ## 0.2.5 -- 2025-01-26
 
 * Fixed build on Illumos.

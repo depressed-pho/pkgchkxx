@@ -35,11 +35,11 @@ namespace pkgxx {
      */
     struct progress_bar {
         struct bar_style {
-            char begin = '[';
-            char fill  = ':';
-            char bg    = ' ';
-            char tip   = ':';
-            char end   = ']';
+            char begin = '['; tty::style begin_sty = {};
+            char fill  = '='; tty::style fill_sty  = tty::faint;
+            char bg    = ' '; tty::style bg_sty    = {};
+            char tip   = '>'; tty::style tip_sty   = fill_sty;
+            char end   = ']'; tty::style end_sty   = {};
         };
 
         /** Creating an instance of \c progress_bar displays a progress
@@ -132,8 +132,8 @@ namespace pkgxx {
         double
         progress() const;
 
-        std::string
-        format_bar(std::size_t width) const;
+        void
+        render_bar(std::size_t width);
 
         std::string
         format_percentage() const;

@@ -45,18 +45,12 @@ namespace pkgxx {
         value_or_ref(T&& val)
             : _v(std::make_unique(std::move(val))) {}
 
-        /** Instantiate \ref value_or_ref by moving a \c unique_ptr to type
-         * \c T.
-         */
-        value_or_ref(std::unique_ptr<T>&& ptr)
-            : _v(std::move(ptr)) {}
-
         /** Instantiate \ref value_or_ref by initialising a value of type
-         * \c T in-place with given arguments.
+         * \c U in-place with given arguments.
          */
-        template <typename... Args>
-        explicit value_or_ref(std::in_place_type_t<T>, Args&&... args)
-            : _v(std::make_unique(std::forward<Args>(args)...)) {}
+        template <typename U, typename... Args>
+        explicit value_or_ref(std::in_place_type_t<U>, Args&&... args)
+            : _v(std::make_unique<U>(std::forward<Args>(args)...)) {}
 
         /** Return a mutable pointer to \c T.
          */

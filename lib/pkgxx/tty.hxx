@@ -3,8 +3,20 @@
 #include <cstddef> // for std::size_t
 #include <exception>
 #include <optional>
+#include <tuple>
+#include <type_traits>
+#include <utility>
 
 #include <pkgxx/fdstream.hxx>
+#include <pkgxx/value_or_ref.hxx>
+
+// We know what we are doing! Just don't warn us about these!
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wgnu-string-literal-operator-template"
+#pragma GCC diagnostic ignored "-Wpedantic"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#include <named-parameters.hpp>
+#pragma GCC diagnostic pop
 
 namespace pkgxx {
     /** Return true iff the given file descriptor refers to a terminal. */
@@ -27,6 +39,10 @@ namespace pkgxx {
         int const fd;
     };
 
+    // I'm not comfortable with bringing it in this scope, but what else
+    // can we do?
+    using namespace na::literals;
+
     /** \ref ttystream is a subclass of \c std::iostream that additionally
      * supports operations specific to terminal devices.
      */
@@ -34,7 +50,18 @@ namespace pkgxx {
         /** Construct a \ref ttystream out of a file descriptor \c
          * fd. Throw \ref not_a_tty If \c fd does not refer to a tty.
          */
-        ttystream(int fd, bool owned = false);
+        template <typename... Args>
+        ttystream(int fd, Args&&... args)
+            : fdstream(
+                fd,
+                na::get("owned"_na = false, std::forward<Args>(args)...))
+            , _use_colour(
+                na::get("use_colour"_na = default_use_colour(), std::forward<Args>(args)...)) {
+
+            if (!cisatty(fd)) {
+                throw not_a_tty(fd);
+            }
+        }
 
         virtual ~ttystream() {}
 
@@ -43,6 +70,18 @@ namespace pkgxx {
          */
         std::optional<dimension<std::size_t>>
         size() const;
+
+        bool
+        use_colour() const {
+            return _use_colour;
+        }
+
+    protected:
+        static bool
+        default_use_colour();
+
+    private:
+        bool _use_colour;
     };
 
     inline ttystream&
@@ -50,8 +89,6 @@ namespace pkgxx {
         return manip(tty);
     }
 
-    /** Output manipulators for tty streams.
-     */
     namespace tty {
         namespace detail {
             struct move_to {
@@ -64,19 +101,155 @@ namespace pkgxx {
             operator<< (ttystream& tty, move_to const& m);
         }
 
-        /** Move the cursor to a given 0-indexed column.
+        /** An output manipulator that moves the cursor to a given
+         * 0-indexed column.
          */
         inline detail::move_to
         move_x(std::size_t const col) {
-            return detail::move_to {
-                .x = col,
-                .y = std::nullopt
-            };
+            return detail::move_to { col, {} };
         }
 
-        /** Erase the current line from the cursor to the end.
+        /** An output manipulator that erases the current line from the
+         * cursor to the end.
          */
         ttystream&
         erase_line_from_cursor(ttystream& tty);
+
+        namespace detail {
+            enum class intensity {
+                dull  = 0,
+                vivid = 60,
+            };
+
+            enum class colour {
+                black   = 0,
+                red     = 1,
+                green   = 2,
+                yellow  = 3,
+                blue    = 4,
+                magenta = 5,
+                cyan    = 6,
+                white   = 7,
+            };
+
+            enum class boldness {
+                bold   = 1,
+                faint  = 2,
+                normal = 22,
+            };
+
+            enum class font {
+                italics = 3,
+                regular = 23,
+            };
+
+            enum class underline {
+                single = 4,
+                none   = 24,
+            };
+        }
+
+        template <typename... Ts>
+        struct chunk;
+
+        struct style {
+            std::optional<
+                std::pair<detail::intensity, detail::colour>
+                > foreground;
+            std::optional<
+                std::pair<detail::intensity, detail::colour>
+                > background;
+            std::optional<detail::boldness> boldness;
+            std::optional<detail::font> font;
+            std::optional<detail::underline> underline;
+
+            style&
+            operator+= (style const& rhs) noexcept;
+
+            /** \ref style forms a monoid under its default constructor and
+             * the operator \c +. It is not commutative. If \c lhs and \c
+             * rhs have conflicting styles, components of \c lhs win.
+             */
+            friend style
+            operator+ (style lhs, style const& rhs) noexcept {
+                lhs += rhs;
+                return lhs;
+            }
+
+            /** The invocation operator attaches the style to a given
+             * value. The resulting value, \ref chunk, can be output to
+             * streams with the style applied.
+             */
+            template <typename T>
+            chunk<T>
+            operator() (T&& val) const {
+                return chunk<T>(*this, std::forward<T>(val));
+            }
+
+            /** Set graphics modes on the tty. The current set of graphics
+             * mode will be reset and then changed according to the
+             * style. This will be a no-op if colours are disabled on \c
+             * tty.
+             */
+            friend ttystream&
+            operator<< (ttystream& tty, style const& sty);
+        };
+
+        /** A chunk of output that is potentially annotated with styles. \c
+         * chunk<T0, T1, ...> contains \ref pkgxx::value_or_ref<T0>, ... so
+         * the contained values can either be values or references or a
+         * mixture of any combinations. The value of \ref style is borrowed
+         * but not copied, so care must be taken about its lifetime.
+         */
+        template <typename... Ts>
+        struct chunk {
+            chunk(style const& sty, Ts&&... vs)
+                : _sty(sty)
+                , _vs(std::forward<Ts>(vs)...) {}
+
+            template <typename... Us>
+            friend ttystream&
+            operator<< (ttystream& tty, chunk<Us...> const& rhs) {
+
+                std::apply([&](auto&&... vs) {
+                    // We need to apply the style for each component of
+                    // chunk, because each component can modify the state
+                    // of the tty.
+                    ((tty << rhs._sty << *vs), ...);
+                }, rhs._vs);
+
+                // Then reset graphics mode before returning.
+                tty << style {};
+
+                return tty;
+            }
+
+        private:
+            style const& _sty;
+            std::tuple<value_or_ref<std::decay_t<Ts>>...> _vs;
+        };
+
+#if __cplusplus >= 202002L
+        // THINKME: Remove this CPP conditional when we switch to C++20.
+        using enum detail::colour;
+#else
+        constexpr inline detail::colour black   = detail::colour::black;
+        constexpr inline detail::colour red     = detail::colour::red;
+        constexpr inline detail::colour green   = detail::colour::green;
+        constexpr inline detail::colour yellow  = detail::colour::yellow;
+        constexpr inline detail::colour blue    = detail::colour::blue;
+        constexpr inline detail::colour magenta = detail::colour::magenta;
+        constexpr inline detail::colour white   = detail::colour::white;
+#endif
+
+        style dull_colour(detail::colour const c);
+        style colour(detail::colour const c);
+        style dull_bg_colour(detail::colour const c);
+        style bg_colour(detail::colour const c);
+
+        extern style const bold;
+        extern style const faint;
+        extern style const italicised;
+        extern style const underlined;
     }
 }
