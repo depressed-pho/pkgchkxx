@@ -107,6 +107,12 @@ namespace pkgxx {
         }
     }
 
+    csigset::csigset(std::initializer_list<int> const& signums) {
+        for (int const signo: signums) {
+            insert(signo);
+        }
+    }
+
     csigset::csigset(csigset const& set) {
         *this = set;
     }
@@ -293,6 +299,32 @@ namespace pkgxx {
         }
 #else
         if (kill(pid, signo) != 0) {
+            throw std::system_error(errno, std::generic_category(), "kill");
+        }
+#endif
+    }
+
+    void
+    csigqueueinfo(pid_t const pid, csiginfo_base const& si) {
+#if defined(HAVE_SIGQUEUEINFO)
+        if (sigqueueinfo(pid, static_cast<siginfo_t const*>(si)) != 0) {
+            throw std::system_error(errno, std::generic_category(), "sigqueueinfo");
+        }
+
+#elif defined(HAVE_SIGQUEUE)
+        if (auto siqp = dynamic_cast<csiginfo_queued const*>(&si); siqp) {
+            if (sigqueue(pid, si.signo(), siqp->value()) != 0) {
+                throw std::system_error(errno, std::generic_category(), "sigqueue");
+            }
+        }
+        else {
+            if (kill(pid, si.signo()) != 0) {
+                throw std::system_error(errno, std::generic_category(), "kill");
+            }
+        }
+
+#else
+        if (kill(pid, si.signo()) != 0) {
             throw std::system_error(errno, std::generic_category(), "kill");
         }
 #endif

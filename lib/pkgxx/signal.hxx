@@ -85,6 +85,9 @@ namespace pkgxx {
         /** Construct an empty signal set. */
         csigset();
 
+        /** Construct a signal set with a \c std::initializer_list. */
+        csigset(std::initializer_list<int> const& signums);
+
         /** Copy a signal set. */
         csigset(csigset const& set);
 
@@ -256,29 +259,32 @@ namespace pkgxx {
     /** A polymorphic wrapper for siginfo_t. */
     struct csiginfo_base {
         csiginfo_base(siginfo_t const& si)
-            : signo(si.si_signo)
-            , code(si.si_code) {}
+            : _si(si) {}
 
         virtual ~csiginfo_base() {}
 
-        int signo;
-        int code;
+        int signo() const { return _si.si_signo; }
+        int code()  const { return _si.si_code;  }
+
+        operator siginfo_t const* () const {
+            return &_si;
+        }
+
+    protected:
+        siginfo_t _si;
     };
     struct csiginfo_queued: public csiginfo_base {
         csiginfo_queued(siginfo_t const& si)
-            : csiginfo_base(si)
-            , pid(si.si_pid)
-            , uid(si.si_uid)
-            , value(si.si_value) {
+            : csiginfo_base(si) {
 
-            assert(si.si_code == SI_QUEUE);
+            assert(code() == SI_QUEUE);
         }
 
         virtual ~csiginfo_queued() {}
 
-        pid_t pid;
-        uid_t uid;
-        sigval value;
+        pid_t  pid()   const { return _si.si_pid;   }
+        uid_t  uid()   const { return _si.si_uid;   }
+        sigval value() const { return _si.si_value; }
     };
 
     constexpr bool
@@ -293,6 +299,15 @@ namespace pkgxx {
     constexpr bool
     is_sigqueue_available() {
 #if defined(HAVE_SIGQUEUE)
+        return true;
+#else
+        return false;
+#endif
+    }
+
+    constexpr bool
+    is_sigqueueinfo_available() {
+#if defined(HAVE_SIGQUEUEINFO)
         return true;
 #else
         return false;
@@ -317,4 +332,11 @@ namespace pkgxx {
      */
     void
     csigqueue(pid_t const pid, int const signo, void* const ptr_value);
+
+    /** A wrapper for sigqueueinfo(2). If the system lacks this syscall,
+     * this function emulates it via either sigqueue(2) or kill(2) but
+     * loses some information about the signal.
+     */
+    void
+    csigqueueinfo(pid_t const pid, csiginfo_base const& si);
 }

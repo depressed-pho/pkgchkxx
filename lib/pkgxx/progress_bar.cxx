@@ -45,7 +45,7 @@ namespace pkgxx {
             // nevertheless non-standard.
             _winch_handler = std::make_unique<scoped_signal_handler>(
                 std::initializer_list<int> {SIGWINCH},
-                [this](int) {
+                [this]() {
                     lock_t lk(_mtx);
                     _term_size = tty().size();
                     redraw(true);

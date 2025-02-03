@@ -1,10 +1,12 @@
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cerrno>
 #include <deque>
 #include <exception>
 #include <functional>
 #include <future>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <signal.h>
@@ -138,8 +140,17 @@ namespace pkgxx {
 
             auto& [_, stack] = *it;
             assert(!stack.empty());
-            assert(stack.back() == &subber);
-            stack.pop_back();
+            // In the normal case stack.back() is &subber, but this isn't
+            // the case when the subber gets moved.
+            bool found = false;
+            for (auto it = stack.rbegin(); it != stack.rend(); it++) {
+                if (*it == &subber) {
+                    stack.erase(std::next(it).base());
+                    found = true;
+                    break;
+                }
+            }
+            assert(found);
 
             if (stack.empty()) {
                 _subbers.erase(it);
@@ -214,7 +225,7 @@ namespace pkgxx {
                 }
 
                 // While waiting for signals we must unlock the mutex,
-                // otherwise no other threads can subscribe.
+                // otherwise no threads can (un)subscribe.
                 lk.unlock();
                 auto const info = csigwaitinfo(current_procmask);
                 lk.lock();
@@ -222,13 +233,13 @@ namespace pkgxx {
                 // We got a signal. But it might be a special one we
                 // interrupt the sigwait call above. See comments in
                 // notify_waiter().
-                if (info->signo == SIGUSR1) {
+                if (info->signo() == SIGUSR1) {
                     if (is_sigwaitinfo_available() && is_sigqueue_available()) {
                         if (csiginfo_queued* const queued =
                             dynamic_cast<csiginfo_queued*>(info.get());
                             queued &&
-                            queued->pid == getpid() &&
-                            queued->value.sival_ptr == this) {
+                            queued->pid() == getpid() &&
+                            queued->value().sival_ptr == this) {
 
                             // It's most likely us that sent this signal.
                             continue;
@@ -243,32 +254,64 @@ namespace pkgxx {
 
                 // The signal turned out to be a genuine one. Broadcast it
                 // to our subscribers.
-                nursery n;
-                for (auto const& [_, subbers]: _subbers) {
-                    for (auto const subber: reverse(subbers)) {
-                        if (subber->_signals.count(info->signo)) {
-                            // We should not be holding the lock of the
-                            // mutex here, because the handler may
-                            // block. However, actually doing so would lead
-                            // to an issue because member variables of this
-                            // class might get mutated while it's
-                            // unlocked. We are iterating on _subbers right
-                            // now, so that is unacceptable.
-                            n.start_soon([subber, &info]() {
-                                // Maybe we should somehow allow
-                                // subscribers to re-raise the signal up
-                                // the scope? Is that worth it?
-                                subber->_handler(info->signo);
-                                // Perhaps subscribers want the full
-                                // siginfo?
-                            });
-                        }
+                std::atomic<bool> resend_to_process = false;
+                {
+                    nursery n;
+                    for (auto const& [_, stack]: _subbers) {
+                        n.start_soon([&stack, &info, &resend_to_process]() {
+                            assert(!stack.empty());
+                            bool resend = false;
+                            for (auto const subber: reverse(stack)) {
+                                if (subber->_signals.count(info->signo())) {
+                                    // We should not be holding the lock of the
+                                    // mutex here, because the handler may
+                                    // block. However, actually doing so would lead
+                                    // to an issue because member variables of this
+                                    // class might get mutated while it's
+                                    // unlocked. We are iterating on _subbers right
+                                    // now, so that is unacceptable.
+
+                                    resend = false;
+                                    subber->_handler(*info, [&]() { resend = true; });
+
+                                    if (!resend) {
+                                        break;
+                                    }
+                                }
+                            }
+                            if (resend) {
+                                // The last scope in the thread decided to
+                                // resend the signal, which means now it needs
+                                // to be redirected to the process itself.
+                                resend_to_process.store(true, std::memory_order_relaxed);
+                            }
+                        });
                     }
                 }
-
                 // The nursery is destroyed here. We invoke handlers
-                // parallelly, and we're sure they all have completed at
+                // parallely, and we're sure they all have completed at
                 // this point.
+                if (resend_to_process.load(std::memory_order_relaxed)) {
+                    // OMG, handlers wanted the signal to be resent to the
+                    // process itself. But we have blocked the signal and
+                    // replaced its action with our own one. Now they have
+                    // to be temporarily restored...
+                    csigqueueinfo(getpid(), *info);
+
+                    auto const saved_sa   = saved_sigacts.find(info->signo());
+                    assert(saved_sa != saved_sigacts.end());
+                    auto const current_sa = saved_sa->second.install(info->signo());
+
+                    csigset ss = {info->signo()};
+                    csigset::procmask(csigset::unblock, ss);
+                    // POSIX specifies that when there are unblocked
+                    // signals pending upon returning from sigprocmask(2)
+                    // at least one of them shall be delivered. We
+                    // definitely have a pending signal, so unblocking it
+                    // shall cause it to be delivered.
+                    csigset::procmask(csigset::block, ss);
+                    current_sa.install(info->signo());
+                }
             }
 
             // We are exiting waiter_main(). Restore any sigactions we have
@@ -292,8 +335,9 @@ namespace pkgxx {
     }
 
     scoped_signal_handler::scoped_signal_handler(
+        int,
         std::initializer_list<int> const& signals,
-        std::function<void (int)>&& handler)
+        handler_type&& handler)
         : _signals(signals)
         , _handler(std::move(handler))
           // This is what keeps the service alive.
@@ -305,11 +349,59 @@ namespace pkgxx {
         _service->subscribe(*this).wait();
     }
 
+    scoped_signal_handler::scoped_signal_handler(scoped_signal_handler const& other) {
+        *this = other;
+    }
+
+    scoped_signal_handler::scoped_signal_handler(scoped_signal_handler&& other) {
+        *this = std::move(other);
+    }
+
     scoped_signal_handler::~scoped_signal_handler() {
-        // We can exit the destructor only after the unsubscription is
-        // confirmed by the waiter thread. Otherwise a signal arriving
-        // right after the unsubscription may cause the waiter to
-        // use-after-free.
-        _service->unsubscribe(*this).wait();
+        if (_service) {
+            // We can exit the destructor only after the unsubscription is
+            // confirmed by the waiter thread. Otherwise a signal arriving
+            // right after the unsubscription may cause the waiter to
+            // use-after-free.
+            _service->unsubscribe(*this).wait();
+        }
+    }
+
+    scoped_signal_handler&
+    scoped_signal_handler::operator= (scoped_signal_handler const& other) {
+        if (_service) {
+            // Unsubscribe before we change anything.
+            _service->unsubscribe(*this).wait();
+        }
+
+        _signals = other._signals;
+        _handler = other._handler;
+        _service = other._service;
+
+        _service->subscribe(*this).wait();
+
+        return *this;
+    }
+
+    scoped_signal_handler&
+    scoped_signal_handler::operator= (scoped_signal_handler&& other) {
+        if (_service) {
+            // Unsubscribe before we change anything.
+            _service->unsubscribe(*this).wait();
+        }
+
+        _signals = std::move(other._signals);
+        _handler = std::move(other._handler);
+        _service = std::move(other._service);
+
+        // It's very important to sub first then unsub, otherwise there'll
+        // be a small time window where signals slip through. In that time
+        // window signals can potentially be caught by both of these, but
+        // that's still better than slipping through because they can kill
+        // the entire process.
+        _service->subscribe(*this).wait();
+        _service->unsubscribe(other).wait();
+
+        return *this;
     }
 }
