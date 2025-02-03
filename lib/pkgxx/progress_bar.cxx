@@ -131,6 +131,7 @@ namespace pkgxx {
         if (got_SIGWINCH) {
             force = true;
             got_SIGWINCH = false;
+            _term_size = tty().size();
         }
 
         if (!should_draw()) {
