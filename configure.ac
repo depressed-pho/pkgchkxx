@@ -37,6 +37,7 @@ AX_APPEND_COMPILE_FLAGS([ dnl
     -Wall dnl
     -Wextra dnl
     -Wconversion dnl
+    -Wpedantic dnl
     -Wsuggest-attribute=cold dnl
     -Wsuggest-attribute=const dnl
     -Wsuggest-attribute=format dnl

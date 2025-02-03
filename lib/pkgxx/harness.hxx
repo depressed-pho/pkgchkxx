@@ -19,6 +19,7 @@
 // We know what we are doing! Just don't warn us about these!
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wgnu-string-literal-operator-template"
+#pragma GCC diagnostic ignored "-Wpedantic"
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #include <named-parameters.hpp>
 #pragma GCC diagnostic pop
