@@ -87,7 +87,6 @@ AC_TYPE_SSIZE_T
 AC_CHECK_DECLS([_SC_NSIG], [], [], [#include <unistd.h>])
 AC_CHECK_DECLS([SIG_BLOCK], [], [], [#include <signal.h>])
 AC_CHECK_DECLS([SIG_UNBLOCK], [], [], [#include <signal.h>])
-AC_CHECK_DECLS([SIGUSR1], [], [], [#include <signal.h>])
 AC_CHECK_DECLS([SIGWINCH], [], [], [#include <signal.h>])
 AC_CHECK_DECLS([TIOCGWINSZ], [], [], [#include <sys/ioctl.h>])
 AC_CHECK_TYPES([struct sigaction], [], [], [

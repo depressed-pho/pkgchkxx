@@ -1,15 +1,28 @@
 #include "config.h"
 
 #include <cmath>
+#include <csignal>
 #include <cstring>
 #include <iomanip>
+#include <mutex>
 #include <signal.h>
 #include <sstream>
 #include <unistd.h>
 
 #include "progress_bar.hxx"
-#include "scoped_signal_handler.hxx"
+#include "signal.hxx"
 #include "tty.hxx"
+
+namespace {
+    std::sig_atomic_t got_SIGWINCH = false;
+
+    std::once_flag sigwinch_handler_installed;
+
+    void
+    sigwinch_handler(int) {
+        got_SIGWINCH = true;
+    }
+}
 
 namespace pkgxx {
     progress_bar::progress_bar(
@@ -43,23 +56,19 @@ namespace pkgxx {
         if (_term_size) {
             // SIGWINCH exists everywhere in practice, but it's
             // nevertheless non-standard.
-            _winch_handler = std::make_unique<scoped_signal_handler>(
-                std::initializer_list<int> {SIGWINCH},
-                [this]() {
-                    lock_t lk(_mtx);
-                    _term_size = tty().size();
-                    redraw(true);
+            std::call_once(
+                sigwinch_handler_installed,
+                []() {
+                    csigaction sa;
+                    sa.handler() = sigwinch_handler;
+                    sa.install(SIGWINCH);
                 });
         }
 #endif
-        redraw();
+        redraw(true);
     }
 
     progress_bar::~progress_bar() {
-        // We must destroy the SIGWINCH handler first, otherwise there can
-        // be a race condition.
-        _winch_handler.reset();
-
         if (should_draw()) {
             tty() << tty::move_x(0)
                   << tty::erase_line_from_cursor
@@ -119,6 +128,11 @@ namespace pkgxx {
 
     void
     progress_bar::redraw(bool force) {
+        if (got_SIGWINCH) {
+            force = true;
+            got_SIGWINCH = false;
+        }
+
         if (!should_draw()) {
             return;
         }

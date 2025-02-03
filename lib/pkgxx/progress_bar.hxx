@@ -11,7 +11,6 @@
 #include <ostream>
 #include <type_traits>
 
-#include <pkgxx/scoped_signal_handler.hxx>
 #include <pkgxx/tty.hxx>
 #include <pkgxx/value_or_ref.hxx>
 
@@ -164,7 +163,5 @@ namespace pkgxx {
         std::size_t _total;
         std::size_t _done;
         double _weight;
-
-        std::unique_ptr<scoped_signal_handler> _winch_handler;
     };
 }
