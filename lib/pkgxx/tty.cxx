@@ -53,6 +53,34 @@ namespace pkgxx {
         return !cgetenv("NO_COLOR").has_value();
     }
 
+    void
+    ttystream::apply_style(tty::style const& sty) {
+        *this << "\x1B[0";
+        if (sty.foreground) {
+            auto const& [i, c] = *sty.foreground;
+            *this << ';'
+                  << 30 + static_cast<int>(i) + static_cast<int>(c);
+        }
+        if (sty.background) {
+            auto const& [i, c] = *sty.background;
+            *this << ';'
+                  << 40 + static_cast<int>(i) + static_cast<int>(c);
+        }
+        if (sty.boldness) {
+            *this << ';'
+                  << static_cast<int>(*sty.boldness);
+        }
+        if (sty.font) {
+            *this << ';'
+                  << static_cast<int>(*sty.font);
+        }
+        if (sty.underline) {
+            *this << ';'
+                  << static_cast<int>(*sty.underline);
+        }
+        *this << 'm';
+    }
+
     namespace tty {
         namespace detail {
             ttystream&
@@ -84,39 +112,6 @@ namespace pkgxx {
             if (!font       && rhs.font      ) font       = rhs.font;
             if (!underline  && rhs.underline ) underline  = rhs.underline;
             return *this;
-        }
-
-        ttystream&
-        operator<< (ttystream& tty, style const& sty) {
-            if (!tty.use_colour()) {
-                return tty;
-            }
-
-            tty << "\x1B[0";
-            if (sty.foreground) {
-                auto const& [i, c] = *sty.foreground;
-                tty << ';'
-                    << 30 + static_cast<int>(i) + static_cast<int>(c);
-            }
-            if (sty.background) {
-                auto const& [i, c] = *sty.background;
-                tty << ';'
-                    << 40 + static_cast<int>(i) + static_cast<int>(c);
-            }
-            if (sty.boldness) {
-                tty << ';'
-                    << static_cast<int>(*sty.boldness);
-            }
-            if (sty.font) {
-                tty << ';'
-                    << static_cast<int>(*sty.font);
-            }
-            if (sty.underline) {
-                tty << ';'
-                    << static_cast<int>(*sty.underline);
-            }
-            tty << 'm';
-            return tty;
         }
 
         style

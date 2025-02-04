@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cassert>
 #include <cstddef> // for std::size_t
 #include <exception>
 #include <optional>
+#include <stack>
 #include <tuple>
 #include <type_traits>
 #include <utility>
@@ -39,82 +41,7 @@ namespace pkgxx {
         int const fd;
     };
 
-    // I'm not comfortable with bringing it in this scope, but what else
-    // can we do?
-    using namespace na::literals;
-
-    /** \ref ttystream is a subclass of \c std::iostream that additionally
-     * supports operations specific to terminal devices.
-     */
-    struct ttystream: public fdstream {
-        /** Construct a \ref ttystream out of a file descriptor \c
-         * fd. Throw \ref not_a_tty If \c fd does not refer to a tty.
-         */
-        template <typename... Args>
-        ttystream(int fd, Args&&... args)
-            : fdstream(
-                fd,
-                na::get("owned"_na = false, std::forward<Args>(args)...))
-            , _use_colour(
-                na::get("use_colour"_na = default_use_colour(), std::forward<Args>(args)...)) {
-
-            if (!cisatty(fd)) {
-                throw not_a_tty(fd);
-            }
-        }
-
-        virtual ~ttystream() {}
-
-        /** Obtain the size of the terminal. Return \c std::nullopt if
-         * obtaining size is not supported on this platform.
-         */
-        std::optional<dimension<std::size_t>>
-        size() const;
-
-        bool
-        use_colour() const {
-            return _use_colour;
-        }
-
-    protected:
-        static bool
-        default_use_colour();
-
-    private:
-        bool _use_colour;
-    };
-
-    inline ttystream&
-    operator<< (ttystream& tty, ttystream& (*manip)(ttystream&)) {
-        return manip(tty);
-    }
-
     namespace tty {
-        namespace detail {
-            struct move_to {
-                /// This cannot be optional because of ANSI.
-                std::size_t x;
-                std::optional<std::size_t> y;
-            };
-
-            ttystream&
-            operator<< (ttystream& tty, move_to const& m);
-        }
-
-        /** An output manipulator that moves the cursor to a given
-         * 0-indexed column.
-         */
-        inline detail::move_to
-        move_x(std::size_t const col) {
-            return detail::move_to { col, {} };
-        }
-
-        /** An output manipulator that erases the current line from the
-         * cursor to the end.
-         */
-        ttystream&
-        erase_line_from_cursor(ttystream& tty);
-
         namespace detail {
             enum class intensity {
                 dull  = 0,
@@ -185,15 +112,116 @@ namespace pkgxx {
             operator() (T&& val) const {
                 return chunk<T>(*this, std::forward<T>(val));
             }
-
-            /** Set graphics modes on the tty. The current set of graphics
-             * mode will be reset and then changed according to the
-             * style. This will be a no-op if colours are disabled on \c
-             * tty.
-             */
-            friend ttystream&
-            operator<< (ttystream& tty, style const& sty);
         };
+    }
+
+#if __cpp_concepts
+    template <typename T>
+    concept ttystreamlike = requires (T& t, T const& tc, tty::style const& sty) {
+        { tc.size() } -> std::optional<dimension<std::size_t>>;
+        { t.push_style(sty) } -> void;
+        { t.pop_style(sty) } -> void;
+    };
+#endif
+
+    // I'm not comfortable with bringing it in this scope, but what else
+    // can we do?
+    using namespace na::literals;
+
+    /** \ref ttystream is a subclass of \c std::iostream that additionally
+     * supports operations specific to terminal devices.
+     */
+    struct ttystream: public fdstream {
+        /** Construct a \ref ttystream out of a file descriptor \c
+         * fd. Throw \ref not_a_tty If \c fd does not refer to a tty.
+         */
+        template <typename... Args>
+        ttystream(int fd, Args&&... args)
+            : fdstream(
+                fd,
+                na::get("owned"_na = false, std::forward<Args>(args)...))
+            , _use_colour(
+                na::get("use_colour"_na = default_use_colour(), std::forward<Args>(args)...))
+            , _styles({ tty::style {} }) {
+
+            if (!cisatty(fd)) {
+                throw not_a_tty(fd);
+            }
+        }
+
+        virtual ~ttystream() {}
+
+        /** Obtain the size of the terminal. Return \c std::nullopt if
+         * obtaining size is not supported on this platform.
+         */
+        std::optional<dimension<std::size_t>>
+        size() const;
+
+        /** This method is actually an implementation detail that cannot be
+         * hidden from public. Do not call this directly.
+         */
+        void
+        push_style(tty::style const& sty) {
+            assert(!_styles.empty());
+
+            auto combined = _styles.top() + sty;
+            apply_style(combined);
+            _styles.push(std::move(combined));
+        }
+
+        /** This method is actually an implementation detail that cannot be
+         * hidden from public. Do not call this directly.
+         */
+        void
+        pop_style() {
+            _styles.pop();
+            assert(!_styles.empty());
+            apply_style(_styles.top());
+        }
+
+    protected:
+        static bool
+        default_use_colour();
+
+    private:
+        void
+        apply_style(tty::style const& sty);
+
+    private:
+        bool _use_colour;
+        std::stack<tty::style> _styles; // invariant: always non-empty
+    };
+
+    inline ttystream&
+    operator<< (ttystream& tty, ttystream& (*manip)(ttystream&)) {
+        return manip(tty);
+    }
+
+    namespace tty {
+        namespace detail {
+            struct move_to {
+                /// This cannot be optional because of ANSI.
+                std::size_t x;
+                std::optional<std::size_t> y;
+            };
+
+            ttystream&
+            operator<< (ttystream& tty, move_to const& m);
+        }
+
+        /** An output manipulator that moves the cursor to a given
+         * 0-indexed column.
+         */
+        inline detail::move_to
+        move_x(std::size_t const col) {
+            return detail::move_to { col, {} };
+        }
+
+        /** An output manipulator that erases the current line from the
+         * cursor to the end.
+         */
+        ttystream&
+        erase_line_from_cursor(ttystream& tty);
 
         /** A chunk of output that is potentially annotated with styles. \c
          * chunk<T0, T1, ...> contains \ref pkgxx::value_or_ref<T0>, ... so
@@ -207,19 +235,21 @@ namespace pkgxx {
                 : _sty(sty)
                 , _vs(std::forward<Ts>(vs)...) {}
 
-            template <typename... Us>
-            friend ttystream&
-            operator<< (ttystream& tty, chunk<Us...> const& rhs) {
+#if __cpp_concepts
+            template <ttystreamlike TTY, typename... Us>
+#else
+            template <typename TTY, typename... Us>
+#endif
+            friend TTY&
+            operator<< (TTY& tty, chunk<Us...> const& rhs) {
+
+                tty.push_style(rhs._sty);
 
                 std::apply([&](auto&&... vs) {
-                    // We need to apply the style for each component of
-                    // chunk, because each component can modify the state
-                    // of the tty.
-                    ((tty << rhs._sty << *vs), ...);
+                    ((tty << *vs), ...);
                 }, rhs._vs);
 
-                // Then reset graphics mode before returning.
-                tty << style {};
+                tty.pop_style();
 
                 return tty;
             }
