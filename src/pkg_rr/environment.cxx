@@ -27,7 +27,7 @@ namespace pkg_rr {
         // obtained from pkgsrc Makefiles.
         std::shared_future<makefile_env> const menv = std::async(
             std::launch::deferred,
-            [this, &opts]() {
+            [this]() {
                 makefile_env _menv;
 
                 if (!fs::is_directory(PKGSRCDIR.get())) {

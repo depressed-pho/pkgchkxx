@@ -176,7 +176,7 @@ namespace pkgxx {
                         _out.pubsync();
                     }
                     else if constexpr (std::is_same_v<Arg, write_cmd>) {
-                        _out.sputn(arg.data(), arg.size());
+                        _out.sputn(arg.data(), static_cast<std::streamsize>(arg.size()));
                     }
                     else if constexpr (std::is_same_v<Arg, push_style_cmd>) {
                         _out.push_style(arg, arg.how_);
@@ -242,11 +242,11 @@ namespace pkgxx {
     maybe_tty_syncbuf::xsputn(const char_type* s, std::streamsize count) {
         if (auto it = _cmds.rbegin(); it != _cmds.rend()) {
             if (auto writep = std::get_if<write_cmd>(&*it); writep) {
-                writep->append(s, count);
+                writep->append(s, static_cast<write_cmd::size_type>(count));
                 return count;
             }
         }
-        _cmds.emplace_back(write_cmd(s, count));
+        _cmds.emplace_back(write_cmd(s, static_cast<write_cmd::size_type>(count)));
         return count;
     }
 

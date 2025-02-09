@@ -197,7 +197,7 @@ namespace {
                 // need to simulate the effect of "pkg_delete -r".
                 if (env.opts.dry_run) {
                     auto const& delete_r =
-                        [&PKG_INFO, &chk, &env](auto const& delete_r, auto const& name) {
+                        [&PKG_INFO, &chk](auto const& delete_r, auto const& name) {
                             // Mark it as deleted, but it's not
                             // enough. pkg_delete -r would delete
                             // everything that transitively depend on it.

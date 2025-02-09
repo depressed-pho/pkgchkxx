@@ -32,8 +32,8 @@ namespace pkgxx {
 
     template <typename T>
     struct dimension {
-        int width;
-        int height;
+        T width;
+        T height;
     };
 
     struct not_a_tty: virtual std::runtime_error {
@@ -202,7 +202,8 @@ namespace pkgxx {
          */
         template <typename... Args>
         ttystream(int fd, Args&&... args)
-            : fdstream(
+            : std::istream(nullptr)
+            , fdstream(
                 fd,
                 na::get("owned"_na = false, std::forward<Args>(args)...))
             , _use_colour(

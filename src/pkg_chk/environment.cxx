@@ -190,7 +190,7 @@ namespace pkg_chk {
          * uname(3). */
         std::shared_future<platform_env> const penv = std::async(
             std::launch::deferred,
-            [this, &opts]() {
+            [this]() {
                 platform_env _penv;
 
                 auto const pkgpath = PKGSRCDIR.get() / "pkgtools/pkg_chk"; // Any package will do.
@@ -251,7 +251,7 @@ namespace pkg_chk {
 
         installed_pkgnames = std::async(
             std::launch::deferred,
-            [this, &opts]() {
+            [this]() {
                 verbose() << "Enumerate PKGNAME from installed packages" << std::endl;
 
                 std::set<pkgxx::pkgname> pkgnames;
@@ -262,7 +262,7 @@ namespace pkg_chk {
             }).share();
         installed_pkgpaths = std::async(
             std::launch::deferred,
-            [this, &opts]() {
+            [this]() {
                 verbose() << "Enumerate PKGPATH from installed packages" << std::endl;
 
                 pkgxx::harness pkg_info(pkgxx::shell, {pkgxx::shell, "-s", "--", "-aQ", "PKGPATH"});
