@@ -18,20 +18,20 @@ namespace pkgxx {
         }
     }
 
-    environment::environment(
-        std::function<
-                void (std::string_view const&, std::string_view const&)
-                > const& var_logger)
-        : _var_logger(var_logger) {
-
+    environment::environment() {
         // Hide PKG_PATH to avoid breakage in 'make' calls.
         {
-            std::string const path = cgetenv("PKG_PATH").value_or("");
-            std::promise<fs::path> p;
-            p.set_value(path);
-            PKG_PATH = p.get_future();
+            fs::path const vPKG_PATH = cgetenv("PKG_PATH").value_or("");
             unsetenv("PKG_PATH");
-            _var_logger("PKG_PATH", path);
+            PKG_PATH = std::async(
+                std::launch::deferred,
+                [&]() {
+                    // We need to do this asynchronously only because
+                    // verbose_var() is a pure virtual method and we are in
+                    // the constructor.
+                    verbose_var("PKG_PATH", vPKG_PATH.string());
+                    return vPKG_PATH;
+                });
         }
 
         // MAKECONF
@@ -60,7 +60,7 @@ namespace pkgxx {
                 if (vMAKECONF.empty()) {
                     vMAKECONF = "/dev/null";
                 }
-                _var_logger("MAKECONF", vMAKECONF.string());
+                verbose_var("MAKECONF", vMAKECONF.string());
                 return vMAKECONF;
             }).share();
 
@@ -81,7 +81,7 @@ namespace pkgxx {
 
                     auto value_of = pkgxx::extract_mkconf_vars(MAKECONF.get(), vars).value();
                     for (auto const& [var, value]: value_of) {
-                        _var_logger(var, value);
+                        verbose_var(var, value);
                     }
 
                     vPKGSRCDIR = value_of["PKGSRCDIR"];
@@ -104,7 +104,7 @@ namespace pkgxx {
                             break;
                         }
                     }
-                    _var_logger("PKGSRCDIR", vPKGSRCDIR.string());
+                    verbose_var("PKGSRCDIR", vPKGSRCDIR.string());
                 }
                 return vPKGSRCDIR;
             }).share();

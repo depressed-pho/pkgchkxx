@@ -4,8 +4,10 @@
 #  include <sys/ioctl.h>
 #endif
 #include <system_error>
+#include <type_traits>
 #include <unistd.h>
 
+#include "always_false_v.hxx"
 #include "environment.hxx"
 #include "tty.hxx"
 
@@ -81,10 +83,196 @@ namespace pkgxx {
         *this << 'm';
     }
 
+    std::optional<pkgxx::dimension<std::size_t>>
+    maybe_ttystreambuf::term_size() const {
+        return std::visit(
+            [](auto&& arg) -> decltype(term_size()) {
+                using Arg = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<Arg, ttystream>) {
+                    return arg.size();
+                }
+                else if constexpr (std::is_same_v<Arg, fdostream>) {
+                    return std::nullopt;
+                }
+                else {
+                    static_assert(always_false_v<Arg>);
+                }
+            }, _out);
+    }
+
+    void
+    maybe_ttystreambuf::push_style(
+        pkgxx::tty::style const& sty,
+        pkgxx::ttystream_base::how how_) {
+
+        return std::visit(
+            [&](auto&& arg) {
+                using Arg = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<Arg, ttystream>) {
+                    arg.push_style(sty, how_);
+                }
+                else if constexpr (std::is_same_v<Arg, fdostream>) {
+                    // Do nothing
+                }
+                else {
+                    static_assert(always_false_v<Arg>);
+                }
+            }, _out);
+    }
+
+    void
+    maybe_ttystreambuf::pop_style() {
+        return std::visit(
+            [](auto&& arg) {
+                using Arg = std::decay_t<decltype(arg)>;
+                if constexpr (std::is_same_v<Arg, ttystream>) {
+                    arg.pop_style();
+                }
+                else if constexpr (std::is_same_v<Arg, fdostream>) {
+                    // Do nothing
+                }
+                else {
+                    static_assert(always_false_v<Arg>);
+                }
+            }, _out);
+    }
+
+    int
+    maybe_ttystreambuf::sync() {
+        return std::visit(
+            [](auto&& arg) {
+                arg.flush();
+                return arg.bad() ? -1 : 0;
+            }, _out);
+    }
+
+    maybe_ttystreambuf::int_type
+    maybe_ttystreambuf::overflow(int_type ch) {
+        return std::visit(
+            [ch](auto&& arg) {
+                if (!traits_type::eq_int_type(ch, traits_type::eof())) {
+                    arg.put(traits_type::to_char_type(ch));
+                }
+                return ch;
+            }, _out);
+    }
+
+    std::streamsize
+    maybe_ttystreambuf::xsputn(const char_type* s, std::streamsize count) {
+        return std::visit(
+            [s, count](auto&& arg) {
+                arg.write(s, count);
+                return count;
+            }, _out);
+    }
+
+    maybe_tty_syncbuf::~maybe_tty_syncbuf() {
+        auto _lk = _out.lock();
+        for (auto const& cmd: _cmds) {
+            std::visit(
+                [this](auto&& arg) {
+                    using Arg = std::decay_t<decltype(arg)>;
+                    if constexpr (std::is_same_v<Arg, sync_cmd>) {
+                        _out.pubsync();
+                    }
+                    else if constexpr (std::is_same_v<Arg, write_cmd>) {
+                        _out.sputn(arg.data(), arg.size());
+                    }
+                    else if constexpr (std::is_same_v<Arg, push_style_cmd>) {
+                        _out.push_style(arg, arg.how_);
+                    }
+                    else if constexpr (std::is_same_v<Arg, pop_style_cmd>) {
+                        _out.pop_style();
+                    }
+                    else {
+                        static_assert(always_false_v<Arg>);
+                    }
+                }, cmd);
+        }
+    }
+
+    [[noreturn]] std::lock_guard<std::mutex>
+    maybe_tty_syncbuf::lock() {
+        assert(0 && "It's a logical error to lock a maybe_tty_syncbuf");
+        std::terminate();
+    }
+
+    std::optional<pkgxx::dimension<std::size_t>>
+    maybe_tty_syncbuf::term_size() const {
+        auto _lk = _out.lock();
+        return _out.term_size();
+    }
+
+    void
+    maybe_tty_syncbuf::push_style(
+        pkgxx::tty::style const& sty,
+        ttystream_base::how how_) {
+
+        _cmds.emplace_back(push_style_cmd(sty, how_));
+    }
+
+    void
+    maybe_tty_syncbuf::pop_style() {
+        _cmds.emplace_back(pop_style_cmd {});
+    }
+
+    int
+    maybe_tty_syncbuf::sync() {
+        _cmds.emplace_back(sync_cmd {});
+        return 0;
+    }
+
+    maybe_tty_syncbuf::int_type
+    maybe_tty_syncbuf::overflow(int_type ch) {
+        if (!traits_type::eq_int_type(ch, traits_type::eof())) {
+            auto const c = traits_type::to_char_type(ch);
+
+            if (auto it = _cmds.rbegin(); it != _cmds.rend()) {
+                if (auto writep = std::get_if<write_cmd>(&*it); writep) {
+                    writep->push_back(c);
+                    return ch;
+                }
+            }
+            _cmds.emplace_back(write_cmd(1, c));
+        }
+        return ch;
+    }
+
+    std::streamsize
+    maybe_tty_syncbuf::xsputn(const char_type* s, std::streamsize count) {
+        if (auto it = _cmds.rbegin(); it != _cmds.rend()) {
+            if (auto writep = std::get_if<write_cmd>(&*it); writep) {
+                writep->append(s, count);
+                return count;
+            }
+        }
+        _cmds.emplace_back(write_cmd(s, count));
+        return count;
+    }
+
+    std::optional<dimension<std::size_t>>
+    maybe_tty_osyncstream::size() const {
+        return _buf ? _buf->term_size() : std::nullopt;
+    }
+
+    void
+    maybe_tty_osyncstream::push_style(tty::style const& sty, how how_) {
+        if (_buf) {
+            _buf->push_style(sty, how_);
+        }
+    }
+
+    void
+    maybe_tty_osyncstream::pop_style() {
+        if (_buf) {
+            _buf->pop_style();
+        }
+    }
+
     namespace tty {
         namespace detail {
-            ttystream&
-            operator<< (ttystream& tty, move_to const& m) {
+            ttystream_base&
+            operator<< (ttystream_base& tty, move_to const& m) {
                 if (m.y) {
                     tty << "\x1B[" << *m.y + 1 << ';' << m.x + 1 << 'H';
                 }
@@ -98,8 +286,8 @@ namespace pkgxx {
             }
         }
 
-        ttystream&
-        erase_line_from_cursor(ttystream& tty) {
+        ttystream_base&
+        erase_line_from_cursor(ttystream_base& tty) {
             tty << "\x1B[K";
             return tty;
         }

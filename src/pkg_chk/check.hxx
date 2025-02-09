@@ -12,6 +12,7 @@
 #include <pkgxx/pkgname.hxx>
 #include <pkgxx/stream.hxx>
 #include <pkgxx/summary.hxx>
+#include <pkgxx/tty.hxx>
 
 namespace pkg_chk {
     struct checker_base {
@@ -72,16 +73,16 @@ namespace pkg_chk {
         virtual void done() const {}
 
         virtual void
-        atomic_msg(std::function<void (std::ostream&)> const& f) const = 0;
+        verbose(std::function<void (pkgxx::ttystream_base&)> const& f) const = 0;
 
         virtual void
-        atomic_warn(std::function<void (std::ostream&)> const& f) const = 0;
+        msg(std::function<void (pkgxx::ttystream_base&)> const& f) const = 0;
 
         virtual void
-        atomic_verbose(std::function<void (std::ostream&)> const& f) const = 0;
+        warn(std::function<void (pkgxx::ttystream_base&)> const& f) const = 0;
 
-        virtual void
-        fatal(std::function<void (std::ostream&)> const& f) const = 0;
+        [[noreturn]] virtual void
+        fatal(std::function<void (pkgxx::ttystream_base&)> const& f) const = 0;
 
         bool _add_missing;
         bool _check_build_version;

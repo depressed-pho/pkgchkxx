@@ -8,7 +8,6 @@ pkgchkxx_SOURCES = \
 	config_file.hxx config_file.cxx \
 	main.cxx \
 	environment.cxx environment.hxx \
-	message.cxx message.hxx \
 	options.cxx options.hxx \
 	tag.cxx tag.hxx
 

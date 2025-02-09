@@ -35,6 +35,7 @@ namespace pkgxx {
      */
     struct progress_bar {
         struct bar_style {
+            tty::style base_sty = {};
             char begin = '['; tty::style begin_sty = {};
             char fill  = '='; tty::style fill_sty  = tty::faint;
             char bg    = ' '; tty::style bg_sty    = {};
@@ -51,8 +52,8 @@ namespace pkgxx {
         progress_bar(std::size_t total, Args&&... args)
             : progress_bar(
                 0, total,
-                static_cast<std::optional<std::reference_wrapper<std::ostream>> const&>(
-                    na::get("output"_na = std::nullopt, std::forward<Args>(args)...)),
+                static_cast<value_or_ref<ttystream_base>&&>(
+                    na::get("output"_na = default_output(), std::forward<Args>(args)...)),
                 na::get("decay_p"_na      = 0.1 , std::forward<Args>(args)...),
                 na::get("show_percent"_na = true, std::forward<Args>(args)...),
                 na::get("show_ETA"_na     = true, std::forward<Args>(args)...),
@@ -76,12 +77,12 @@ namespace pkgxx {
         message(F const& f) {
             lock_t lk(_mtx);
 
-            static_assert(std::is_invocable_v<F, std::ostream&>);
-            static_assert(std::is_same_v<void, std::invoke_result_t<F, std::ostream&>>);
+            static_assert(std::is_invocable_v<F, ttystream_base&>);
+            static_assert(std::is_same_v<void, std::invoke_result_t<F, ttystream_base&>>);
 
             if (should_draw()) {
-                tty() << tty::move_x(0)
-                      << tty::erase_line_from_cursor;
+                *_output << tty::move_x(0)
+                         << tty::erase_line_from_cursor;
             }
             f(*_output);
             redraw();
@@ -91,31 +92,15 @@ namespace pkgxx {
         progress_bar(
             int, // a dummy parameter to avoid conflicting with the public ctor
             std::size_t total,
-            std::optional<std::reference_wrapper<std::ostream>> const& output,
+            value_or_ref<ttystream_base>&& output,
             double decay_p,
             bool show_percent,
             bool show_ETA,
             bar_style const& style,
             std::chrono::steady_clock::duration const& redraw_rate);
 
-        static value_or_ref<std::ostream>
+        static value_or_ref<ttystream_base>
         default_output();
-
-        /** Return a nullptr if the output stream is not actually a
-         * \ref ttystream.
-         */
-        ttystream*
-        ttyp() {
-            return dynamic_cast<ttystream*>(_output.get());
-        }
-
-        /** Abort if ttyp() returns nullptr. */
-        ttystream&
-        tty() {
-            auto const ptr = ttyp();
-            assert(ptr);
-            return *ptr;
-        }
 
         /** Should we actually draw a progress bar? */
         bool
@@ -146,7 +131,7 @@ namespace pkgxx {
         using lock_t  = std::lock_guard<mutex_t>;
 
         mutable mutex_t _mtx;
-        value_or_ref<std::ostream> _output;
+        value_or_ref<ttystream_base> _output;
         double _decay_p;
         bool _show_percent;
         bool _show_ETA;

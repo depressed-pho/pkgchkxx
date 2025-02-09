@@ -1,122 +1,96 @@
 #pragma once
 
 #include <iostream>
-#include <thread>
 #include <optional>
-#include <type_traits>
 
-#include "options.hxx"
+#include <pkgxx/tty.hxx>
 
 namespace pkg_rr {
-    struct msg_logger: public std::ostream {
-        msg_logger()
-            : std::ostream(nullptr) {}
+    /** A variant of \ref pkgxx::maybe_tty_syncbuf but modifies outputs.
+     */
+    struct msgstreambuf: public virtual pkgxx::ttystreambuf_base
+                       , public virtual std::streambuf {
+        msgstreambuf(
+            pkgxx::ttystreambuf_base& out,
+            pkgxx::tty::style const& default_style = {});
 
-        msg_logger(std::ostream& out)
-            : std::ostream(nullptr)
-            , _buf(std::in_place, out) {
+        virtual ~msgstreambuf();
 
-            rdbuf(&_buf.value());
-        }
+        // Don't call this.
+        [[noreturn]] virtual std::lock_guard<std::mutex>
+        lock() override;
 
-        msg_logger(msg_logger&& l)
-            : std::ostream(std::move(l))
-            , _buf(std::move(l._buf)) {
+        virtual std::optional<pkgxx::dimension<std::size_t>>
+        term_size() const override;
 
-            if (_buf) {
-                rdbuf(&_buf.value());
-            }
-        }
+        virtual void
+        push_style(pkgxx::tty::style const& sty, pkgxx::ttystream_base::how how_) override;
+
+        virtual void
+        pop_style() override;
+
+    protected:
+        virtual int
+        sync() override;
+
+        virtual int_type
+        overflow(int_type ch = traits_type::eof()) override;
+
+        virtual std::streamsize
+        xsputn(const char_type* s, std::streamsize count) override;
 
     private:
-        struct msg_buf: public std::streambuf {
-            msg_buf(std::ostream& out)
-                : _out(out)
-                , _state(state::initial) {}
-
-        protected:
-            virtual int_type
-            overflow(int_type ch = traits_type::eof()) override;
-
-            virtual std::streamsize
-            xsputn(const char_type* s, std::streamsize count) override;
-
-        private:
-            enum class state {
-                initial, // The next output sould follow "RR> "
-                newline, // The next output should follow "rr> "
-                general
-            };
-
-            void
-            print_prefix();
-
-            std::ostream& _out;
-            state _state;
+        enum class state {
+            initial, // The next line sould follow "RR> "
+            newline, // The next line should follow "rr> "
+            general
         };
 
-        std::optional<msg_buf> _buf;
+        void
+        print_prefix();
+
+    private:
+        pkgxx::maybe_tty_syncbuf _out;
+        state _state;
+        pkgxx::tty::style _default_sty;
+        pkgxx::tty::style _RR_sty;
+        pkgxx::tty::style _rr_sty;
     };
 
-    inline msg_logger
-    msg(std::ostream& out = std::cerr) {
-        return msg_logger(out);
+    /** A variant of \ref pkgxx::maybe_tty_osyncstream but modifies outputs.
+     */
+    struct msgstream: public virtual pkgxx::ttystream_base
+                    , public virtual std::ostream {
+
+        msgstream();
+        msgstream(ttystream_base& out, pkgxx::tty::style const& default_style = {});
+        msgstream(msgstream&& other);
+        virtual ~msgstream() = default;
+
+        virtual std::optional<pkgxx::dimension<std::size_t>>
+        size() const override;
+
+        virtual void
+        push_style(pkgxx::tty::style const& sty, how how_) override;
+
+        virtual void
+        pop_style() override;
+
+    private:
+        std::unique_ptr<msgstreambuf> _buf;
+    };
+
+    template <typename T>
+    msgstream&
+    operator<< (msgstream& out, T const& val) {
+        static_cast<pkgxx::ttystream_base&>(out) << val;
+        return out;
     }
 
-    inline msg_logger
-    warn(std::ostream& out = std::cerr) {
-        auto out_ = msg(out);
-        out_ << "WARNING: ";
-        return out_;
-    }
-
-    inline msg_logger
-    error(std::ostream& out = std::cerr) {
-        auto out_ = msg(out);
-        out_ << "*** ";
-        return out_;
-    }
-
-    template <typename Function>
-    [[noreturn]] inline void
-    fatal(Function&& f, std::ostream& out = std::cerr) {
-        static_assert(std::is_invocable_v<Function&&, std::ostream&>);
-
-        auto out_ = error(out);
-        f(out_);
-        std::exit(1);
-    }
-
-    inline msg_logger
-    verbose(pkg_rr::options const& opts, unsigned level = 1, std::ostream& out = std::cerr) {
-        if (opts.verbose >= level) {
-            return msg_logger(out);
-        }
-        else {
-            return msg_logger();
-        }
-    }
-
-    inline void
-    verbose_var(
-        pkg_rr::options const& opts,
-        std::string_view const& var,
-        std::string_view const& value,
-        unsigned level = 2,
-        std::ostream& out = std::cerr) {
-
-        verbose(opts, level, out)
-            << "Variable: " << var << " = " << (value.empty() ? "(empty)" : value) << std::endl;
-    }
-
-    template <typename Rep, typename Period>
-    void vsleep(
-        pkg_rr::options const& opts,
-        const std::chrono::duration<Rep, Period>& duration,
-        unsigned level = 2) {
-
-        if (opts.verbose >= level) {
-            std::this_thread::sleep_for(duration);
-        }
+    template <typename T>
+    msgstream&&
+    operator<< (msgstream&& out, T const& val) {
+        static_cast<pkgxx::ttystream_base&>(out) << val;
+        return std::move(out);
     }
 }

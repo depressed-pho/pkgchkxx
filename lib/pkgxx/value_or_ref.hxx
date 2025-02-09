@@ -26,7 +26,7 @@ namespace pkgxx {
         value_or_ref(value_or_ref<T> const& other)
             : _v([&] {
                      return std::visit(
-                         [](auto&& arg) {
+                         [](auto&& arg) -> decltype(_v) {
                              using Arg = std::decay_t<decltype(arg)>;
                              if constexpr (std::is_same_v<Arg, std::unique_ptr<T>>) {
                                  return std::make_unique<T>(*arg);

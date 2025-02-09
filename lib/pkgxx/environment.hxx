@@ -1,7 +1,6 @@
 #pragma once
 
 #include <filesystem>
-#include <functional>
 #include <future>
 #include <optional>
 #include <string_view>
@@ -20,18 +19,18 @@ namespace pkgxx {
      */
     struct environment {
         /** Obtain values from the environment. */
-        environment(
-            std::function<
-                void (std::string_view const&, std::string_view const&)
-                > const& var_logger = [](auto, auto) {});
+        environment();
+
+        virtual ~environment() = default;
 
         std::shared_future<std::filesystem::path> MAKECONF;  ///< Path to mk.conf
         std::shared_future<std::filesystem::path> PKG_PATH;  ///< For pkg_add(1)
         std::shared_future<std::filesystem::path> PKGSRCDIR; ///< Base of pkgsrc tree
 
-    private:
-        std::function<
-            void (std::string_view const&, std::string_view const&)
-            > _var_logger;
+    protected:
+        virtual void
+        verbose_var(
+            std::string_view const& var,
+            std::string_view const& value) const = 0;
     };
 }

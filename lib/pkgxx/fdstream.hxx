@@ -66,7 +66,7 @@ namespace pkgxx {
 
     /** An output stream that writes data to a POSIX file descriptor.
      */
-    struct fdostream: public std::ostream {
+    struct fdostream: public virtual std::ostream {
         /** Construct an output stream writing data to a file
          * descriptor. By default the fd will be owned by the stream,
          * i.e. when it's destructed the fd will also be closed. */
@@ -116,7 +116,7 @@ namespace pkgxx {
 
     /** An input stream that reads data from a POSIX file descriptor.
      */
-    struct fdistream: public std::istream {
+    struct fdistream: public virtual std::istream {
         /** Construct an input stream reading data from a file
          * descriptor. By default the fd will be owned by the stream,
          * i.e. when it's destructed the fd will also be closed. */
@@ -167,12 +167,14 @@ namespace pkgxx {
     /** A stream that reads data from / writes data to a POSIX file
      * descriptor.
      */
-    struct fdstream: public std::iostream {
+    struct fdstream: public virtual std::istream
+                   , public virtual std::ostream {
         /** Construct a stream reading data from / writing data to a file
          * descriptor. By default the fd will be owned by the stream,
          * i.e. when it's destructed the fd will also be closed. */
         fdstream(int fd, bool owned = true)
-            : std::iostream(nullptr)
+            : std::istream(nullptr)
+            , std::ostream(nullptr)
             , _buf(std::make_unique<fdstreambuf>(fd, owned)) {
 
             rdbuf(_buf.get());
@@ -181,7 +183,8 @@ namespace pkgxx {
         /** Construct an instance of \ref fdstream by moving a buffer out
          * of another instance. */
         fdstream(fdstream&& other)
-            : std::iostream(std::move(other))
+            : std::istream(std::move(other))
+            , std::ostream(std::move(other))
             , _buf(std::move(other._buf)) {
 
             other.set_rdbuf(nullptr);

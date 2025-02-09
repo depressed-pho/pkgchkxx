@@ -28,19 +28,19 @@ namespace pkgxx {
     progress_bar::progress_bar(
         int,
         std::size_t total,
-        std::optional<std::reference_wrapper<std::ostream>> const& output,
+        value_or_ref<ttystream_base>&& output,
         double decay_p,
         bool show_percent,
         bool show_ETA,
         bar_style const& style,
         std::chrono::steady_clock::duration const& redraw_rate)
-        : _output(output ? value_or_ref(output->get()) : default_output())
+        : _output(std::move(output))
         , _decay_p(decay_p)
         , _show_percent(show_percent)
         , _show_ETA(show_ETA)
         , _style(std::move(style))
         , _redraw_rate(redraw_rate)
-        , _term_size(ttyp() ? ttyp()->size() : std::nullopt)
+        , _term_size(_output->size())
         , _last_updated(std::chrono::steady_clock::now())
         , _total(total)
         , _done(0)
@@ -70,9 +70,9 @@ namespace pkgxx {
 
     progress_bar::~progress_bar() {
         if (should_draw()) {
-            tty() << tty::move_x(0)
-                  << tty::erase_line_from_cursor
-                  << std::flush;
+            *_output << tty::move_x(0)
+                     << tty::erase_line_from_cursor
+                     << std::flush;
         }
     }
 
@@ -114,16 +114,10 @@ namespace pkgxx {
         return *this;
     }
 
-    value_or_ref<std::ostream>
+    value_or_ref<ttystream_base>
     progress_bar::default_output() {
-        if (auto const fd = STDERR_FILENO; cisatty(fd)) {
-            return value_or_ref<std::ostream>(
-                std::in_place_type_t<ttystream>(), fd, "owned"_na = false);
-        }
-        else {
-            return value_or_ref<std::ostream>(
-                std::in_place_type_t<fdostream>(), fd, false);
-        }
+        return value_or_ref<ttystream_base>(
+            std::in_place_type<maybe_ttystream>, STDERR_FILENO, "owned"_na = false);
     }
 
     void
@@ -131,7 +125,7 @@ namespace pkgxx {
         if (got_SIGWINCH) {
             force = true;
             got_SIGWINCH = false;
-            _term_size = tty().size();
+            _term_size = _output->size();
         }
 
         if (!should_draw()) {
@@ -176,9 +170,9 @@ namespace pkgxx {
         for (auto const& elem: postfix) {
             if (bar_width < 1 + elem.length()) {
                 // The terminal is too narrow.
-                tty() << tty::move_x(0)
-                      << tty::erase_line_from_cursor
-                      << std::flush;
+                *_output << tty::move_x(0)
+                         << tty::erase_line_from_cursor
+                         << std::flush;
                 return;
             }
             else {
@@ -187,12 +181,14 @@ namespace pkgxx {
         }
 
         // No need to erase the line. We can just overwrite it.
-        tty() << tty::move_x(0);
+        *_output << tty::move_x(0);
+        _output->push_style(_style.base_sty, ttystream_base::how::combine);
         render_bar(bar_width);
         for (auto const& elem: postfix) {
-            tty() << ' ' << elem;
+            *_output << ' ' << elem;
         }
-        tty() << std::flush;
+        _output->pop_style();
+        *_output << std::flush;
     }
 
     double
@@ -216,19 +212,19 @@ namespace pkgxx {
             static_cast<std::size_t>(
                 std::floor(progress() * static_cast<double>(width - 2)));
 
-        tty() << _style.begin_sty(_style.begin);
+        *_output << _style.begin_sty(_style.begin);
         for (std::size_t i = 0; i < width - 2; i++) {
             if (i < prog) {
-                tty() << _style.fill_sty(_style.fill);
+                *_output << _style.fill_sty(_style.fill);
             }
             else if (i == prog) {
-                tty() << _style.tip_sty(_style.tip);
+                *_output << _style.tip_sty(_style.tip);
             }
             else {
-                tty() << _style.bg_sty(_style.bg);
+                *_output << _style.bg_sty(_style.bg);
             }
         }
-        tty() << _style.end_sty(_style.end);
+        *_output << _style.end_sty(_style.end);
     }
 
     std::string

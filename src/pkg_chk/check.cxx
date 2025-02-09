@@ -30,10 +30,9 @@ namespace pkg_chk {
             std::async(
                 std::launch::deferred,
                 [this]() {
-                    atomic_verbose(
-                        [](auto& out) {
-                            out << "Getting summary from installed packages" << std::endl;
-                        });
+                    verbose([](auto& out) {
+                        out << "Getting summary from installed packages" << std::endl;
+                    });
                     return pkgxx::summary(_PKG_INFO.get());
                 }).share())
         , _installed_pkgnames(
@@ -91,81 +90,72 @@ namespace pkg_chk {
 
                                         if (latest_build_version.has_value()) {
                                             if (latest_build_version == installed_build_version) {
-                                                atomic_verbose(
-                                                    [&](auto& out) {
-                                                        out << path << " - " << name << " OK" << std::endl;
-                                                    });
+                                                verbose([&](auto& out) {
+                                                    out << path << " - " << name << " OK" << std::endl;
+                                                });
                                             }
                                             else {
-                                                atomic_msg(
-                                                    [&](auto& out) {
-                                                        out << path << " - " << name << " build_version mismatch" << std::endl;
-                                                    });
-                                                atomic_verbose(
-                                                    [&](auto& out) {
-                                                        out << "--current--"                   << std::endl
-                                                            << latest_build_version.value()
-                                                            << "--installed--"                 << std::endl
-                                                            << installed_build_version.value()
-                                                            << "----"                          << std::endl
-                                                            << std::endl;
-                                                    });
+                                                msg([&](auto& out) {
+                                                    out << path << " - " << name << " build_version mismatch" << std::endl;
+                                                });
+                                                verbose([&](auto& out) {
+                                                    out << "--current--"                   << std::endl
+                                                        << latest_build_version.value()
+                                                        << "--installed--"                 << std::endl
+                                                        << installed_build_version.value()
+                                                        << "----"                          << std::endl
+                                                        << std::endl;
+                                                });
                                                 res.lock()->MISMATCH_TODO.emplace(*installed, path);
                                             }
                                         }
                                         else {
-                                            atomic_msg(
-                                                [&](auto& out) {
-                                                    out << path << " - " << name << " build_version missing" << std::endl;
-                                                });
+                                            msg([&](auto& out) {
+                                                out << path << " - " << name << " build_version missing" << std::endl;
+                                            });
                                         }
                                     }
                                     else {
-                                        atomic_verbose(
-                                            [&](auto& out) {
-                                                out << path << " - " << name << " OK" << std::endl;
-                                            });
+                                        verbose([&](auto& out) {
+                                            out << path << " - " << name << " OK" << std::endl;
+                                        });
                                     }
                                 }
                                 else if (installed->version < name.version) {
                                     // We have an older version installed.
-                                    atomic_msg(
-                                        [&](auto& out) {
-                                            out << path << " - " << *installed << " < " << name
-                                                << (is_binary_available(name) ? " (has binary package)" : "")
-                                                << std::endl;
-                                        });
+                                    msg([&](auto& out) {
+                                        out << path << " - " << *installed << " < " << name
+                                            << (is_binary_available(name) ? " (has binary package)" : "")
+                                            << std::endl;
+                                    });
                                     res.lock()->MISMATCH_TODO.emplace(*installed, path);
                                 }
                                 else {
                                     // We have a newer version installed
                                     // but how can that happen?
                                     if (_check_build_version) {
-                                        atomic_msg(
-                                            [&](auto& out) {
-                                                out << path << " - " << *installed << " > " << name
-                                                    << (is_binary_available(name) ? " (has binary package)" : "")
-                                                    << std::endl;
-                                            });
+                                        msg([&](auto& out) {
+                                            out << path << " - " << *installed << " > " << name
+                                                << (is_binary_available(name) ? " (has binary package)" : "")
+                                                << std::endl;
+                                        });
                                         res.lock()->MISMATCH_TODO.emplace(*installed, path);
                                     }
                                     else {
-                                        atomic_msg(
-                                            [&](auto& out) {
-                                                out << path << " - " << *installed << " > " << name << " - ignoring"
-                                                    << (is_binary_available(name) ? " (has binary package)" : "")
-                                                    << std::endl;
-                                            });
+                                        msg([&](auto& out) {
+                                            out << path << " - " << *installed << " > " << name << " - ignoring"
+                                                << (is_binary_available(name) ? " (has binary package)" : "")
+                                                << std::endl;
+                                        });
                                     }
                                 }
                             }
                             else {
-                                atomic_msg(
-                                    [&](auto& out) {
-                                        out << path << " - " << name << " missing"
-                                            << (is_binary_available(name) ? " (has binary package)" : "")
-                                            << std::endl;
-                                    });
+                                msg([&](auto& out) {
+                                    out << path << " - " << name << " missing"
+                                        << (is_binary_available(name) ? " (has binary package)" : "")
+                                        << std::endl;
+                                });
                                 res.lock()->MISSING_TODO.emplace(name, path);
                             }
                         }
@@ -229,20 +219,18 @@ namespace pkg_chk {
         // * pkg_chk -r: Same as above.
         //
         if (!fs::exists(_PKGSRCDIR.get() / path / "Makefile")) {
-            atomic_warn(
-                [&](auto& out) {
-                    out << "No " << path << "/Makefile - package moved or obsolete?" << std::endl;
-                });
+            warn([&](auto& out) {
+                out << "No " << path << "/Makefile - package moved or obsolete?" << std::endl;
+            });
             return {};
         }
 
         auto const default_pkgname =
             pkgxx::extract_pkgmk_var<pkgxx::pkgname>(_PKGSRCDIR.get() / path, "PKGNAME");
         if (!default_pkgname) {
-            fatal(
-                [&](auto& out) {
-                    out << "Unable to extract PKGNAME for " << path << std::endl;
-                });
+            fatal([&](auto& out) {
+                out << "Unable to extract PKGNAME for " << path << std::endl;
+            });
             std::terminate(); // Should not reach here.
         }
 
@@ -281,14 +269,13 @@ namespace pkg_chk {
                             pkgnames.insert(std::move(alternative_pkgname));
                         }
                         else {
-                            atomic_warn(
-                                [&](auto& out) {
-                                    out << path << " had presumably provided a package named like "
-                                        << installed_pkgname.base << "-[0-9]* but it no longer does so. "
-                                        << "The installed package " << installed_pkgname
-                                        << " cannot be updated. Delete it and re-run the command."
-                                        << std::endl;
-                                });
+                            warn([&](auto& out) {
+                                out << path << " had presumably provided a package named like "
+                                    << installed_pkgname.base << "-[0-9]* but it no longer does so. "
+                                    << "The installed package " << installed_pkgname
+                                    << " cannot be updated. Delete it and re-run the command."
+                                    << std::endl;
+                            });
                             return {};
                         }
                     }

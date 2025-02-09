@@ -54,7 +54,7 @@ namespace pkg_rr {
         dump_todo() const;
 
         void
-        dump_todo(std::ostream& out, std::string const& label, todo_type const& todo) const;
+        dump_todo(pkgxx::ttystream_base& out, std::string const& label, todo_type const& todo) const;
 
         bool
         is_pkg_installed(pkgxx::pkgbase const& base) const;
@@ -121,8 +121,8 @@ namespace pkg_rr {
         template <typename Function>
         [[noreturn]] void
         abort(Function&& f) const {
-            static_assert(std::is_invocable_v<Function&&, std::ostream&>);
-            pkg_rr::fatal(
+            static_assert(std::is_invocable_v<Function&&, msgstream&>);
+            env.fatal(
                 [&](auto& out) {
                     f(out);
                     out << "*** Please read the errors listed above, fix the problem," << std::endl
@@ -173,5 +173,10 @@ namespace pkg_rr {
 
         // See a comment in is_pkg_installed().
         std::set<pkgxx::pkgbase> mutable definitely_installed;
+
+        pkgxx::tty::style _pkgname_sty;
+        pkgxx::tty::style _new_deps_sty;
+        pkgxx::tty::style _even_sty;
+        pkgxx::tty::style _odd_sty;
     };
 }

@@ -34,6 +34,7 @@ AX_CXX_COMPILE_STDCXX([17], [noext], [mandatory])
 
 AC_LANG_PUSH([C++])
 AX_APPEND_COMPILE_FLAGS([ dnl
+    -fdiagnostics-show-template-tree dnl
     -Wall dnl
     -Wextra dnl
     -Wconversion dnl

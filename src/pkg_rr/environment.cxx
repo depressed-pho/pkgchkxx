@@ -1,10 +1,13 @@
-#include <pkgxx/makevars.hxx>
-
 #include "config.h"
+
+#include <pkgxx/makevars.hxx>
+#include <unistd.h>
+
 #include "environment.hxx"
 #include "message.hxx"
 
 namespace fs = std::filesystem;
+namespace tty = pkgxx::tty;
 
 namespace {
     struct makefile_env {
@@ -17,13 +20,8 @@ namespace {
 
 namespace pkg_rr {
     environment::environment(pkg_rr::options const& opts)
-        : pkgxx::environment(
-            [&](auto&& var, auto&& value) {
-                verbose_var(
-                    opts,
-                    std::forward<decltype(var)>(var),
-                    std::forward<decltype(value)>(value));
-            }) {
+        : opts(opts)
+        , _cerr(std::make_shared<pkgxx::maybe_ttystream>(STDERR_FILENO)) {
 
         // Now we have PKGSRCDIR, use it to collect values that can only be
         // obtained from pkgsrc Makefiles.
@@ -54,7 +52,7 @@ namespace pkg_rr {
                     value_of = pkgxx::extract_mkconf_vars(MAKECONF.get(), vars).value();
                 }
                 for (auto const& [var, value]: value_of) {
-                    verbose_var(opts, var, value);
+                    verbose_var(var, value);
                 }
                 _menv.FETCH_USING = value_of["FETCH_USING"].empty() ? std::nullopt  : std::make_optional(value_of["FETCH_USING"]);
                 _menv.PKG_ADMIN   = value_of["PKG_ADMIN"  ].empty() ? CFG_PKG_ADMIN : value_of["PKG_ADMIN"];
@@ -66,5 +64,94 @@ namespace pkg_rr {
         PKG_ADMIN   = std::async(std::launch::deferred, [menv]() { return menv.get().PKG_ADMIN;   }).share();
         PKG_INFO    = std::async(std::launch::deferred, [menv]() { return menv.get().PKG_INFO;    }).share();
         SU_CMD      = std::async(std::launch::deferred, [menv]() { return menv.get().SU_CMD;      }).share();
+    }
+
+    pkgxx::maybe_tty_osyncstream
+    environment::raw_msg() const {
+        return pkgxx::maybe_tty_osyncstream(*_cerr);
+    }
+
+    msgstream
+    environment::verbose(unsigned level) const {
+        return verbose(*_cerr, level);
+    }
+
+    msgstream
+    environment::verbose(pkgxx::ttystream_base& out, unsigned level) const {
+        if (opts.verbose >= level) {
+            return msgstream(
+                out,
+                tty::dull_colour(tty::blue));
+        }
+        else {
+            return msgstream();
+        }
+    }
+
+    void
+    environment::verbose_var(
+        std::string_view const& var,
+        std::string_view const& value) const {
+
+        verbose_var(var, value, *_cerr);
+    }
+
+    void
+    environment::verbose_var(
+        std::string_view const& var,
+        std::string_view const& value,
+        pkgxx::ttystream_base& out) const {
+
+        verbose(out, 2)
+            << "Variable: " << var << " = " << (value.empty() ? "(empty)" : value) << std::endl;
+    }
+
+    msgstream
+    environment::msg() const {
+        return msg(*_cerr);
+    }
+
+    msgstream
+    environment::msg(pkgxx::ttystream_base& out) const {
+        return msgstream(out, tty::dull_colour(tty::green));
+    }
+
+    msgstream
+    environment::warn() const {
+        return warn(*_cerr);
+    }
+
+    msgstream
+    environment::warn(pkgxx::ttystream_base& out) const {
+        auto out_ = msgstream(out, tty::bold + tty::colour(tty::yellow));
+        out_ << "WARNING: ";
+        return out_;
+    }
+
+    msgstream
+    environment::error() const {
+        return error(*_cerr);
+    }
+
+    msgstream
+    environment::error(pkgxx::ttystream_base& out) const {
+        auto out_ = msgstream(out, tty::bold + tty::colour(tty::red));
+        out_ << "*** ";
+        return out_;
+    }
+
+    [[noreturn]] void
+    environment::fatal(std::function<void (msgstream&)> const& f) const {
+        fatal(f, *_cerr);
+    }
+
+    [[noreturn]] void
+    environment::fatal(
+        std::function<void (msgstream&)> const& f,
+        pkgxx::ttystream_base& out) const {
+
+        auto out_ = error(out);
+        f(out_);
+        std::exit(1);
     }
 }

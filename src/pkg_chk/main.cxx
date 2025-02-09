@@ -23,7 +23,6 @@
 #include "pkg_chk/check.hxx"
 #include "config_file.hxx"
 #include "environment.hxx"
-#include "message.hxx"
 #include "options.hxx"
 
 namespace fs = std::filesystem;
@@ -40,30 +39,30 @@ namespace {
 
     bool
     run_cmd(
-        pkg_chk::options const& opts,
-        pkg_chk::environment const& env [[maybe_unused]],
+        pkg_chk::environment const& env,
         std::string const& cmd,
         std::vector<std::string> const& args,
         bool fail_ok,
         std::optional<std::filesystem::path> const& cwd = std::nullopt,
         std::function<void (std::map<std::string, std::string>&)> const& env_mod = [](auto&) {}) {
 
-        if (opts.list_ver_diffs) {
+        if (env.opts.list_ver_diffs) {
             return true;
         }
 
         std::time_t const now = std::time(nullptr);
-        msg(opts) << std::put_time(std::localtime(&now), "%R ")
-                  << cmd;
+        auto msg = env.msg();
+        msg << std::put_time(std::localtime(&now), "%R ")
+            << cmd;
         for (auto const& arg: args) {
-            msg(opts) << ' ' << arg;
+            msg << ' ' << arg;
         }
         if (cwd) {
-            msg(opts) << " [CWD: " << cwd->string() << ']';
+            msg << " [CWD: " << cwd->string() << ']';
         }
-        msg(opts) << std::endl;
+        msg << std::endl;
 
-        if (!opts.dry_run) {
+        if (!env.opts.dry_run) {
             using namespace na::literals;
             std::vector<std::string> argv = {pkgxx::shell, "-s", "--"};
             argv.insert(argv.end(), args.begin(), args.end());
@@ -78,7 +77,7 @@ namespace {
             prog.cin().close();
 
             for (std::string line; std::getline(prog.cout(), line); ) {
-                msg(opts) << line << std::endl;
+                msg << line << std::endl;
             }
 
             if (prog.wait_exit().status != 0) {
@@ -87,12 +86,12 @@ namespace {
                         out << '\'' << cmd << ' ' << pkgxx::stringify_argv(args) << "' failed" << std::endl;
                     };
                 if (fail_ok) {
-                    msg(opts) << "** ";
-                    show_error(msg(opts));
+                    msg << "** ";
+                    show_error(msg);
                     return false;
                 }
                 else {
-                    fatal(opts, show_error);
+                    env.fatal(show_error);
                 }
             }
         }
@@ -101,7 +100,6 @@ namespace {
 
     bool
     run_cmd_su(
-        pkg_chk::options const& opts,
         pkg_chk::environment const& env,
         std::string const& cmd,
         std::vector<std::string> const& args,
@@ -110,23 +108,23 @@ namespace {
         std::function<void (std::map<std::string, std::string>&)> const& env_mod = [](auto&) {}) {
 
         if (!env.SU_CMD.get().empty()) {
-            return run_cmd(opts, env, env.SU_CMD.get(), {cmd + ' ' + pkgxx::stringify_argv(args)}, fail_ok, cwd, env_mod);
+            return run_cmd(env, env.SU_CMD.get(), {cmd + ' ' + pkgxx::stringify_argv(args)}, fail_ok, cwd, env_mod);
         }
         else {
-            return run_cmd(opts, env, cmd, args, fail_ok, cwd, env_mod);
+            return run_cmd(env, cmd, args, fail_ok, cwd, env_mod);
         }
     }
 
     std::set<pkgxx::pkgpath>
-    pkgpaths_to_check(pkg_chk::options const& opts, pkg_chk::environment const& env) {
+    pkgpaths_to_check(pkg_chk::environment const& env) {
         std::set<pkgxx::pkgpath> pkgpaths;
-        if (opts.delete_mismatched || opts.update) {
+        if (env.opts.delete_mismatched || env.opts.update) {
             pkgpaths = env.installed_pkgpaths.get();
         }
-        if (opts.add_missing) {
+        if (env.opts.add_missing) {
             env.PKGCHK_CONF.get(); // Force the evaluation of PKGCHK_CONF,
                                    // or verbose messages would interleave.
-            verbose(opts) << "Append to PKGDIRLIST based on config "
+            env.verbose() << "Append to PKGDIRLIST based on config "
                           << env.PKGCHK_CONF.get() << std::endl;
             pkg_chk::config const conf(env.PKGCHK_CONF.get());
             for (auto const& path:
@@ -139,49 +137,51 @@ namespace {
     }
 
     struct checker: virtual pkg_chk::configurable_checker_base {
-        checker(pkg_chk::options const& opts, pkg_chk::environment const& env)
+        checker(pkg_chk::environment const& env)
             : checker_base(
-                opts.add_missing,
-                opts.check_build_version,
-                opts.concurrency,
-                opts.update,
-                opts.delete_mismatched,
+                env.opts.add_missing,
+                env.opts.check_build_version,
+                env.opts.concurrency,
+                env.opts.update,
+                env.opts.delete_mismatched,
                 env.PKG_INFO)
             , source_checker_base(env.PKGSRCDIR)
             , binary_checker_base(
                 env.PACKAGES,
                 env.PKG_SUFX,
                 env.bin_pkg_summary)
-            , configurable_checker_base(opts.build_from_source)
-            , _opts(opts) {}
+            , configurable_checker_base(env.opts.build_from_source)
+            , _env(env) {}
 
     protected:
         virtual void
-        atomic_msg(std::function<void (std::ostream&)> const& f) const override {
-            pkg_chk::atomic_msg(_opts, f);
+        verbose(std::function<void (pkgxx::ttystream_base&)> const& f) const override {
+            auto out = _env.verbose();
+            f(out);
         }
 
         virtual void
-        atomic_warn(std::function<void (std::ostream&)> const& f) const override {
-            pkg_chk::atomic_warn(_opts, f);
+        msg(std::function<void (pkgxx::ttystream_base&)> const& f) const override {
+            auto out = _env.msg();
+            f(out);
         }
 
         virtual void
-        atomic_verbose(std::function<void (std::ostream&)> const& f) const override {
-            pkg_chk::atomic_verbose(_opts, f);
+        warn(std::function<void (pkgxx::ttystream_base&)> const& f) const override {
+            auto out = _env.warn();
+            f(out);
         }
 
-        virtual void
-        fatal(std::function<void (std::ostream&)> const& f) const override {
-            pkg_chk::fatal(_opts, f);
+        [[noreturn]] virtual void
+        fatal(std::function<void (pkgxx::ttystream_base&)> const& f) const override {
+            _env.fatal(f);
         }
 
-        pkg_chk::options const& _opts;
+        pkg_chk::environment _env;
     };
 
     void
     delete_pkgs(
-        pkg_chk::options const& opts,
         pkg_chk::environment const& env,
         std::map<pkgxx::pkgname, pkgxx::pkgpath> const& pkgs,
         checker& chk) {
@@ -191,13 +191,13 @@ namespace {
 
         for (auto const& [name, _path]: pkgs) {
             if (pkgxx::is_pkg_installed(PKG_INFO, name)) {
-                run_cmd_su(opts, env, PKG_DELETE, {"-r", name.string()}, true);
+                run_cmd_su(env, PKG_DELETE, {"-r", name.string()}, true);
 
                 // With -n we don't actually delete packages but we still
                 // need to simulate the effect of "pkg_delete -r".
-                if (opts.dry_run) {
+                if (env.opts.dry_run) {
                     auto const& delete_r =
-                        [&PKG_INFO, &chk, &opts](auto const& delete_r, auto const& name) {
+                        [&PKG_INFO, &chk, &env](auto const& delete_r, auto const& name) {
                             // Mark it as deleted, but it's not
                             // enough. pkg_delete -r would delete
                             // everything that transitively depend on it.
@@ -207,7 +207,6 @@ namespace {
                                 return;
                             }
 
-                            pkgxx::nursery n(opts.concurrency);
                             for (auto const& broken_pkg: pkgxx::who_requires(PKG_INFO, name)) {
                                 delete_r(delete_r, broken_pkg);
                             }
@@ -220,20 +219,19 @@ namespace {
 
     void
     delete_and_recheck(
-        pkg_chk::options const& opts,
         pkg_chk::environment const& env,
         std::set<pkgxx::pkgpath> const& pkgpaths,
         checker& chk,
         checker::result& res) {
 
         std::set<pkgxx::pkgpath> update_conf;
-        if (opts.update) {
+        if (env.opts.update) {
             // Save current installed set to PKGCHK_UPDATE_CONF so that
             // restarting failed update would not cause installed packages
             // to end up missing.
             fs::path const& update_conf_file = env.PKGCHK_UPDATE_CONF.get();
             if (fs::exists(update_conf_file)) {
-                msg(opts) << "Merging in previous " << update_conf_file << std::endl;
+                env.msg() << "Merging in previous " << update_conf_file << std::endl;
                 update_conf = pkg_chk::config(update_conf_file).pkgpaths();
             }
 
@@ -241,7 +239,7 @@ namespace {
                 update_conf.insert(path);
             }
 
-            if (!opts.dry_run && !opts.list_ver_diffs) {
+            if (!env.opts.dry_run && !env.opts.list_ver_diffs) {
                 std::ofstream out(update_conf_file, std::ios_base::out | std::ios_base::trunc);
                 if (!out) {
                     throw std::system_error(errno, std::generic_category(), "Failed to open " + update_conf_file.string());
@@ -252,16 +250,16 @@ namespace {
                 }
             }
         }
-        if (opts.delete_mismatched || opts.update) {
+        if (env.opts.delete_mismatched || env.opts.update) {
             if (!res.MISMATCH_TODO.empty()) {
-                delete_pkgs(opts, env, res.MISMATCH_TODO, chk);
-                msg(opts) << "Rechecking packages after deletions" << std::endl;
+                delete_pkgs(env, res.MISMATCH_TODO, chk);
+                env.msg() << "Rechecking packages after deletions" << std::endl;
             }
             std::set<pkgxx::pkgpath> recheck_paths = pkgpaths;
-            if (opts.update) {
+            if (env.opts.update) {
                 recheck_paths.insert(update_conf.begin(), update_conf.end());
             }
-            if (opts.add_missing || opts.update) {
+            if (env.opts.add_missing || env.opts.update) {
                 res = chk.run(recheck_paths);
             }
         }
@@ -269,30 +267,28 @@ namespace {
 
     bool
     try_fetch(
-        pkg_chk::options const& opts,
         pkg_chk::environment const& env,
         pkgxx::pkgpath const& path) {
 
         std::stringstream ss;
         ss << CFG_BMAKE << " -C " << (env.PKGSRCDIR.get() / path) << " fetch-list | " << pkgxx::shell;
-        return run_cmd(opts, env, ss.str(), {}, true);
+        return run_cmd(env, ss.str(), {}, true);
     }
 
     bool
     try_install(
-        pkg_chk::options const& opts,
         pkg_chk::environment const& env,
         pkgxx::pkgname const& name,
         pkgxx::pkgpath const& path) {
 
         if (pkgxx::is_pkg_installed(env.PKG_INFO.get(), name)) {
-            msg(opts) << name << " was installed in a previous stage" << std::endl;
+            env.msg() << name << " was installed in a previous stage" << std::endl;
             return run_cmd_su(
-                opts, env, env.PKG_ADMIN.get(), {"unset", "automatic", name.string()}, true);
+                env, env.PKG_ADMIN.get(), {"unset", "automatic", name.string()}, true);
         }
-        else if (opts.use_binary_pkgs && env.is_binary_available(name)) {
+        else if (env.opts.use_binary_pkgs && env.is_binary_available(name)) {
             return run_cmd_su(
-                opts, env, env.PKG_ADD.get(),
+                env, env.PKG_ADD.get(),
                 {(env.PACKAGES.get() / (name.string() + env.PKG_SUFX.get())).string()},
                 true,
                 std::nullopt,
@@ -302,12 +298,12 @@ namespace {
                     }
                 });
         }
-        else if (opts.build_from_source) {
+        else if (env.opts.build_from_source) {
             return run_cmd(
-                opts, env, CFG_BMAKE,
+                env, CFG_BMAKE,
                 {
                     "update",
-                    opts.no_clean ? "NOCLEAN=yes" : "DEPENDS_TARGET=package-install clean"
+                    env.opts.no_clean ? "NOCLEAN=yes" : "DEPENDS_TARGET=package-install clean"
                 },
                 true,
                 env.PKGSRCDIR.get() / path);
@@ -318,49 +314,49 @@ namespace {
     }
 
     void
-    add_delete_update(pkg_chk::options const& opts, pkg_chk::environment const& env) {
-        std::set<pkgxx::pkgpath> const pkgpaths = pkgpaths_to_check(opts, env);
-        if (opts.print_pkgpaths_to_check) {
+    add_delete_update(pkg_chk::environment const& env) {
+        std::set<pkgxx::pkgpath> const pkgpaths = pkgpaths_to_check(env);
+        if (env.opts.print_pkgpaths_to_check) {
             for (pkgxx::pkgpath const& path: pkgpaths) {
-                std::cout << path << std::endl;
+                env.msg() << path << std::endl;
             }
             return;
         }
 
-        checker chk(opts, env);
+        checker chk(env);
         checker::result res = chk.run(pkgpaths);
-        if (opts.list_ver_diffs) {
+        if (env.opts.list_ver_diffs) {
             // This isn't really what the original pkg_chk -q does, but
             // should be the right thing according to its man page. We
             // believe it's a bug in the original code.
             return;
         }
         if (!res.MISMATCH_TODO.empty() ||
-            (opts.update && fs::exists(env.PKGCHK_UPDATE_CONF.get()))) {
+            (env.opts.update && fs::exists(env.PKGCHK_UPDATE_CONF.get()))) {
 
-            delete_and_recheck(opts, env, pkgpaths, chk, res);
+            delete_and_recheck(env, pkgpaths, chk, res);
         }
 
         std::set<pkgxx::pkgname> FAILED_DONE;
-        if (opts.fetch && !res.MISSING_TODO.empty()) {
+        if (env.opts.fetch && !res.MISSING_TODO.empty()) {
             // The script generated by "make fetch-list" recurse into
             // dependencies, which means we can't run it parallelly without
             // the risk of race condition.
-            msg(opts) << "Fetching distfiles" << std::endl;
+            env.msg() << "Fetching distfiles" << std::endl;
             for (auto const& [name, path]: res.MISSING_TODO) {
                 // Packages previously marked as MISMATCH_TODO have been
                 // moved to MISSING_TODO at this point.
-                if (!try_fetch(opts, env, path)) {
+                if (!try_fetch(env, path)) {
                     FAILED_DONE.insert(name);
                 }
             }
         }
 
         std::set<pkgxx::pkgname> INSTALL_DONE;
-        if ((opts.add_missing || opts.update) && !res.MISSING_TODO.empty()) {
-            msg(opts) << "Installing packages" << std::endl;
+        if ((env.opts.add_missing || env.opts.update) && !res.MISSING_TODO.empty()) {
+            env.msg() << "Installing packages" << std::endl;
             for (auto const& [name, path]: res.MISSING_TODO) {
-                if (try_install(opts, env, name, path)) {
+                if (try_install(env, name, path)) {
                     INSTALL_DONE.insert(name);
                 }
                 else {
@@ -371,40 +367,42 @@ namespace {
 
         // Delete PKGCHK_UPDATE_CONF if the update completed without any
         // errors.
-        if (opts.update && FAILED_DONE.empty() && fs::exists(env.PKGCHK_UPDATE_CONF.get())) {
+        if (env.opts.update && FAILED_DONE.empty() && fs::exists(env.PKGCHK_UPDATE_CONF.get())) {
             fs::remove(env.PKGCHK_UPDATE_CONF.get());
         }
 
         if (!res.MISSING_DONE.empty()) {
-            msg(opts) << "Missing:";
+            auto msg = env.msg();
+            msg << "Missing:";
             for (pkgxx::pkgpath const& path: res.MISSING_DONE) {
-                msg(opts) << ' ' << path;
+                msg << ' ' << path;
             }
-            msg(opts) << std::endl;
+            msg << std::endl;
         }
         if (!INSTALL_DONE.empty()) {
-            msg(opts) << "Installed:";
+            auto msg = env.msg();
+            msg << "Installed:";
             for (pkgxx::pkgname const& name: INSTALL_DONE) {
-                msg(opts) << ' ' << name;
+                msg << ' ' << name;
             }
-            msg(opts) << std::endl;
+            msg << std::endl;
         }
         if (!FAILED_DONE.empty()) {
-            fatal(opts,
-                  [&](auto& out) {
-                      out << "Failed:";
-                      for (pkgxx::pkgname const& name: FAILED_DONE) {
-                          msg(opts) << ' ' << name;
-                      }
-                      msg(opts) << std::endl;
-                  });
+            env.fatal(
+                [&](auto& out) {
+                    out << "Failed:";
+                    for (pkgxx::pkgname const& name: FAILED_DONE) {
+                        out << ' ' << name;
+                    }
+                    out << std::endl;
+                });
         }
     }
 
     void
-    generate_conf_from_installed(pkg_chk::options const& opts, pkg_chk::environment const& env) {
+    generate_conf_from_installed(pkg_chk::environment const& env) {
         fs::path const& file = env.PKGCHK_CONF.get();
-        verbose(opts) << "Write " << file << " based on installed packages" << std::endl;
+        env.verbose() << "Write " << file << " based on installed packages" << std::endl;
 
         if (fs::exists(file)) {
             fs::path old = file;
@@ -456,7 +454,7 @@ namespace {
     }
 
     void
-    list_bin_pkgs(pkg_chk::options const& opts, pkg_chk::environment const& env) {
+    list_bin_pkgs(pkg_chk::environment const& env) {
         std::string    const& sufx = env.PKG_SUFX.get();
         pkgxx::summary const& sum  = env.bin_pkg_summary.get();
         pkgxx::pkgmap  const& pm   = env.bin_pkg_map.get();
@@ -482,13 +480,13 @@ namespace {
                         to_list.insert(*latest);
                     }
                     else {
-                        fatal_later(opts)
+                        env.fatal_later()
                             << latest->first << " - no binary package found" << std::endl;
                     }
                 }
             }
             else {
-                fatal_later(opts) << path << " - Unable to extract pkgname" << std::endl;
+                env.fatal_later() << path << " - Unable to extract pkgname" << std::endl;
             }
         }
 
@@ -499,21 +497,22 @@ namespace {
 
             decltype(to_list) scheduled;
             for (auto const& [name, vars]: to_list) {
-                verbose(opts) << vars.PKGPATH << ": " << name << std::endl;
+                auto msg = env.verbose();
+                msg << vars.PKGPATH << ": " << name << std::endl;
                 for (auto const& dep_pattern: vars.DEPENDS) {
-                    verbose(opts) << "    depends on " << dep_pattern << ": ";
+                    msg << "    depends on " << dep_pattern << ": ";
                     if (auto const best = dep_pattern.best(sum); best != sum.end()) {
                         pkgxx::pkgname const& dep = best->first;
 
-                        verbose(opts) << dep << std::endl;
+                        msg << dep << std::endl;
                         if (!topology.has_vertex(dep)) {
                             scheduled.insert(*best);
                         }
                         topology.add_edge(name, dep);
                     }
                     else {
-                        verbose(opts) << "(nothing matches)" << std::endl;
-                        fatal_later(opts) << name << ": missing dependency " << dep_pattern << std::endl;
+                        msg << "(nothing matches)" << std::endl;
+                        env.fatal_later() << name << ": missing dependency " << dep_pattern << std::endl;
                     }
                 }
             }
@@ -529,9 +528,9 @@ namespace {
             // This exception contains reference wrappers to pkgname, which
             // means we can't just let it go down the stack because those
             // wrappers would become dangling at some point.
-            fatal(opts, [&](auto& out) {
-                            out << e.what() << std::endl;
-                        });
+            env.fatal([&](auto& out) {
+                out << e.what() << std::endl;
+            });
         }
     }
 }
@@ -539,21 +538,23 @@ namespace {
 int main(int argc, char* argv[]) {
     try {
         pkg_chk::options opts(argc, argv);
-
-        verbose(opts) << "ARGV:";
-        for (int i = 0; i < argc; i++) {
-            verbose(opts) << " " << argv[i];
-        }
-        verbose(opts) << std::endl;
-
         pkg_chk::environment env(opts);
+        {
+            auto msg = env.verbose();
+            msg << "ARGV:";
+            for (int i = 0; i < argc; i++) {
+                msg << " " << argv[i];
+            }
+            msg << std::endl;
+        }
+
         switch (opts.mode) {
         case pkg_chk::mode::ADD_DELETE_UPDATE:
-            add_delete_update(opts, env);
+            add_delete_update(env);
             break;
 
         case pkg_chk::mode::GENERATE_PKGCHK_CONF:
-            generate_conf_from_installed(opts, env);
+            generate_conf_from_installed(env);
             break;
 
         case pkg_chk::mode::HELP:
@@ -561,7 +562,7 @@ int main(int argc, char* argv[]) {
             return 1;
 
         case pkg_chk::mode::LIST_BIN_PKGS:
-            list_bin_pkgs(opts, env);
+            list_bin_pkgs(env);
             break;
 
         case pkg_chk::mode::LOOKUP_TODO:

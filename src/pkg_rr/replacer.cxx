@@ -11,7 +11,9 @@
 #include "replacer.hxx"
 
 using namespace std::chrono_literals;
+using namespace pkgxx::tty::literals;
 namespace fs = std::filesystem;
+namespace tty = pkgxx::tty;
 
 namespace {
     struct replace_failed: virtual std::runtime_error {
@@ -19,16 +21,16 @@ namespace {
     };
 
     struct source_checker: virtual pkg_chk::source_checker_base {
-        source_checker(pkg_rr::options const& opts, pkg_rr::environment const& env)
+        source_checker(pkg_rr::environment const& env)
             : checker_base(
                 false, // add_missing (-a)
-                opts.check_build_version,
-                opts.concurrency,
+                env.opts.check_build_version,
+                env.opts.concurrency,
                 true,  // update (-u)
                 false, // delete_mismatched (-r)
                 env.PKG_INFO)
             , source_checker_base(env.PKGSRCDIR)
-            , _opts(opts) {}
+            , _env(env) {}
 
     protected:
         virtual void total(std::size_t num) const override {
@@ -44,34 +46,34 @@ namespace {
         }
 
         virtual void
-        atomic_msg(std::function<void (std::ostream&)> const& f) const override {
+        msg(std::function<void (pkgxx::ttystream_base&)> const& f) const override {
             _pb->message([&](auto& out) {
-                auto out_ = pkg_rr::msg(out);
+                auto out_ = _env.msg(out);
                 f(out_);
             });
         }
 
         virtual void
-        atomic_warn(std::function<void (std::ostream&)> const& f) const override {
+        warn(std::function<void (pkgxx::ttystream_base&)> const& f) const override {
             _pb->message([&](auto& out) {
-                auto out_ = pkg_rr::warn(out);
+                auto out_ = _env.warn(out);
                 f(out_);
             });
         }
 
         virtual void
-        atomic_verbose(std::function<void (std::ostream&)> const&) const override {
+        verbose(std::function<void (pkgxx::ttystream_base&)> const&) const override {
             // Don't show verbose messages from pkg_chk.
         }
 
         virtual void
-        fatal(std::function<void (std::ostream&)> const& f) const override {
+        fatal(std::function<void (pkgxx::ttystream_base&)> const& f) const override {
             _pb->message([&](auto& out) {
-                pkg_rr::fatal(f, out);
+                _env.fatal(f, out);
             });
         }
 
-        pkg_rr::options const& _opts;
+        pkg_rr::environment _env;
         mutable std::unique_ptr<pkgxx::progress_bar> _pb;
     };
 
@@ -99,7 +101,11 @@ namespace pkg_rr {
         , opts(opts_)
         , env(env_)
         , UNSAFE_VAR(opts.strict ? "unsafe_depends_strict" : "unsafe_depends")
-        , pattern_to_base_cache(0) {
+        , pattern_to_base_cache(0)
+        , _pkgname_sty(tty::bold)
+        , _new_deps_sty(tty::faint)
+        , _even_sty(tty::dull_colour(tty::magenta))
+        , _odd_sty(tty::dull_colour(tty::cyan)) {
 
         std::future<todo_type> MISMATCH_TODO_f;
         std::future<todo_type> REBUILD_TODO_f;
@@ -135,10 +141,10 @@ namespace pkg_rr {
             auto [base, path] = choose_one();
             try {
                 if (DEPENDS_CHECKED.count(base)) {
-                    msg() << "Selecting " << base << " ("
-                          << static_cast<std::filesystem::path const&>(path).string()
-                          << ") as next package to replace" << std::endl;
-                    vsleep(opts, 1s);
+                    env.msg() << "Selecting " << _pkgname_sty(base) << " ("
+                              << static_cast<std::filesystem::path const&>(path).string()
+                              << ") as next package to replace" << std::endl;
+                    env.vsleep(1s);
                 }
                 else {
                     auto const version = update_depends_with_source(base, path);
@@ -158,7 +164,7 @@ namespace pkg_rr {
                 FAILED.push_back(base);
 
                 if (opts.continue_on_errors) {
-                    error() << e.what() << std::endl;
+                    env.error() << e.what() << std::endl;
                 }
                 else {
                     abort([&](auto& out) {
@@ -176,22 +182,22 @@ namespace pkg_rr {
 
             refresh_todo();
             dump_todo();
-            vsleep(opts, 2s);
+            env.vsleep(2s);
         }
-        msg() << "No more packages to replace; done." << std::endl;
+        env.msg() << "No more packages to replace; done." << std::endl;
         report();
     }
 
     std::future<rolling_replacer::todo_type>
     rolling_replacer::check_mismatch(pkg_rr::package_scanner& scanner) const {
         if (opts.check_for_updates) {
-            msg() << "Checking for mismatched installed packages by scanning source tree" << std::endl;
-            auto result = source_checker(opts, env).run();
+            env.msg() << "Checking for mismatched installed packages by scanning source tree" << std::endl;
+            auto result = source_checker(env).run();
 
             if (!result.MISMATCH_TODO.empty()) {
                 // Spawn xargs only if it's non-empty; otherwise we would
                 // end up asking for password for nothing.
-                msg() << "Marking outdated packages as mismatched" << std::endl;
+                env.msg() << "Marking outdated packages as mismatched" << std::endl;
 
                 pkgxx::harness xargs =
                     spawn_su(std::string(CFG_XARGS) + ' ' + env.PKG_ADMIN.get() + " set mismatch=YES");
@@ -201,8 +207,8 @@ namespace pkg_rr {
                 xargs.cin().close();
 
                 if (xargs.wait_exit().status != 0) {
-                    warn() << "mismatch variable not set due to permissions; "
-                           << "the status will not persist." << std::endl;
+                    env.warn() << "mismatch variable not set due to permissions; "
+                               << "the status will not persist." << std::endl;
                 }
             }
 
@@ -217,7 +223,7 @@ namespace pkg_rr {
             return res.get_future();
         }
         else {
-            msg() << "Checking for mismatched installed packages (mismatch=YES)" << std::endl;
+            env.msg() << "Checking for mismatched installed packages (mismatch=YES)" << std::endl;
             return scanner.add_axis("mismatch", opts.no_check);
         }
     }
@@ -230,7 +236,7 @@ namespace pkg_rr {
             return res.get_future();
         }
         else {
-            msg() << "Checking for rebuild-requested installed packages (rebuild=YES)" << std::endl;
+            env.msg() << "Checking for rebuild-requested installed packages (rebuild=YES)" << std::endl;
             return scanner.add_axis("rebuild");
         }
     }
@@ -243,14 +249,14 @@ namespace pkg_rr {
             return res.get_future();
         }
         else {
-            msg() << "Checking for unsafe installed packages (" << UNSAFE_VAR << "=YES)" << std::endl;
+            env.msg() << "Checking for unsafe installed packages (" << UNSAFE_VAR << "=YES)" << std::endl;
             return scanner.add_axis(UNSAFE_VAR);
         }
     }
 
     void
     rolling_replacer::recheck_unsafe(pkgxx::pkgbase const& base) {
-        msg() << "Re-checking for unsafe installed packages (" << UNSAFE_VAR << "=YES)" << std::endl;
+        env.msg() << "Re-checking for unsafe installed packages (" << UNSAFE_VAR << "=YES)" << std::endl;
         auto const& PKG_INFO = env.PKG_INFO.get();
         pkgxx::guarded<todo_type> unsafe_pkgs;
         {
@@ -327,7 +333,7 @@ namespace pkg_rr {
 
     void
     rolling_replacer::dump_todo() const {
-        auto out = verbose(opts);
+        auto out = env.verbose();
 
         if (opts.just_fetch) {
             out << "Packages to fetch:" << std::endl;
@@ -342,12 +348,12 @@ namespace pkg_rr {
             dump_todo(out, "UNSAFE_TODO"  , UNSAFE_TODO  );
         }
 
-        vsleep(opts, 2s);
+        env.vsleep(2s);
     }
 
     void
     rolling_replacer::dump_todo(
-        std::ostream& out, std::string const& label, todo_type const& todo) const {
+        pkgxx::ttystream_base& out, std::string const& label, todo_type const& todo) const {
 
         // We could simply list packages in the alphabetical order, but
         // here we tsort them so that packages that are going to be
@@ -364,7 +370,7 @@ namespace pkg_rr {
                     else {
                         out << ' ';
                     }
-                    out << it->first;
+                    out << (num_pkgs % 2 == 0 ? _even_sty : _odd_sty)(it->first);
                     num_pkgs++;
                 }
             }
@@ -381,7 +387,7 @@ namespace pkg_rr {
         }
         out << ']';
         if (num_pkgs > 0) {
-            out << " (" << num_pkgs << ' '
+            out << " (" << tty::dull_colour(tty::yellow)(num_pkgs) << ' '
                 << (num_pkgs == 1 ? "package" : "packages")
                 << ')';
         }
@@ -410,7 +416,7 @@ namespace pkg_rr {
 
     pkgxx::graph<pkgxx::pkgbase, void, true>
     rolling_replacer::depgraph_installed() const {
-        msg() << "Building dependency graph for installed packages" << std::endl;
+        env.msg() << "Building dependency graph for installed packages" << std::endl;
 
         // There are two ways to build it. First, enumerate all the
         // installed packages and see which packages they depend
@@ -499,7 +505,7 @@ namespace pkg_rr {
 
     pkgxx::pkgversion
     rolling_replacer::update_depends_with_source(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path) {
-        msg() << "Checking if " << base << " has new depends..." << std::endl;
+        env.msg() << "Checking if " << _pkgname_sty(base) << " has new depends..." << std::endl;
         auto const old_depends = topology.out_edges(base).value();
         auto const source      = source_depends(base, path);
         auto const& [version, new_depends] = source;
@@ -565,24 +571,24 @@ namespace pkg_rr {
             > const& old_depends,
         std::map<pkgxx::pkgbase, pkgxx::pkgpath> const& new_depends) {
 
-        auto out = msg();
+        auto out = env.msg();
         bool is_first = true;
         for (auto const& [dep_base, _pair]: new_depends) {
             if (old_depends.count(dep_base) == 0) {
                 if (is_first) {
-                    out << base << " has the following new depends (need to re-tsort):" << std::endl
+                    out << _pkgname_sty(base) << " has the following new depends (need to re-tsort):" << std::endl
                         << '[';
                     is_first = false;
                 }
                 else {
                     out << ' ';
                 }
-                out << dep_base;
+                out << _new_deps_sty(dep_base);
             }
         }
         if (!is_first) {
             out << ']' << std::endl;
-            vsleep(opts, 2s);
+            env.vsleep(2s);
         }
     }
 
@@ -621,7 +627,8 @@ namespace pkg_rr {
         }
 
         if (opts.dry_run) {
-            msg() << "Would run: " << pkgxx::stringify_argv(argv) << std::endl;
+            env.msg() << tty::faint("Would run: "_ch << pkgxx::stringify_argv(argv))
+                      << std::endl;
         }
         else if (opts.log_dir) {
             auto const version  = DEPENDS_CHECKED.find(base);
@@ -733,7 +740,7 @@ namespace pkg_rr {
                         continue;
                     }
                 }
-                warn() << "Invalid dependency: `" << dep << "' in " << var << std::endl;
+                env.warn() << "Invalid dependency: `" << dep << "' in " << var << std::endl;
             }
         }
 
@@ -799,7 +806,7 @@ namespace pkg_rr {
 
     void
     rolling_replacer::fetch(pkgxx::pkgbase const& base, pkgxx::pkgpath const& path) {
-        msg() << "Fetching " << base << std::endl;
+        env.msg() << "Fetching " << base << std::endl;
         run_make(base, path, {"fetch", "depends-fetch"}, make_vars_for_pkg(base));
     }
 
@@ -809,10 +816,10 @@ namespace pkg_rr {
 
         bool const was_installed = is_pkg_installed(base);
         if (was_installed) {
-            msg() << "Replacing " << base << std::endl;
+            env.msg() << "Replacing " << _pkgname_sty(base) << std::endl;
         }
         else {
-            msg() << "Installing " << base << std::endl;
+            env.msg() << "Installing " << _pkgname_sty(base) << std::endl;
         }
 
         auto make_vars = make_vars_for_pkg(base);
@@ -893,10 +900,10 @@ namespace pkg_rr {
     rolling_replacer::report() const {
         if (opts.verbose > 0) {
             for (auto const& base: SUCCEEDED) {
-                std::cout << "+ " << base << std::endl;
+                env.raw_msg() << tty::dull_colour(tty::green)("+ "_ch << base) << std::endl;
             }
             for (auto const& base: FAILED) {
-                std::cout << "- " << base << std::endl;
+                env.raw_msg() << tty::colour(tty::red)("- "_ch << base) << std::endl;
             }
         }
     }

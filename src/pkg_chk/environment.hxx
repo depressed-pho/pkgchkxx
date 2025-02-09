@@ -1,12 +1,15 @@
 #pragma once
 
 #include <filesystem>
+#include <functional>
 #include <future>
+#include <memory>
 #include <set>
 #include <string>
 
 #include <pkgxx/environment.hxx>
 #include <pkgxx/summary.hxx>
+#include <pkgxx/tty.hxx>
 
 #include "options.hxx"
 #include "tag.hxx"
@@ -27,6 +30,27 @@ namespace pkg_chk {
             return bin_pkg_summary.get().count(name) > 0;
         }
 
+        pkgxx::maybe_tty_osyncstream
+        msg() const;
+
+        pkgxx::maybe_tty_osyncstream
+        warn() const;
+
+        pkgxx::maybe_tty_osyncstream
+        verbose() const;
+
+        virtual void
+        verbose_var(
+            std::string_view const& var,
+            std::string_view const& value) const override;
+
+        [[noreturn]] void
+        fatal(std::function<void (pkgxx::maybe_tty_osyncstream&)> const& f) const;
+
+        pkgxx::maybe_tty_osyncstream
+        fatal_later() const;
+
+        options const& opts;
         std::shared_future<std::string>           MACHINE_ARCH;
         std::shared_future<std::string>           OPSYS;
         std::shared_future<std::string>           OS_VERSION;
@@ -50,5 +74,9 @@ namespace pkg_chk {
 
         std::shared_future<tagset>  included_tags;
         std::shared_future<tagset>  excluded_tags;
+
+    private:
+        std::shared_ptr<pkgxx::maybe_ttystream> _cout;
+        std::shared_ptr<pkgxx::maybe_ttystream> _cerr;
     };
 }

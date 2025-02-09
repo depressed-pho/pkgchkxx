@@ -1,9 +1,12 @@
+#include <atomic>
 #include <cerrno>
+#include <cstdlib>
 #include <filesystem>
 #include <initializer_list>
 #include <string>
 #include <sys/utsname.h>
 #include <system_error>
+#include <type_traits>
 #include <utility>
 #include <unistd.h>
 #include <vector>
@@ -14,7 +17,6 @@
 
 #include "config.h"
 #include "environment.hxx"
-#include "message.hxx"
 
 using namespace std::literals;
 namespace fs = std::filesystem;
@@ -65,17 +67,21 @@ namespace {
         pkg_chk::tagset included_tags;
         pkg_chk::tagset excluded_tags;
     };
+
+    // Unholy global variable...
+    std::atomic<bool> delayed_fatality = false;
+
+    [[noreturn]] void
+    exit_for_failure() {
+        std::exit(1);
+    }
 }
 
 namespace pkg_chk {
     environment::environment(pkg_chk::options const& opts)
-        : pkgxx::environment(
-            [&](auto&& var, auto&& value) {
-                verbose_var(
-                    opts,
-                    std::forward<decltype(var)>(var),
-                    std::forward<decltype(value)>(value));
-            }) {
+        : opts(opts)
+        , _cout(std::make_shared<pkgxx::maybe_ttystream>(STDOUT_FILENO))
+        , _cerr(std::make_shared<pkgxx::maybe_ttystream>(STDERR_FILENO)) {
 
         // Now we have PKGSRCDIR, use it to collect values that can only be
         // obtained from pkgsrc Makefiles.
@@ -85,11 +91,11 @@ namespace pkg_chk {
                 makefile_env _menv;
 
                 if (!fs::is_directory(PKGSRCDIR.get())) {
-                    fatal(opts, [this](auto& out) {
-                                    out << "Unable to locate PKGSRCDIR ("
-                                        << (PKGSRCDIR.get().empty() ? "not set" : PKGSRCDIR.get())
-                                        << ")" << std::endl;
-                                });
+                    fatal([this](auto& out) {
+                        out << "Unable to locate PKGSRCDIR ("
+                            << (PKGSRCDIR.get().empty() ? "not set" : PKGSRCDIR.get())
+                            << ")" << std::endl;
+                    });
                 }
                 std::vector<std::string> vars = {
                     "PACKAGES",
@@ -120,7 +126,7 @@ namespace pkg_chk {
                     value_of = pkgxx::extract_mkconf_vars(MAKECONF.get(), vars).value();
                 }
                 for (auto const& [var, value]: value_of) {
-                    verbose_var(opts, var, value);
+                    verbose_var(var, value);
                 }
                 _menv.PACKAGES           =
                     opts.bin_pkg_path.empty()
@@ -143,11 +149,11 @@ namespace pkg_chk {
 
                 if (_menv.PACKAGES.empty()) {
                     _menv.PACKAGES = PKGSRCDIR.get() / "packages";
-                    verbose_var(opts, "PACKAGES", _menv.PACKAGES);
+                    verbose_var("PACKAGES", _menv.PACKAGES.string());
                 }
                 if (fs::is_directory(_menv.PACKAGES / "All")) {
                     _menv.PACKAGES /= "All";
-                    verbose_var(opts, "PACKAGES", _menv.PACKAGES);
+                    verbose_var("PACKAGES", _menv.PACKAGES.string());
                 }
                 if (_menv.PKGCHK_CONF.empty()) {
                     // Check PKG_SYSCONFDIR then fall back to PKGSRCDIR.
@@ -157,12 +163,12 @@ namespace pkg_chk {
                     else {
                         _menv.PKGCHK_CONF = PKGSRCDIR.get() / "pkgchk.conf";
                     }
-                    verbose_var(opts, "PKGCHK_CONF", _menv.PKGCHK_CONF);
+                    verbose_var("PKGCHK_CONF", _menv.PKGCHK_CONF.string());
                 }
                 if (_menv.PKGCHK_UPDATE_CONF.empty()) {
                     _menv.PKGCHK_UPDATE_CONF =
                         PKGSRCDIR.get() / ("pkgchk_update-"s + cuname().nodename + ".conf"s);
-                    verbose_var(opts, "PKGCHK_UPDATE_CONF", _menv.PKGCHK_UPDATE_CONF);
+                    verbose_var("PKGCHK_UPDATE_CONF", _menv.PKGCHK_UPDATE_CONF.string());
                 }
 
                 return _menv;
@@ -196,7 +202,7 @@ namespace pkg_chk {
                     };
                     auto value_of = pkgxx::extract_pkgmk_vars(pkgpath, vars).value();
                     for (auto const& [var, value]: value_of) {
-                        verbose_var(opts, var, value);
+                        verbose_var(var, value);
                     }
                     _penv.OPSYS        = value_of["OPSYS"       ];
                     _penv.OS_VERSION   = value_of["OS_VERSION"  ];
@@ -215,9 +221,9 @@ namespace pkg_chk {
                     uname.cin().close();
                     std::getline(uname.cout(), _penv.MACHINE_ARCH);
 
-                    verbose_var(opts, "OPSYS"       , _penv.OPSYS       );
-                    verbose_var(opts, "OS_VERSION"  , _penv.OS_VERSION  );
-                    verbose_var(opts, "MACHINE_ARCH", _penv.MACHINE_ARCH);
+                    verbose_var("OPSYS"       , _penv.OPSYS       );
+                    verbose_var("OS_VERSION"  , _penv.OS_VERSION  );
+                    verbose_var("MACHINE_ARCH", _penv.MACHINE_ARCH);
                 }
 
                 return _penv;
@@ -231,10 +237,10 @@ namespace pkg_chk {
         bin_pkg_summary = std::async(
             std::launch::deferred,
             [this, &opts]() {
-                auto m = msg(opts);
-                auto v = verbose(opts);
+                auto m = msg();
+                auto v = verbose();
                 pkgxx::summary sum(m, v, opts.concurrency, PACKAGES.get(), PKG_INFO.get(), PKG_SUFX.get());
-                verbose(opts) << "Binary packages: " << sum.size() << std::endl;
+                v << "Binary packages: " << sum.size() << std::endl;
                 return sum;
             }).share();
         bin_pkg_map = std::async(
@@ -246,7 +252,7 @@ namespace pkg_chk {
         installed_pkgnames = std::async(
             std::launch::deferred,
             [this, &opts]() {
-                verbose(opts) << "Enumerate PKGNAME from installed packages" << std::endl;
+                verbose() << "Enumerate PKGNAME from installed packages" << std::endl;
 
                 std::set<pkgxx::pkgname> pkgnames;
                 for (auto& name: pkgxx::installed_pkgnames(PKG_INFO.get())) {
@@ -257,7 +263,7 @@ namespace pkg_chk {
         installed_pkgpaths = std::async(
             std::launch::deferred,
             [this, &opts]() {
-                verbose(opts) << "Enumerate PKGPATH from installed packages" << std::endl;
+                verbose() << "Enumerate PKGPATH from installed packages" << std::endl;
 
                 pkgxx::harness pkg_info(pkgxx::shell, {pkgxx::shell, "-s", "--", "-aQ", "PKGPATH"});
                 pkg_info.cin() << "exec " << PKG_INFO.get() << " \"$@\"" << std::endl;
@@ -326,11 +332,64 @@ namespace pkg_chk {
                 _tenv.excluded_tags.insert(
                     PKGCHK_NOTAGS.get().begin(), PKGCHK_NOTAGS.get().end());
 
-                verbose(opts) << "set   TAGS=" << _tenv.included_tags << std::endl;
-                verbose(opts) << "unset TAGS=" << _tenv.excluded_tags << std::endl;
+                verbose() << "set   TAGS=" << _tenv.included_tags << std::endl
+                          << "unset TAGS=" << _tenv.excluded_tags << std::endl;
                 return _tenv;
             }).share();
         included_tags = std::async(std::launch::deferred, [tenv]() { return tenv.get().included_tags; }).share();
         excluded_tags = std::async(std::launch::deferred, [tenv]() { return tenv.get().excluded_tags; }).share();
+    }
+
+    pkgxx::maybe_tty_osyncstream
+    environment::msg() const {
+        return
+            pkgxx::maybe_tty_osyncstream(
+                opts.mode == pkg_chk::mode::LIST_BIN_PKGS
+                ? *_cout
+                : *_cerr);
+    }
+
+    pkgxx::maybe_tty_osyncstream
+    environment::warn() const {
+        auto out = pkgxx::maybe_tty_osyncstream(*_cerr);
+        out << "WARNING: ";
+        return out;
+    }
+
+    pkgxx::maybe_tty_osyncstream
+    environment::verbose() const {
+        if (opts.verbose) {
+            return pkgxx::maybe_tty_osyncstream(*_cerr);
+        }
+        else {
+            return pkgxx::maybe_tty_osyncstream();
+        }
+    }
+
+    void
+    environment::verbose_var(
+        std::string_view const& var,
+        std::string_view const& value) const {
+
+        verbose() << "Variable: " << var << " = " << (value.empty() ? "(empty)" : value) << std::endl;
+    }
+
+    [[noreturn]] void
+    environment::fatal(std::function<void (pkgxx::maybe_tty_osyncstream&)> const& f) const {
+        auto msg = pkgxx::maybe_tty_osyncstream(*_cerr);
+        msg << "** ";
+        f(msg);
+        std::exit(1);
+    }
+
+    pkgxx::maybe_tty_osyncstream
+    environment::fatal_later() const {
+        if (!delayed_fatality) {
+            delayed_fatality = true;
+            std::atexit(exit_for_failure);
+        }
+        auto msg = pkgxx::maybe_tty_osyncstream(*_cerr);
+        msg << "** ";
+        return msg;
     }
 }
