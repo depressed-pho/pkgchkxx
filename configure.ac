@@ -44,6 +44,7 @@ AX_APPEND_COMPILE_FLAGS([ dnl
     -Wsuggest-attribute=noreturn dnl
     -Wsuggest-attribute=pure dnl
     -Wsuggest-override dnl
+    -Werror=switch dnl
     -Werror=return-type dnl
     -Wnull-dereference dnl
     -Wuninitialized dnl
