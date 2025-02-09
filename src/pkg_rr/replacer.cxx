@@ -104,6 +104,7 @@ namespace pkg_rr {
         , pattern_to_base_cache(0)
         , _pkgname_sty(tty::bold)
         , _new_deps_sty(tty::faint)
+        , _var_sty(tty::faint)
         , _even_sty(tty::dull_colour(tty::magenta))
         , _odd_sty(tty::dull_colour(tty::cyan)) {
 
@@ -223,7 +224,8 @@ namespace pkg_rr {
             return res.get_future();
         }
         else {
-            env.msg() << "Checking for mismatched installed packages (mismatch=YES)" << std::endl;
+            env.msg() << "Checking for mismatched installed packages "
+                      << _var_sty("(mismatch=YES)") << std::endl;
             return scanner.add_axis("mismatch", opts.no_check);
         }
     }
@@ -236,7 +238,8 @@ namespace pkg_rr {
             return res.get_future();
         }
         else {
-            env.msg() << "Checking for rebuild-requested installed packages (rebuild=YES)" << std::endl;
+            env.msg() << "Checking for rebuild-requested installed packages "
+                      << _var_sty("(rebuild=YES)") << std::endl;
             return scanner.add_axis("rebuild");
         }
     }
@@ -249,14 +252,16 @@ namespace pkg_rr {
             return res.get_future();
         }
         else {
-            env.msg() << "Checking for unsafe installed packages (" << UNSAFE_VAR << "=YES)" << std::endl;
+            env.msg() << "Checking for unsafe installed packages "
+                      << _var_sty('('_ch << UNSAFE_VAR << "=YES)") << std::endl;
             return scanner.add_axis(UNSAFE_VAR);
         }
     }
 
     void
     rolling_replacer::recheck_unsafe(pkgxx::pkgbase const& base) {
-        env.msg() << "Re-checking for unsafe installed packages (" << UNSAFE_VAR << "=YES)" << std::endl;
+        env.msg() << "Re-checking for unsafe installed packages "
+                  << _var_sty('('_ch << UNSAFE_VAR << "=YES)") << std::endl;
         auto const& PKG_INFO = env.PKG_INFO.get();
         pkgxx::guarded<todo_type> unsafe_pkgs;
         {

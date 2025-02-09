@@ -176,6 +176,7 @@ namespace pkg_rr {
 
         pkgxx::tty::style _pkgname_sty;
         pkgxx::tty::style _new_deps_sty;
+        pkgxx::tty::style _var_sty;
         pkgxx::tty::style _even_sty;
         pkgxx::tty::style _odd_sty;
     };

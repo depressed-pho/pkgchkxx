@@ -528,6 +528,8 @@ namespace pkgxx {
                 : _sty(std::move(sty))
                 , _vs(std::forward<Us>(vs)...) {}
 
+            /** Append something to a chunk.
+             */
             template <typename U>
             friend chunk<chunk<Ts...>, std::remove_reference_t<U>>
             operator<< (chunk<Ts...>&& lhs, U&& rhs) {
@@ -535,6 +537,18 @@ namespace pkgxx {
                     std::nullopt,
                     std::move(lhs),
                     std::forward<U>(rhs));
+            }
+
+            /** Special case for appending a string literal to a chunk. We
+             * need this due to the way how chunks are implemented.
+             */
+            template <std::size_t N>
+            friend chunk<chunk<Ts...>, std::string_view>
+            operator<< (chunk<Ts...>&& lhs, char const (&rhs)[N]) {
+                return chunk<chunk<Ts...>, std::string_view>(
+                    std::nullopt,
+                    std::move(lhs),
+                    rhs);
             }
 
             friend ttystream_base&
@@ -575,6 +589,14 @@ namespace pkgxx {
             operator"" _ch(char const* str, std::size_t len) {
                 return chunk<std::string_view>(
                     std::nullopt, std::string_view(str, len));
+            }
+
+            inline chunk<char>
+            operator"" _ch(char c) {
+                // std::move() is necessary here, otherwise
+                // value_or_ref<char> would think it's an lvalue reference
+                // and only borrow this temporary char but not copy it.
+                return chunk<char>(std::nullopt, std::move(c));
             }
         }
 
