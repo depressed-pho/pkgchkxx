@@ -1,6 +1,7 @@
 noinst_LTLIBRARIES = libpkgxx.la
 
 libpkgxx_la_SOURCES = \
+	always_false_v.hxx \
 	build_version.hxx build_version.cxx \
 	bzip2stream.cxx bzip2stream.hxx \
 	environment.cxx environment.hxx \
