@@ -1,6 +1,6 @@
 # Release notes
 
-## 0.2.6 -- not released yet
+## 0.3 -- 2025-02-10
 
 * `pkgrrxx` now uses colours in its output if `stderr` is a tty and the
   environment variable `NO_COLOR` is not defined.
