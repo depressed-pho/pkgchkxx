@@ -1,9 +1,11 @@
 # Release notes
 
-## 0.3.1 -- not released yet
+## 0.3.1 -- 2025-02-10
 
 * Fix an issue where `pkgrrxx` (and possibly `pkgchkxx` also) would die
   when it receives a signal while it's blocking on `waitpid(2)`.
+* Fix an issue in 0.3 where ANSI escape sequences would leak into `make`
+  output.
 
 ## 0.3 -- 2025-02-10
 

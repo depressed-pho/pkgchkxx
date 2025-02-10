@@ -18,6 +18,11 @@ namespace pkg_rr {
 
     msgstreambuf::~msgstreambuf() {
         _out.pop_style();
+        _out.pubsync();
+        // It is extremely important to flush the tty here because we
+        // aren't the only process that writes to this tty. The other
+        // processes may also write to it, and if we didn't flush the SGR
+        // reset in our buffer their output would be coloured.
     }
 
     [[noreturn]] std::lock_guard<std::mutex>
