@@ -39,7 +39,7 @@ libpkgxx_la_CXXFLAGS = \
 	-I$(top_srcdir)/lib \
 	-DCFG_PREFIX='"$(prefix)"' \
 	$(BZIP2_CPPFLAGS) \
-	$(LIBFETCH_CPPFLAGS) \
+	$(LIBFETCH_CFLAGS) \
 	$(ZLIB_CPPFLAGS)
 
 libpkgxx_la_LDFLAGS = \

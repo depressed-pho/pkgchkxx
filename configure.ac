@@ -71,8 +71,8 @@ AX_DOXYGEN
 AX_CXX_STD_FILESYSTEM
 AX_CXX_STD_THREAD
 AX_BZIP2
-AX_LIBFETCH
 AX_ZLIB
+PKG_CHECK_MODULES_STATIC([LIBFETCH], [fetch], [], [AC_MSG_ERROR([libfetch is missing])])
 
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h])
