@@ -180,23 +180,29 @@ namespace pkgxx {
         assert(_pid);
 
         if (!_status) {
-            int cstatus;
-            if (waitpid(*_pid, &cstatus, 0) == -1) {
-                throw std::system_error(
-                    errno, std::generic_category(), "waitpid");
-            }
-            else if (WIFEXITED(cstatus)) {
-                _status.emplace(exited {WEXITSTATUS(cstatus)});
-            }
-            else if (WIFSIGNALED(cstatus)) {
-                _status.emplace(signaled {
-                    WTERMSIG(cstatus),
-                    static_cast<bool>(WCOREDUMP(cstatus))});
-            }
-            else {
-                std::cerr << "The process " << *_pid << " terminated but it didn't exit nor receive a signal. "
-                          << "Then what the hell has happened to it???" << std::endl;
-                std::abort(); // Impossible
+            while (true) {
+                int cstatus;
+                if (waitpid(*_pid, &cstatus, 0) == -1) {
+                    if (errno == EINTR) {
+                        continue;
+                    }
+                    throw std::system_error(
+                        errno, std::generic_category(), "waitpid");
+                }
+                else if (WIFEXITED(cstatus)) {
+                    _status.emplace(exited {WEXITSTATUS(cstatus)});
+                }
+                else if (WIFSIGNALED(cstatus)) {
+                    _status.emplace(signaled {
+                            WTERMSIG(cstatus),
+                            static_cast<bool>(WCOREDUMP(cstatus))});
+                }
+                else {
+                    std::cerr << "The process " << *_pid << " terminated but it didn't exit nor receive a signal. "
+                              << "Then what the hell has happened to it???" << std::endl;
+                    std::abort(); // Impossible
+                }
+                break;
             }
         }
 

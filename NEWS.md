@@ -1,5 +1,10 @@
 # Release notes
 
+## 0.3.1 -- not released yet
+
+* Fix an issue where `pkgrrxx` (and possibly `pkgchkxx` also) would die
+  when it receives a signal while it's blocking on `waitpid(2)`.
+
 ## 0.3 -- 2025-02-10
 
 * `pkgrrxx` now uses colours in its output if `stderr` is a tty and the
