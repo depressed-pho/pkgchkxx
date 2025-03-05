@@ -1,5 +1,10 @@
 # Release notes
 
+## 0.3.2 -- 2025-03-05
+
+* Fix an issue where a progress bar shown by `pkgrrxx -u` flashes rapidly
+  when there are many packages to update.
+
 ## 0.3.1 -- 2025-02-10
 
 * Fix an issue where `pkgrrxx` (and possibly `pkgchkxx` also) would die

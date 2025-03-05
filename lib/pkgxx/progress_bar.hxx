@@ -85,7 +85,7 @@ namespace pkgxx {
                          << tty::erase_line_from_cursor;
             }
             f(*_output);
-            redraw();
+            redraw(true);
         }
 
     private:
