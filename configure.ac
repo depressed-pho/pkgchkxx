@@ -125,7 +125,6 @@ AC_CHECK_FUNCS([sigwaitinfo])
 AC_CHECK_FUNCS([strerror])
 AC_CHECK_FUNCS([sysconf])
 AC_CHECK_FUNCS([uname])
-AC_CHECK_FUNCS([vfork])
 AC_FUNC_FORK
 
 AC_CONFIG_FILES([

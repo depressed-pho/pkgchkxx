@@ -2,6 +2,10 @@
 
 ## 0.3.2 -- 2025-03-05
 
+* Fix an issue where `pkgrrxx` (and possibly `pkgchkxx` also) leaks file
+  descriptors and eventually die. This only happened on platforms where
+  `posix_spawn(3)` was missing but `vfork(2)` was available. The bug was
+  introduced at version 0.2.5. Reported by @bsiegert [#11].
 * Fix an issue where a progress bar shown by `pkgrrxx -u` flashes rapidly
   when there are many packages to update.
 

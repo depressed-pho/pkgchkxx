@@ -363,11 +363,11 @@ namespace pkgxx {
             }
             cenvp.push_back(nullptr);
 
-#  if defined(HAVE_VFORK)
-            pid_t const pid = vfork();
-#  else
+            // Using vfork() is unsafe here, even if OS supports it,
+            // because side effects caused by the child messes up the
+            // parent state. Specifically msg_in.close() causes the parent
+            // to leak fd.
             pid_t const pid = fork();
-#  endif
             if (pid == 0) {
                 msg_in.close();
 
@@ -458,13 +458,7 @@ namespace pkgxx {
             }
             else {
                 throw std::system_error(
-                    errno, std::generic_category(),
-#  if defined(HAVE_VFORK)
-                    "vfork"
-#  else
-                    "fork"
-#  endif
-                    );
+                    errno, std::generic_category(), "fork");
             }
 #endif // defined(USE_POSIX_SPAWN)
         }
