@@ -1,5 +1,11 @@
 # Release notes
 
+## 0.3.3 -- not released yet
+
+* Fix an issue where `pkgchkxx -ab` crashes upon trying to install the
+  first missing package. This was a use-after-free bug introduced in
+  0.3. Reported by Marc Baudoin [#12].
+
 ## 0.3.2 -- 2025-03-05
 
 * Fix an issue where `pkgrrxx` (and possibly `pkgchkxx` also) leaks file

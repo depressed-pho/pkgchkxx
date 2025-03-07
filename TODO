@@ -1,3 +1,4 @@
 # -*- org -*-
 
 * TODO [#A] write some unit tests
+* TODO [#B] Dump stack trace on exception, especially for things like std::bad_alloc

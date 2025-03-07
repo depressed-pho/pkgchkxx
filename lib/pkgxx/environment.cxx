@@ -21,11 +21,11 @@ namespace pkgxx {
     environment::environment() {
         // Hide PKG_PATH to avoid breakage in 'make' calls.
         {
-            fs::path const vPKG_PATH = cgetenv("PKG_PATH").value_or("");
+            fs::path vPKG_PATH = cgetenv("PKG_PATH").value_or("");
             unsetenv("PKG_PATH");
             PKG_PATH = std::async(
                 std::launch::deferred,
-                [&]() {
+                [this, vPKG_PATH = std::move(vPKG_PATH)]() {
                     // We need to do this asynchronously only because
                     // verbose_var() is a pure virtual method and we are in
                     // the constructor.
