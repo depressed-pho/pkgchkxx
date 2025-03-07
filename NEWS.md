@@ -1,6 +1,6 @@
 # Release notes
 
-## 0.3.3 -- not released yet
+## 0.3.3 -- 2025-03-07
 
 * Fix an issue where `pkgchkxx -ab` crashes upon trying to install the
   first missing package. This was a use-after-free bug introduced in
