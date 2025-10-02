@@ -60,7 +60,7 @@ namespace pkgxx {
         /** A modifier is a specially-treated string occuring in a package version. */
         struct modifier {
             /// The kind of modifier.
-            enum class kind: int {
+            enum class kind_t: int {
                 ALPHA = -3,
                 BETA  = -2,
                 RC    = -1,
@@ -69,19 +69,25 @@ namespace pkgxx {
 
             /// Construct an instance of \ref modifier with its kind and
             /// its original string.
-            modifier(kind k, std::string const& str) noexcept
+            modifier(kind_t k, std::string const& str) noexcept
                 : _kind(k)
                 , _str(str) {}
 
             /// Construct an instance of \ref modifier with its kind and
             /// its original string.
-            modifier(kind k, std::string&& str) noexcept
+            modifier(kind_t k, std::string&& str) noexcept
                 : _kind(k)
                 , _str(str) {}
 
             /// Turn a modifier into an integer representing its kind.
             operator int() const noexcept {
                 return static_cast<int>(_kind);
+            }
+
+            /// Obtain the kind of the modifier.
+            kind_t
+            kind() const noexcept {
+                return _kind;
             }
 
             /// Obtain the original string of a modifier.
@@ -104,7 +110,7 @@ namespace pkgxx {
         private:
             friend struct std::hash<modifier>;
 
-            kind _kind;
+            kind_t _kind;
             std::string _str;
         };
 

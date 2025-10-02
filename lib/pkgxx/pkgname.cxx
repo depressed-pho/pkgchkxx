@@ -9,13 +9,13 @@ namespace {
     using namespace pkgxx;
 
     std::vector<pkgversion::modifier> const modifiers = {
-        pkgversion::modifier(pkgversion::modifier::kind::ALPHA, "alpha"),
-        pkgversion::modifier(pkgversion::modifier::kind::BETA , "beta"),
-        pkgversion::modifier(pkgversion::modifier::kind::RC   , "pre"),
-        pkgversion::modifier(pkgversion::modifier::kind::RC   , "rc"),
-        pkgversion::modifier(pkgversion::modifier::kind::DOT  , "pl"),
-        pkgversion::modifier(pkgversion::modifier::kind::DOT  , "_"),
-        pkgversion::modifier(pkgversion::modifier::kind::DOT  , ".")
+        pkgversion::modifier(pkgversion::modifier::kind_t::ALPHA, "alpha"),
+        pkgversion::modifier(pkgversion::modifier::kind_t::BETA , "beta"),
+        pkgversion::modifier(pkgversion::modifier::kind_t::RC   , "pre"),
+        pkgversion::modifier(pkgversion::modifier::kind_t::RC   , "rc"),
+        pkgversion::modifier(pkgversion::modifier::kind_t::DOT  , "pl"),
+        pkgversion::modifier(pkgversion::modifier::kind_t::DOT  , "_"),
+        pkgversion::modifier(pkgversion::modifier::kind_t::DOT  , ".")
     };
 }
 
@@ -38,8 +38,15 @@ namespace pkgxx {
                 bool found_mod = false;
                 for (auto const& mod: modifiers) {
                     if (ci_starts_with(it, str.end(), mod.string())) {
-                        _comps.push_back(mod);
-                        it += mod.string().size();
+                        // It's very important to construct a new modifier
+                        // object based on the original string, otherwise
+                        // its case will not be preserved (#13).
+                        auto const len = mod.string().size();
+                        _comps.emplace_back(
+                            modifier(
+                                mod.kind(),
+                                std::string(it, it + len)));
+                        it += len;
                         found_mod = true;
                         break;
                     }
@@ -58,7 +65,7 @@ namespace pkgxx {
                 break;
             }
             if (is_ascii_alpha(*it)) {
-                _comps.emplace_back(modifier(modifier::kind::DOT, ""s));
+                _comps.emplace_back(modifier(modifier::kind_t::DOT, ""s));
                 _comps.emplace_back(alpha(*it++));
                 continue;
             }

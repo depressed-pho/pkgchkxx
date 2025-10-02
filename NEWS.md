@@ -1,5 +1,11 @@
 # Release notes
 
+## 0.3.4 -- 2025-10-02
+
+* Fixed an issue where `pkgrrxx` didn't preserve case in version numbers,
+  leading to a failure while checking for updates when a package like
+  `osabi-NetBSD-11.0_BETA` was installed. Reported by @drixter [#13].
+
 ## 0.3.3 -- 2025-03-07
 
 * Fix an issue where `pkgchkxx -ab` crashes upon trying to install the
