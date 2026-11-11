@@ -122,13 +122,14 @@ namespace pkg_rr {
         [[noreturn]] void
         abort(Function&& f) const {
             static_assert(std::is_invocable_v<Function&&, msgstream&>);
-            env.fatal(
-                [&](auto& out) {
-                    f(out);
-                    out << "*** Please read the errors listed above, fix the problem," << std::endl
-                        << "*** then re-run " << progname.filename().string() << " to continue." << std::endl;
-                    report();
-                });
+            {
+                auto out = env.error();
+                f(out);
+                out << "*** Please read the errors listed above, fix the problem," << std::endl
+                    << "*** then re-run " << progname.filename().string() << " to continue." << std::endl;
+            }
+            report();
+            std::exit(1);
         }
 
         void

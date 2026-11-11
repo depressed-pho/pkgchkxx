@@ -150,8 +150,12 @@ namespace pkg_rr {
         std::function<void (msgstream&)> const& f,
         pkgxx::ttystream_base& out) const {
 
-        auto out_ = error(out);
-        f(out_);
+        {
+            auto out_ = error(out);
+            f(out_);
+            // out_ has to be destructed before we exit, otherwise no
+            // messages will be .
+        }
         std::exit(1);
     }
 }

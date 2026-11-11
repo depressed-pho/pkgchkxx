@@ -1,5 +1,11 @@
 # Release notes
 
+## 0.3.5 -- 2026-11-11
+
+* FIxed an issue where `pkgrrxx` would fail to display some of its error
+  messages when a fatal error occurs, instead it silently exits. This is
+  presumably a regression from 0.3 when the ANSI colours were introduced.
+
 ## 0.3.4 -- 2025-10-02
 
 * Fixed an issue where `pkgrrxx` didn't preserve case in version numbers,
