@@ -2,7 +2,7 @@
 
 ## 0.3.5 -- 2026-11-11
 
-* FIxed an issue where `pkgrrxx` would fail to display some of its error
+* Fixed an issue where `pkgrrxx` would fail to display some of its error
   messages when a fatal error occurs, instead it silently exits. This is
   presumably a regression from 0.3 when the ANSI colours were introduced.
 
