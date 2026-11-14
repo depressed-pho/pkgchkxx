@@ -52,7 +52,7 @@ namespace pkgxx {
         progress_bar(std::size_t total, Args&&... args)
             : progress_bar(
                 0, total,
-                static_cast<value_or_ref<ttystream_base>&&>(
+                static_cast<value_or_ref<maybe_ttystream>&&>(
                     na::get("output"_na = default_output(), std::forward<Args>(args)...)),
                 na::get("decay_p"_na      = 0.1 , std::forward<Args>(args)...),
                 na::get("show_percent"_na = true, std::forward<Args>(args)...),
@@ -77,8 +77,8 @@ namespace pkgxx {
         message(F const& f) {
             lock_t lk(_mtx);
 
-            static_assert(std::is_invocable_v<F, ttystream_base&>);
-            static_assert(std::is_same_v<void, std::invoke_result_t<F, ttystream_base&>>);
+            static_assert(std::is_invocable_v<F, maybe_ttystream&>);
+            static_assert(std::is_same_v<void, std::invoke_result_t<F, maybe_ttystream&>>);
 
             if (should_draw()) {
                 *_output << tty::move_x(0)
@@ -92,14 +92,14 @@ namespace pkgxx {
         progress_bar(
             int, // a dummy parameter to avoid conflicting with the public ctor
             std::size_t total,
-            value_or_ref<ttystream_base>&& output,
+            value_or_ref<maybe_ttystream>&& output,
             double decay_p,
             bool show_percent,
             bool show_ETA,
             bar_style const& style,
             std::chrono::steady_clock::duration const& redraw_rate);
 
-        static value_or_ref<ttystream_base>
+        static value_or_ref<maybe_ttystream>
         default_output();
 
         /** Should we actually draw a progress bar? */
@@ -131,7 +131,7 @@ namespace pkgxx {
         using lock_t  = std::lock_guard<mutex_t>;
 
         mutable mutex_t _mtx;
-        value_or_ref<ttystream_base> _output;
+        value_or_ref<maybe_ttystream> _output;
         double _decay_p;
         bool _show_percent;
         bool _show_ETA;

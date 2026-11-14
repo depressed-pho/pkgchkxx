@@ -28,7 +28,7 @@ namespace pkgxx {
     progress_bar::progress_bar(
         int,
         std::size_t total,
-        value_or_ref<ttystream_base>&& output,
+        value_or_ref<maybe_ttystream>&& output,
         double decay_p,
         bool show_percent,
         bool show_ETA,
@@ -114,9 +114,9 @@ namespace pkgxx {
         return *this;
     }
 
-    value_or_ref<ttystream_base>
+    value_or_ref<maybe_ttystream>
     progress_bar::default_output() {
-        return value_or_ref<ttystream_base>(
+        return value_or_ref<maybe_ttystream>(
             std::in_place_type<maybe_ttystream>, STDERR_FILENO, "owned"_na = false);
     }
 
