@@ -40,7 +40,7 @@ namespace pkgxx {
                 << "x:"           << std::endl;
             for (auto const& var: vars) {
                 make.cin()
-                    << "\t@printf '%s\\0' \"${" << var << "}\"" << std::endl;
+                    << "\t@printf '%s\\0' ${" << var << ":Q}" << std::endl;
             }
             make.cin().close();
 
@@ -106,7 +106,7 @@ namespace pkgxx {
                 << "x:"        << std::endl;
             for (auto const& var: vars) {
                 make.cin()
-                    << "\t@printf '%s\\0' \"${" << var << "}\"" << std::endl;
+                    << "\t@printf '%s\\0' ${" << var << ":Q}" << std::endl;
             }
             make.cin().close();
 
