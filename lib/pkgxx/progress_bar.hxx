@@ -54,7 +54,7 @@ namespace pkgxx {
                 0, total,
                 static_cast<value_or_ref<maybe_ttystream>&&>(
                     na::get("output"_na = default_output(), std::forward<Args>(args)...)),
-                na::get("decay_p"_na      = 0.1 , std::forward<Args>(args)...),
+                na::get("decay_p"_na      = 1.0 , std::forward<Args>(args)...),
                 na::get("show_percent"_na = true, std::forward<Args>(args)...),
                 na::get("show_ETA"_na     = true, std::forward<Args>(args)...),
                 static_cast<bar_style const&>(
