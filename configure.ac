@@ -136,6 +136,7 @@ AC_CONFIG_FILES([
     lib/Makefile
     lib/pkgxx/Makefile
     src/Makefile
+    src/lint/Makefile
     src/pkg_chk/Makefile
     src/pkg_rr/Makefile
     test/Makefile
