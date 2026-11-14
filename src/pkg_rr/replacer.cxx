@@ -307,7 +307,7 @@ namespace pkg_rr {
                 }
             }
         }
-        for (auto const& unsafe_pkg: *(unsafe_pkgs.lock())) {
+        for (auto const& unsafe_pkg: unsafe_pkgs.take()) {
             auto const& [unsafe_base, _unsafe_path] = unsafe_pkg;
             topology.add_edge(unsafe_base, base);
             UNSAFE_TODO.insert(unsafe_pkg);
@@ -482,7 +482,7 @@ namespace pkg_rr {
                         });
                 }
             }
-            to_scan = std::move(*(scheduled.lock()));
+            to_scan = scheduled.take();
         }
 
         // Now we have a graph of @blddep entries, which includes not only
@@ -495,7 +495,7 @@ namespace pkg_rr {
             depgraph.lock()->remove_in_edges(FETCH_USING.value());
         }
 
-        return std::move(*(depgraph.lock()));
+        return depgraph.take();
     }
 
     std::pair<pkgxx::pkgbase, pkgxx::pkgpath>
@@ -804,9 +804,7 @@ namespace pkg_rr {
                 }
             }
         }
-        return std::make_pair(
-            std::move(version),
-            std::move(*(resolved_deps.lock())));
+        return std::make_pair(std::move(version), resolved_deps.take());
     }
 
     void

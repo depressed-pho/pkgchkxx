@@ -42,9 +42,7 @@ namespace pkg_rr {
             }
         }
         for (auto& axis: _axes) {
-            std::get<0>(axis).set_value(
-                std::move(
-                    *(std::get<1>(axis).lock())));
+            std::get<0>(axis).set_value(std::get<1>(axis).take());
         }
     }
 }

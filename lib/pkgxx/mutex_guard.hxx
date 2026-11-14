@@ -23,15 +23,27 @@ namespace pkgxx {
                 , _lk(cell._mtx) {}
 
         public:
-            /** Obtain a mutable reference to the guarded value. */
+            /** Obtain an l-value reference to the guarded value. */
             T&
-            operator* () const {
+            operator* () & noexcept {
                 return _cell->_val;
             }
 
-            /** Obtain a mutable pointer to the guarded value. */
+            /** Obtain an l-value reference to the guarded value. */
+            T const&
+            operator* () const& noexcept {
+                return _cell->_val;
+            }
+
+            /** Obtain an r-value reference to the guarded value. */
+            T&&
+            operator* () && noexcept {
+                return std::move(_cell->_val);
+            }
+
+            /** Obtain the pointer to the guarded value. */
             T*
-            operator-> () const {
+            operator-> () noexcept {
                 return &(_cell->_val);
             }
 
@@ -61,6 +73,14 @@ namespace pkgxx {
         mutex_guard
         lock() {
             return mutex_guard(*this);
+        }
+
+        /** Move the value out of the container. \c T has to be
+         * move-constructible.
+         */
+        T
+        take() {
+            return T(*lock());
         }
 
     private:

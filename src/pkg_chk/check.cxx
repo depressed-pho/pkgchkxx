@@ -165,9 +165,9 @@ namespace pkg_chk {
         }
         done();
 
-        // The nursery has to be destroyed before this std::move() happens,
+        // The nursery has to be destroyed before this take() happens,
         // otherwise we would return an empty result.
-        return std::move(*res.lock());
+        return res.take();
     }
 
     checker_base::result
