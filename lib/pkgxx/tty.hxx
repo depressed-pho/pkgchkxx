@@ -202,8 +202,7 @@ namespace pkgxx {
          */
         template <typename... Args>
         ttystream(int fd, Args&&... args)
-            : std::istream(nullptr)
-            , fdstream(
+            : fdstream(
                 fd,
                 na::get("owned"_na = false, std::forward<Args>(args)...))
             , _use_colour(
@@ -214,6 +213,14 @@ namespace pkgxx {
                 throw not_a_tty(fd);
             }
         }
+
+        /** Construct an instance of \ref ttystream by moving a buffer out
+         * of another instance.
+         */
+        ttystream(ttystream&& other)
+            : fdstream(std::move(other))
+            , _use_colour(std::move(other._use_colour))
+            , _styles(std::move(other._styles)) {}
 
         virtual ~ttystream() = default;
 
@@ -346,24 +353,39 @@ namespace pkgxx {
         std::variant<ttystream, fdostream> _out;
     };
 
-    /** \ref ttystream is a subclass of \c ttystream_base that potentially
-     * (but not necessarily) refers to a tty.
+    /** \ref maybe_ttystream is a subclass of \c ttystream_base that
+     * potentially (but not necessarily) refers to a tty. It can even be a
+     * null stream.
      */
     struct maybe_ttystream: public virtual ttystream_base
                           , public virtual std::ostream {
+        /** Construct a \ref maybe_ttystream that silently discards any
+         * outputs.
+         */
         maybe_ttystream()
             : std::ostream(nullptr) {}
 
-        /** Construct a \ref ttystream out of a file descriptor \c
+        /** Construct a \ref maybe_ttystream out of a file descriptor \c
          * fd. Unlike \ref ttystream, the constructor does not throw \ref
          * not_a_tty even if \c fd does not refer to a tty.
          */
         template <typename... Args>
         maybe_ttystream(int fd, Args&&... args)
             : std::ostream(nullptr)
-            , _buf(std::in_place, fd, std::forward<Args>(args)...) {
+            , _buf(std::make_unique<maybe_ttystreambuf>(fd, std::forward<Args>(args)...)) {
 
-            rdbuf(&_buf.value());
+            rdbuf(_buf.get());
+        }
+
+        /** Construct an instance of \ref maybe_ttystream by moving a
+         * buffer out of another instance.
+         */
+        maybe_ttystream(maybe_ttystream&& other)
+            : std::ostream(nullptr)
+            , _buf(std::move(other._buf)) {
+
+            other.set_rdbuf(nullptr);
+            rdbuf(_buf.get());
         }
 
         virtual ~maybe_ttystream() = default;
@@ -376,19 +398,19 @@ namespace pkgxx {
         virtual void
         push_style(tty::style const& sty, how how_) override {
             if (_buf) {
-                return _buf->push_style(sty, how_);
+                _buf->push_style(sty, how_);
             }
         }
 
         virtual void
         pop_style() override {
             if (_buf) {
-                return _buf->pop_style();
+                _buf->pop_style();
             }
         }
 
     private:
-        std::optional<maybe_ttystreambuf> _buf;
+        std::unique_ptr<maybe_ttystreambuf> _buf;
     };
 
     /** This is like \c std::syncbuf but is for \ref ttystream_base.
