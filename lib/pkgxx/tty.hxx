@@ -222,7 +222,7 @@ namespace pkgxx {
             , _use_colour(std::move(other._use_colour))
             , _styles(std::move(other._styles)) {}
 
-        virtual ~ttystream() = default;
+        virtual ~ttystream();
 
         virtual std::optional<dimension<std::size_t>>
         size() const override;

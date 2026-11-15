@@ -21,6 +21,12 @@ namespace pkgxx {
 #endif
     }
 
+    ttystream::~ttystream() {
+        if (!_styles.empty()) {
+            apply_style(tty::style {}); // Revert the state of tty.
+        }
+    }
+
     std::optional<dimension<std::size_t>>
     ttystream::size() const {
         if (!fd()) {
