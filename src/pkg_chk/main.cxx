@@ -19,6 +19,7 @@
 #include <pkgxx/pkgdb.hxx>
 #include <pkgxx/pkgpath.hxx>
 #include <pkgxx/todo.hxx>
+#include <pkgxx/varcache.hxx>
 
 #include "pkg_chk/check.hxx"
 #include "config_file.hxx"
@@ -322,6 +323,11 @@ namespace {
             }
             return;
         }
+
+        pkgxx::varcache(env.PKGSRCDIR.get())
+            .default_vars()
+            .enable_msg(env.opts.verbose)
+            .populate();
 
         checker chk(env);
         checker::result res = chk.run(pkgpaths);

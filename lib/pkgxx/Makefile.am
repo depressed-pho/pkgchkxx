@@ -31,6 +31,7 @@ libpkgxx_la_SOURCES = \
 	tty.cxx tty.hxx \
 	unwrap.hxx \
 	value_or_ref.hxx \
+	varcache.hxx varcache.cxx \
 	wwwstream.cxx wwwstream.hxx \
 	xargs_fold.hxx
 

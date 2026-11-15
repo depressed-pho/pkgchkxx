@@ -118,7 +118,7 @@ namespace pkg_chk {
                     vars.push_back("SU_CMD");
                 }
                 std::map<std::string, std::string> value_of;
-                auto const pkgpath = PKGSRCDIR.get() / "pkgtools/pkg_install"; // Any package will do.
+                auto const pkgpath = PKGSRCDIR.get() / "pkgtools/pkg_install"; // Any packages will do.
                 if (fs::is_directory(pkgpath)) {
                     value_of = pkgxx::extract_pkgmk_vars(pkgpath, vars).value();
                 }

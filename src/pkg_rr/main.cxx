@@ -1,4 +1,5 @@
 #include <exception>
+#include <pkgxx/varcache.hxx>
 
 #include "environment.hxx"
 #include "options.hxx"
@@ -7,13 +8,18 @@
 int main(int argc, char* argv[]) {
     try {
         pkg_rr::options opts(argc, argv);
+        pkg_rr::environment env(opts);
 
         if (opts.help) {
             pkg_rr::usage(argv[0]);
             return 1;
         }
 
-        pkg_rr::environment env(opts);
+        pkgxx::varcache(env.PKGSRCDIR.get())
+            .default_vars()
+            .enable_msg(opts.verbose >= 2)
+            .populate();
+
         pkg_rr::rolling_replacer(argv[0], opts, env).run();
     }
     catch (pkg_rr::bad_options& e) {
