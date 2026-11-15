@@ -40,7 +40,7 @@ namespace pkgxx {
                 << "x:"           << std::endl;
             for (auto const& var: vars) {
                 make.cin()
-                    << "\t@printf '%s\\0' ${" << var << ":Q}" << std::endl;
+                    << "\t@printf '%s\\0' ${" << var << ":U__pkgxx_undefined__:Q}" << std::endl;
             }
             make.cin().close();
 
@@ -48,7 +48,9 @@ namespace pkgxx {
                 std::string value;
                 std::getline(make.cout(), value, '\0');
 
-                value_of[vars[i]] = value;
+                if (value != "__pkgxx_undefined__") {
+                    value_of[vars[i]] = value;
+                }
             }
             make.cout().close();
 
@@ -106,7 +108,7 @@ namespace pkgxx {
                 << "x:"        << std::endl;
             for (auto const& var: vars) {
                 make.cin()
-                    << "\t@printf '%s\\0' ${" << var << ":Q}" << std::endl;
+                    << "\t@printf '%s\\0' ${" << var << ":U__pkgxx_undefined__:Q}" << std::endl;
             }
             make.cin().close();
 
@@ -114,7 +116,9 @@ namespace pkgxx {
                 std::string value;
                 std::getline(make.cout(), value, '\0');
 
-                value_of[vars[i]] = value;
+                if (value != "__pkgxx_undefined__") {
+                    value_of[vars[i]] = value;
+                }
             }
             make.cout().close();
 
