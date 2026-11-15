@@ -18,6 +18,18 @@ namespace pkgxx {
         }
     }
 
+    void
+    csetenv(
+        std::string const& name,
+        std::string const& value,
+        bool overwrite) {
+
+        int rv = setenv(name.c_str(), value.c_str(), overwrite ? 1 : 0);
+        if (rv != 0) {
+            throw std::system_error(errno, std::generic_category(), "setenv");
+        }
+    }
+
     environment::environment() {
         // Hide PKG_PATH to avoid breakage in 'make' calls.
         {

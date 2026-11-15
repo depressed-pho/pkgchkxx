@@ -10,6 +10,13 @@ namespace pkgxx {
     std::optional<std::string>
     cgetenv(std::string const& name);
 
+    /** C++ wrapper for POSIX setenv(3) */
+    void
+    csetenv(
+        std::string const& name,
+        std::string const& value,
+        bool overwrite = true);
+
     /** Values from the environment such as various Makefiles. Most of such
      * values are very expensive to retrieve so they are lazily
      * evaluated.
