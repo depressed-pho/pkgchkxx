@@ -20,6 +20,30 @@ namespace {
 }
 
 namespace pkgxx {
+    bad_pkgname::bad_pkgname(std::string_view const& name)
+        : std::runtime_error("")
+        , name(name) {}
+
+    char const*
+    bad_pkgname::what() const noexcept {
+        if (!msg) {
+            msg.emplace("`" + name + "' is not a valid PKGNAME");
+        }
+        return msg->c_str();
+    }
+
+    bad_pkgversion::bad_pkgversion(std::string_view const& version)
+        : std::runtime_error("")
+        , version(version) {}
+
+    char const*
+    bad_pkgversion::what() const noexcept {
+        if (!msg) {
+            msg.emplace("`" + version + "' is not a valid PKGVERSION");
+        }
+        return msg->c_str();
+    }
+
     pkgversion::pkgversion(std::string_view const& str)
         : _rev(0) {
 
@@ -69,9 +93,11 @@ namespace pkgxx {
                 _comps.emplace_back(alpha(*it++));
                 continue;
             }
-            // Dunno what to do about this character. It's an invalid
-            // version. Just ignore it.
-            it++;
+            throw bad_pkgversion(str);
+        }
+
+        if (_comps.empty()) {
+            throw bad_pkgversion(str);
         }
     }
 
@@ -109,12 +135,16 @@ namespace pkgxx {
     pkgname::pkgname(std::string_view const& name) {
         auto const hyphen = name.rfind('-');
         if (hyphen == std::string_view::npos) {
-            // This shouldn't happen.
-            base = pkgbase(name);
+            throw bad_pkgname(name);
         }
         else {
-            base    = pkgbase(name.substr(0, hyphen));
-            version = pkgversion(name.substr(hyphen + 1));
+            try {
+                base    = pkgbase(name.substr(0, hyphen));
+                version = pkgversion(name.substr(hyphen + 1));
+            }
+            catch (bad_pkgversion const&) {
+                throw bad_pkgname(name);
+            }
         }
     }
 }

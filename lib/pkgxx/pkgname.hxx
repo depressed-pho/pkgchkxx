@@ -15,6 +15,30 @@
 #include <pkgxx/ordered.hxx>
 
 namespace pkgxx {
+    struct bad_pkgname: virtual std::runtime_error {
+        bad_pkgname(std::string_view const& name);
+
+        virtual char const*
+        what() const noexcept override;
+
+        std::string name;
+
+    private:
+        mutable std::optional<std::string> msg;
+    };
+
+    struct bad_pkgversion: virtual std::runtime_error {
+        bad_pkgversion(std::string_view const& version);
+
+        virtual char const*
+        what() const noexcept override;
+
+        std::string version;
+
+    private:
+        mutable std::optional<std::string> msg;
+    };
+
     /** A type alias that represents a PKGBASE. */
     using pkgbase = std::string;
 
@@ -157,11 +181,15 @@ namespace pkgxx {
         pkgversion()
             : _rev(0) {}
 
-        /** Parse a PKGVERSION string. */
+        /** Parse a PKGVERSION string. Throws \ref pkgxx::bad_pkgversion if
+         * it's malformed.
+         */
         pkgversion(std::string const& str)
             : pkgversion(static_cast<std::string_view>(str)) {}
 
-        /** Parse a PKGVERSION string. */
+        /** Parse a PKGVERSION string. Throws \ref pkgxx::bad_pkgversion if
+         * it's malformed.
+         */
         pkgversion(std::string_view const& str);
 
         /** \ref pkgversion equality. */
@@ -222,7 +250,9 @@ namespace pkgxx {
      * PKGVERSION.
      */
     struct pkgname: ordered<pkgname> {
-        /** Parse a PKGNAME string e.g. <tt>foo-1.0</tt>. */
+        /** Parse a PKGNAME string e.g. <tt>foo-1.0</tt>. Throws \ref
+         * pkgxx::bad_pkgname if it's malformed.
+         */
         pkgname(std::string_view const& name);
 
         /** Forward-construct an instance of \ref pkgname. */
