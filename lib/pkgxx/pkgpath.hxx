@@ -2,6 +2,7 @@
 
 #include <exception>
 #include <filesystem>
+#include <optional>
 #include <ostream>
 #include <string_view>
 
@@ -10,8 +11,19 @@
 
 namespace pkgxx {
     struct bad_pkgpath: virtual std::runtime_error {
-        using std::runtime_error::runtime_error;
+        bad_pkgpath(std::string_view const& pkgpath);
+
+        virtual char const*
+        what() const noexcept override;
+
+        std::string pkgpath;
+
+    private:
+        mutable std::optional<std::string> msg;
     };
+
+    /** A type alias that represents a package category. */
+    using category = std::string;
 
     /** A class that represents a PKGPATH; a pair of package category and a
      * sub-directory.
