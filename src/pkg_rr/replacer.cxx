@@ -720,6 +720,8 @@ namespace pkg_rr {
         auto vars =
             pkgxx::extract_pkgmk_vars(
                 pkgdir,
+                // THINKME: What about INDIRECT_BUILD_DEPENDS and
+                // INDIRECT_DEPENDS?
                 {"PKGVERSION", "BUILD_DEPENDS", "TOOL_DEPENDS", "DEPENDS"},
                 make_vars_for_pkg(base));
         if (!vars.has_value()) {
@@ -738,10 +740,16 @@ namespace pkg_rr {
                     auto dep_pattern = dep.substr(0, colon);
                     auto dep_path    = dep.substr(colon + 1);
 
-                    if (dep_path.substr(0, 6) == "../../") {
+                    // Paths aren't required to start with
+                    // "../../". Canonicalise them like what
+                    // mk/scripts/pkg_path does.
+                    auto const abs_dep_path = (pkgdir / dep_path).lexically_normal();
+                    auto const dep_pkgpath  = abs_dep_path.lexically_relative(env.PKGSRCDIR.get());
+                    if (dep_pkgpath.has_parent_path() && !dep_pkgpath.parent_path().has_parent_path()) {
+                        // It has exactly 2 path segments under PKGSRCDIR.
                         deps.emplace(
-                            pkgxx::pkgpattern(dep_pattern),
-                            pkgxx::pkgpath(dep_path.substr(6)));
+                            pkgxx::pkgpattern{dep_pattern},
+                            pkgxx::pkgpath{dep_pkgpath.string()});
                         continue;
                     }
                 }
