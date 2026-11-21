@@ -94,7 +94,8 @@ namespace pkgxx {
         std::optional<value_type> _current;
     };
 
-    /// Split a string into words like shells do.
+    /// Split a string into words like shells do, but without unquoting or
+    /// unescaping.
     struct words {
         /// The const iterator that iterates through words in a string.
         using const_iterator = word_iterator const;

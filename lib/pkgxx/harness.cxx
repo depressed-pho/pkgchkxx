@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include "harness.hxx"
+#include "shell_args.hxx"
 #include "spawn.hxx"
 
 namespace pkgxx {
@@ -263,7 +264,7 @@ namespace pkgxx {
     command_error::what() const noexcept {
         if (!msg) {
             msg.emplace(
-                "Command arguments were: " + stringify_argv(argv));
+                "Command arguments were: " + shell_args(argv).string());
         }
         return msg->c_str();
     }

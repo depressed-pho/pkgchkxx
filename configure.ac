@@ -6,6 +6,8 @@ AC_INIT([pkgchkxx], [0.3.5], [pkgsrc-users@NetBSD.org])
 AC_CONFIG_MACRO_DIR([m4])
 AC_CONFIG_SRCDIR([lib/pkgxx/pkgname.hxx])
 AC_CONFIG_HEADERS([lib/pkgxx/config.h])
+AC_CONFIG_AUX_DIR([build-aux])
+AC_REQUIRE_AUX_FILE([tap-driver.sh])
 
 LT_PREREQ([2.4.7])
 LT_INIT
@@ -136,5 +138,6 @@ AC_CONFIG_FILES([
     src/Makefile
     src/pkg_chk/Makefile
     src/pkg_rr/Makefile
+    test/Makefile
 ])
 AC_OUTPUT

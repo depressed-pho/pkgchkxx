@@ -2,9 +2,9 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
-
 #include <pkgxx/config.h>
 #include <pkgxx/progress_bar.hxx>
+#include <pkgxx/shell_args.hxx>
 #include <pkgxx/string_algo.hxx>
 
 #include "pkg_chk/check.hxx"
@@ -632,7 +632,7 @@ namespace pkg_rr {
         }
 
         if (opts.dry_run) {
-            env.msg() << tty::faint("Would run: "_ch << pkgxx::stringify_argv(argv))
+            env.msg() << tty::faint("Would run: "_ch << pkgxx::shell_args(argv))
                       << std::endl;
         }
         else if (opts.log_dir) {
@@ -671,7 +671,7 @@ namespace pkg_rr {
             }
 
             if (make.wait_exit().status != 0) {
-                throw replace_failed("Command failed: " + pkgxx::stringify_argv(argv));
+                throw replace_failed("Command failed: " + pkgxx::shell_args(std::move(argv)).string());
             }
         }
         else {
@@ -683,7 +683,7 @@ namespace pkg_rr {
                 "stderr_action"_na = pkgxx::harness::fd_action::inherit);
 
             if (make.wait_exit().status != 0) {
-                throw replace_failed("Command failed: " + pkgxx::stringify_argv(argv));
+                throw replace_failed("Command failed: " + pkgxx::shell_args(std::move(argv)).string());
             }
         }
     }
@@ -836,8 +836,7 @@ namespace pkg_rr {
             // If the package wasn't installed before we did, it's clear
             // that the user didn't explicitly ask to install it.
             if (!opts.dry_run)
-                run_su(env.PKG_ADMIN.get() + ' ' + pkgxx::stringify_argv(
-                           std::initializer_list<std::string> {"set", "automatic=YES", base}));
+                run_su(env.PKG_ADMIN.get() + ' ' + pkgxx::shell_args{"set", "automatic=YES", base}.string());
         }
 
         clean(base, path);

@@ -18,6 +18,7 @@
 #include <pkgxx/nursery.hxx>
 #include <pkgxx/pkgdb.hxx>
 #include <pkgxx/pkgpath.hxx>
+#include <pkgxx/shell_args.hxx>
 #include <pkgxx/todo.hxx>
 #include <pkgxx/varcache.hxx>
 
@@ -84,7 +85,12 @@ namespace {
             if (prog.wait_exit().status != 0) {
                 auto const& show_error =
                     [&](auto&& out) {
-                        out << '\'' << cmd << ' ' << pkgxx::stringify_argv(args) << "' failed" << std::endl;
+                        out << '\''
+                            << cmd
+                            << ' '
+                            << pkgxx::shell_args(std::move(args))
+                            << "' failed"
+                            << std::endl;
                     };
                 if (fail_ok) {
                     msg << "** ";
@@ -109,7 +115,7 @@ namespace {
         std::function<void (std::map<std::string, std::string>&)> const& env_mod = [](auto&) {}) {
 
         if (!env.SU_CMD.get().empty()) {
-            return run_cmd(env, env.SU_CMD.get(), {cmd + ' ' + pkgxx::stringify_argv(args)}, fail_ok, cwd, env_mod);
+            return run_cmd(env, env.SU_CMD.get(), {cmd + ' ' + pkgxx::shell_args(args).string()}, fail_ok, cwd, env_mod);
         }
         else {
             return run_cmd(env, cmd, args, fail_ok, cwd, env_mod);

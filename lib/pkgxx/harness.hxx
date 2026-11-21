@@ -8,7 +8,6 @@
 #include <optional>
 #include <ostream>
 #include <signal.h>
-#include <sstream>
 #include <string>
 #include <sys/types.h>
 #include <type_traits>
@@ -28,42 +27,6 @@
 
 namespace pkgxx {
     static inline std::string const shell = "/bin/sh";
-
-    template <typename Argv>
-    inline std::string
-    stringify_argv(Argv const& argv) {
-        using namespace std::literals;
-        static auto const any_specials    = " \t\n~`#$&*()\\|[];'\"<>?";
-        static auto const strong_specials = "$`\\\""sv;
-
-        std::stringstream ss;
-        bool is_first = true;
-        for (auto const& arg: argv) {
-            if (is_first) {
-                is_first = false;
-            }
-            else {
-                ss << ' ';
-            }
-            if (arg.find_first_of(any_specials) != Argv::value_type::npos) {
-                // The argument contains some shell special
-                // characters. Quote it to not confuse someone seeing this
-                // message.
-                ss << '"';
-                for (auto c: arg) {
-                    if (strong_specials.find(c) != std::string_view::npos) {
-                        ss << '\\';
-                    }
-                    ss << c;
-                }
-                ss << '"';
-            }
-            else {
-                ss << arg;
-            }
-        }
-        return ss.str();
-    }
 
     // I'm not comfortable with bringing it in this scope, but what else
     // can we do?

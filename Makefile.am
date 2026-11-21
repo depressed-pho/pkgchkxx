@@ -1,4 +1,4 @@
-SUBDIRS = doc lib src
+SUBDIRS = doc lib src test
 
 EXTRA_DIST = \
 	HACKING.md \

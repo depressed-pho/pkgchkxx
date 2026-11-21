@@ -21,6 +21,8 @@ libpkgxx_la_SOURCES = \
 	pkgpath.cxx pkgpath.hxx \
 	pkgpattern.cxx pkgpattern.hxx \
 	progress_bar.cxx progress_bar.hxx \
+	shell_args.hxx shell_args.cxx \
+	tap.hxx tap.cxx \
 	signal.hxx signal.cxx \
 	spawn.cxx spawn.hxx \
 	stream.hxx \
