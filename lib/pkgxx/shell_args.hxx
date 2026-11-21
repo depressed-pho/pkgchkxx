@@ -122,7 +122,7 @@ namespace pkgxx {
         };
         auto const flush = [&]() {
             if (cur_arg) {
-                this->push_back(*cur_arg);
+                this->push_back(*std::move(cur_arg));
                 cur_arg.reset();
             }
         };

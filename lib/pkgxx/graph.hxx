@@ -137,7 +137,7 @@ namespace pkgxx {
         remove_out_edges(VertexT const& src);
 
         /** See if the graph has the given vertex. */
-        bool
+        [[gnu::pure]] bool
         has_vertex(VertexT const& value) const {
             return _vertex_id_of.count(value) != 0;
         }

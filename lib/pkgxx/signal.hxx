@@ -27,7 +27,7 @@ namespace pkgxx {
             using pointer           = value_type*;
             using reference         = value_type&;
 
-            bool
+            [[gnu::pure]] bool
             operator== (iterator const& other) const noexcept;
 
             reference
@@ -148,11 +148,11 @@ namespace pkgxx {
         cend() const { return iterator(); }
 
         /** Obtain the raw pointer to the underlying sigset_t. */
-        sigset_t const*
+        [[gnu::pure]] sigset_t const*
         get() const;
 
         /** Obtain the raw pointer to the underlying sigset_t. */
-        sigset_t*
+        [[gnu::pure]] sigset_t*
         get();
 
     private:

@@ -31,7 +31,7 @@ namespace {
 }
 
 namespace pkgxx {
-    bool
+    [[gnu::pure]] bool
     csigset::iterator::operator== (iterator const& other) const noexcept {
         if (_cur.has_value()) {
             return _ref == other._ref && _cur == other._cur;
@@ -180,7 +180,7 @@ namespace pkgxx {
         return std::make_pair(iterator(*this, signo), inserted);
     }
 
-    sigset_t const*
+    [[gnu::pure]] sigset_t const*
     csigset::get() const {
         return std::visit([](auto&& arg) -> sigset_t const* {
             using T = std::decay_t<decltype(arg)>;
@@ -194,7 +194,7 @@ namespace pkgxx {
         }, _set);
     }
 
-    sigset_t*
+    [[gnu::pure]] sigset_t*
     csigset::get() {
         return std::visit([](auto&& arg) -> sigset_t* {
             using T = std::decay_t<decltype(arg)>;

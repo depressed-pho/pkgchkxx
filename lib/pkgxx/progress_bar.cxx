@@ -191,7 +191,7 @@ namespace pkgxx {
         *_output << std::flush;
     }
 
-    double
+    [[gnu::pure]] double
     progress_bar::progress() const {
         if (_total == 0) {
             return 1.0; // special case

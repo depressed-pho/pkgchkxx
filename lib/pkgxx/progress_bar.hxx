@@ -114,7 +114,7 @@ namespace pkgxx {
         void
         redraw(std::initializer_list<std::string> const& postfix);
 
-        double
+        [[gnu::pure]] double
         progress() const;
 
         void
