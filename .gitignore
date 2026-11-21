@@ -23,6 +23,7 @@ build-aux/install-sh
 build-aux/ltmain.sh
 build-aux/missing
 build-aux/test-driver
+config.h.in
 config.status
 configure
 libtool
@@ -30,11 +31,4 @@ m4/libtool.m4
 m4/lt*.m4
 stamp-*
 
-doc/Doxyfile
-doc/_output
-doc/*.8
-lib/pkgxx/config.h
-lib/pkgxx/config.h.in
-src/pkg_chk/pkgchkxx
-src/pkg_rr/pkgrrxx
-test/shell_args
+_build
