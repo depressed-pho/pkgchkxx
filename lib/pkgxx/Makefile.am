@@ -11,7 +11,7 @@ libpkgxx_la_SOURCES = \
 	harness.hxx harness.cxx \
 	hash.hxx \
 	iterable.hxx \
-	makevars.cxx makevars.hxx \
+	makevars.hxx \
 	mutex_guard.hxx \
 	nursery.cxx nursery.hxx \
 	ordered.hxx \

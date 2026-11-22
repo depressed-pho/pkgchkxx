@@ -225,8 +225,10 @@ namespace pkg_chk {
             return {};
         }
 
-        auto const default_pkgname =
-            pkgxx::extract_pkgmk_var<pkgxx::pkgname>(_PKGSRCDIR.get() / path, "PKGNAME");
+        auto const default_pkgname = ([&]() {
+            auto opt = pkgxx::extract_pkgmk_var(_PKGSRCDIR.get() / path, "PKGNAME");
+            return opt ? std::make_optional<pkgxx::pkgname>(*opt) : std::nullopt;
+        })();
         if (!default_pkgname) {
             fatal([&](auto& out) {
                 out << "Unable to extract PKGNAME for " << path << std::endl;
@@ -258,10 +260,11 @@ namespace pkg_chk {
                         // must treat it like a removed package in that
                         // case.
                         auto const alternative_pkgname =
-                            pkgxx::extract_pkgmk_var<pkgxx::pkgname>(
-                                _PKGSRCDIR.get() / path,
-                                "PKGNAME",
-                                {{"PKGNAME_REQD", installed_pkgname.base + "-[0-9]*"}}).value();
+                            pkgxx::pkgname(
+                                pkgxx::extract_pkgmk_var(
+                                    _PKGSRCDIR.get() / path,
+                                    "PKGNAME",
+                                    {{"PKGNAME_REQD", installed_pkgname.base + "-[0-9]*"}}).value());
                         // If it doesn't support this PKGNAME_REQD, it
                         // reports a PKGNAME whose PKGBASE doesn't match
                         // the requested one.

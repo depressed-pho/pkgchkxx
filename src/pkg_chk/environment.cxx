@@ -9,6 +9,7 @@
 #include <type_traits>
 #include <utility>
 #include <unistd.h>
+#include <unordered_map>
 #include <vector>
 
 #include <pkgxx/harness.hxx>
@@ -117,7 +118,7 @@ namespace pkg_chk {
                 if (geteuid() != 0) {
                     vars.push_back("SU_CMD");
                 }
-                std::map<std::string, std::string> value_of;
+                std::unordered_map<std::string, std::string> value_of;
                 auto const pkgpath = PKGSRCDIR.get() / "pkgtools/pkg_install"; // Any packages will do.
                 if (fs::is_directory(pkgpath)) {
                     value_of = pkgxx::extract_pkgmk_vars(pkgpath, vars).value();
