@@ -15,7 +15,7 @@
 #include <pkgxx/ordered.hxx>
 
 namespace pkgxx {
-    struct bad_pkgname: virtual std::runtime_error {
+    struct bad_pkgname: public std::runtime_error {
         bad_pkgname(std::string_view const& name);
 
         virtual char const*
@@ -27,7 +27,7 @@ namespace pkgxx {
         mutable std::optional<std::string> msg;
     };
 
-    struct bad_pkgversion: virtual std::runtime_error {
+    struct bad_pkgversion: public std::runtime_error {
         bad_pkgversion(std::string_view const& version);
 
         virtual char const*

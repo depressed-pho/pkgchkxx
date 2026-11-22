@@ -27,7 +27,7 @@ namespace pkgxx {
     char const*
     bad_pkgname::what() const noexcept {
         if (!msg) {
-            msg.emplace("`" + name + "' is not a valid PKGNAME");
+            msg.emplace("Malformed PKGNAME: " + name);
         }
         return msg->c_str();
     }
@@ -39,7 +39,7 @@ namespace pkgxx {
     char const*
     bad_pkgversion::what() const noexcept {
         if (!msg) {
-            msg.emplace("`" + version + "' is not a valid PKGVERSION");
+            msg.emplace("Malformed PKGVERSION: " + version);
         }
         return msg->c_str();
     }
@@ -142,8 +142,8 @@ namespace pkgxx {
                 base    = pkgbase(name.substr(0, hyphen));
                 version = pkgversion(name.substr(hyphen + 1));
             }
-            catch (bad_pkgversion const&) {
-                throw bad_pkgname(name);
+            catch (...) {
+                std::throw_with_nested(bad_pkgname{name});
             }
         }
     }

@@ -17,6 +17,42 @@
 #include <pkgxx/string_algo.hxx>
 
 namespace pkgxx {
+    struct bad_pkgpattern: public std::runtime_error {
+        bad_pkgpattern(std::string_view const& pattern);
+
+        virtual char const*
+        what() const noexcept override;
+
+        std::string pattern;
+
+    private:
+        mutable std::optional<std::string> msg;
+    };
+
+    struct bad_alternatives: public std::runtime_error {
+        bad_alternatives(std::string_view const& alternatives);
+
+        virtual char const*
+        what() const noexcept override;
+
+        std::string alternatives;
+
+    private:
+        mutable std::optional<std::string> msg;
+    };
+
+    struct bad_version_range: public std::runtime_error {
+        bad_version_range(std::string_view const& version_range);
+
+        virtual char const*
+        what() const noexcept override;
+
+        std::string version_range;
+
+    private:
+        mutable std::optional<std::string> msg;
+    };
+
     namespace detail {
         template <typename Iterator>
         inline constexpr auto const&
