@@ -8,7 +8,7 @@
 #include <vector>
 
 namespace pkgxx {
-    struct bad_shell_args: virtual std::runtime_error {
+    struct bad_shell_args: public std::runtime_error {
 #if !defined(DOXYGEN)
         bad_shell_args(std::string_view const& str);
 #endif
@@ -23,7 +23,7 @@ namespace pkgxx {
         mutable std::optional<std::string> msg;
     };
 
-    struct unmatched_quoted_string: virtual bad_shell_args {
+    struct unmatched_quoted_string: public bad_shell_args {
 #if !defined(DOXYGEN)
         unmatched_quoted_string(
             bad_shell_args&& bsa,
@@ -38,7 +38,7 @@ namespace pkgxx {
         std::string::size_type pos;
     };
 
-    struct orphan_backslash: virtual bad_shell_args {
+    struct orphan_backslash: public bad_shell_args {
 #if !defined(DOXYGEN)
         orphan_backslash(
             bad_shell_args&& bsa,

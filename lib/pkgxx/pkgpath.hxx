@@ -10,7 +10,7 @@
 #include <pkgxx/ordered.hxx>
 
 namespace pkgxx {
-    struct bad_pkgpath: virtual std::runtime_error {
+    struct bad_pkgpath: public std::runtime_error {
         bad_pkgpath(std::string_view const& pkgpath);
 
         virtual char const*

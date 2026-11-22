@@ -4,7 +4,7 @@
 #include "tap.hxx"
 
 namespace {
-    struct bailed_out: virtual std::runtime_error {
+    struct bailed_out: public std::runtime_error {
         bailed_out(std::optional<std::string_view> const& reason = std::nullopt)
             : std::runtime_error("")
             , reason(reason

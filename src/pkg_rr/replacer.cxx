@@ -16,7 +16,7 @@ namespace fs = std::filesystem;
 namespace tty = pkgxx::tty;
 
 namespace {
-    struct replace_failed: virtual std::runtime_error {
+    struct replace_failed: public std::runtime_error {
         using std::runtime_error::runtime_error;
     };
 

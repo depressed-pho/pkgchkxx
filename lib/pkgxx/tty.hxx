@@ -36,7 +36,7 @@ namespace pkgxx {
         T height;
     };
 
-    struct not_a_tty: virtual std::runtime_error {
+    struct not_a_tty: public std::runtime_error {
 #if !defined(DOXYGEN)
         not_a_tty(int const fd)
             : std::runtime_error("the file descriptor does not refer to a tty")

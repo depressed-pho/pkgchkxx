@@ -22,8 +22,7 @@ namespace pkgxx {
     unmatched_quoted_string::unmatched_quoted_string(
         bad_shell_args&& bsa,
         std::string::size_type pos)
-        : std::runtime_error("")
-        , bad_shell_args(std::move(bsa))
+        : bad_shell_args(std::move(bsa))
         , pos(pos) {}
 #endif
 
@@ -41,8 +40,7 @@ namespace pkgxx {
     orphan_backslash::orphan_backslash(
         bad_shell_args&& bsa,
         std::string::size_type pos)
-        : std::runtime_error("")
-        , bad_shell_args(std::move(bsa))
+        : bad_shell_args(std::move(bsa))
         , pos(pos) {}
 #endif
 

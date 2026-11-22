@@ -188,7 +188,7 @@ namespace pkgxx {
     };
 
     /** An error happened while running an external command. */
-    struct command_error: virtual std::runtime_error {
+    struct command_error: public std::runtime_error {
 #if !defined(DOXYGEN)
         command_error(
             std::filesystem::path&& cmd_,
@@ -215,7 +215,7 @@ namespace pkgxx {
     };
 
     /** An error happened while trying to spawn a process. */
-    struct failed_to_spawn_process: virtual command_error {
+    struct failed_to_spawn_process: public command_error {
 #if !defined(DOXYGEN)
         failed_to_spawn_process(
             command_error&& ce,
@@ -231,7 +231,7 @@ namespace pkgxx {
     };
 
     /** A child process terminated in an unexpected way. */
-    struct process_terminated_unexpectedly: virtual command_error {
+    struct process_terminated_unexpectedly: public command_error {
 #if !defined(DOXYGEN)
         process_terminated_unexpectedly(
             command_error&& ce,
@@ -243,7 +243,7 @@ namespace pkgxx {
     };
 
     /** A child process unexpectedly died of a signal. */
-    struct process_died_of_signal: virtual process_terminated_unexpectedly {
+    struct process_died_of_signal: public process_terminated_unexpectedly {
 #if !defined(DOXYGEN)
         process_died_of_signal(
             process_terminated_unexpectedly&& ptu,
@@ -263,7 +263,7 @@ namespace pkgxx {
     /** A child process unexpectedly terminated for a reason other than
      * calling \c _Exit(2) or \c exit(3) with an argument \c 0.
      */
-    struct process_exited_for_failure: virtual process_terminated_unexpectedly {
+    struct process_exited_for_failure: public process_terminated_unexpectedly {
 #if !defined(DOXYGEN)
         process_exited_for_failure(
             process_terminated_unexpectedly&& ptu,
