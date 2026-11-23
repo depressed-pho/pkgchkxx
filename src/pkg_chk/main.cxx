@@ -36,6 +36,7 @@ namespace {
 
     void
     normalize_pkgname(pkgxx::pkgname& name) {
+        // FIXME: This is bad. Don't guess. Consult pkg_info instead.
         name.base = std::regex_replace(name.base, RE_PYTHON_PREFIX, "py-");
     }
 
@@ -549,8 +550,8 @@ namespace {
 
 int main(int argc, char* argv[]) {
     try {
-        pkg_chk::options opts(argc, argv);
-        pkg_chk::environment env(opts);
+        pkg_chk::options opts{argc, argv};
+        pkg_chk::environment env{opts};
         {
             auto msg = env.verbose();
             msg << "ARGV:";
@@ -570,8 +571,8 @@ int main(int argc, char* argv[]) {
             break;
 
         case pkg_chk::mode::HELP:
-            pkg_chk::usage(argv[0]);
-            return 1;
+            opts.usage();
+            return 0;
 
         case pkg_chk::mode::LIST_BIN_PKGS:
             list_bin_pkgs(env);
@@ -586,9 +587,6 @@ int main(int argc, char* argv[]) {
             std::abort();
         }
         return 0;
-    }
-    catch (pkg_chk::bad_options& e) {
-        return 1;
     }
     catch (std::exception& e) {
         std::cerr << argv[0] << ": " << e.what() << std::endl;

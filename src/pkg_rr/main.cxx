@@ -11,8 +11,8 @@ int main(int argc, char* argv[]) {
         pkg_rr::environment env(opts);
 
         if (opts.help) {
-            pkg_rr::usage(argv[0]);
-            return 1;
+            opts.usage();
+            return 0;
         }
 
         pkgxx::varcache(env.PKGSRCDIR.get())
@@ -21,9 +21,6 @@ int main(int argc, char* argv[]) {
             .populate();
 
         pkg_rr::rolling_replacer(argv[0], opts, env).run();
-    }
-    catch (pkg_rr::bad_options& e) {
-        return 1;
     }
     catch (std::exception& e) {
         std::cerr << argv[0] << ": " << e.what() << std::endl;

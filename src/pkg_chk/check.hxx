@@ -9,6 +9,7 @@
 #include <set>
 
 #include <pkgxx/build_version.hxx>
+#include <pkgxx/numeral.hxx>
 #include <pkgxx/pkgname.hxx>
 #include <pkgxx/stream.hxx>
 #include <pkgxx/summary.hxx>
@@ -25,7 +26,7 @@ namespace pkg_chk {
         checker_base(
             bool add_missing,
             bool check_build_version,
-            unsigned concurrency,
+            pkgxx::positive<unsigned> const& concurrency,
             bool update,
             bool delete_mismatched,
             std::shared_future<std::string> const& PKG_INFO);
@@ -86,7 +87,7 @@ namespace pkg_chk {
 
         bool _add_missing;
         bool _check_build_version;
-        unsigned _concurrency;
+        pkgxx::positive<unsigned> _concurrency;
         bool _update;
         bool _delete_mismatched;
 

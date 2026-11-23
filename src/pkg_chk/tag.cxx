@@ -1,3 +1,4 @@
+#include <array>
 #include <optional>
 
 #include <pkgxx/string_algo.hxx>
@@ -6,41 +7,33 @@
 
 namespace pkg_chk {
     tagset::tagset(std::string_view const& tags) {
-        if (!tags.empty()) {
-            std::optional<std::string::size_type> last_sep;
-            while (true) {
-                auto const next_sep =
-                    last_sep ? tags.find_first_of(',', *last_sep + 1)
-                             : tags.find_first_of(',');
-                if (next_sep == std::string::npos) {
-                    if (last_sep) {
-                        emplace(tags.substr(*last_sep + 1));
-                    }
-                    else {
-                        emplace(tags);
-                    }
-                    break;
-                }
-                else {
-                    last_sep = next_sep;
-                }
-            }
+        for (auto const& tag: pkgxx::words(tags, ",")) {
+            emplace(tag);
         }
     }
 
     std::ostream&
-    operator<< (std::ostream& out, tagset const& tags) {
-        bool is_first = true;
-        for (auto const& t: tags) {
-            if (is_first) {
-                is_first = false;
-            }
-            else {
-                out << ',';
-            }
-            out << t;
+    operator<< (std::ostream& out, tagset const& in) {
+        return pkgxx::join(out, in, ',');
+    }
+
+    std::istream&
+    operator>> (std::istream& in, tagset& out) {
+        // Let's be lazy, and read the entire input from the stream. We
+        // will load everything onto the memory anyway.
+        std::string tags;
+        std::array<decltype(tags)::value_type, 1024> buf;
+        while (in.good()) {
+            in.read(buf.data(), buf.size());
+            tags.append(buf.data(), static_cast<decltype(tags)::size_type>(in.gcount()));
         }
-        return out;
+
+        // Then parse it.
+        out.clear();
+        for (auto const& tag: pkgxx::words(tags, ",")) {
+            out.emplace(tag);
+        }
+        return in;
     }
 
     tagpat::tagpat(std::string_view const& pattern) {
@@ -63,17 +56,6 @@ namespace pkg_chk {
         if (pat.negative) {
             out << '-';
         }
-
-        bool is_first = true;
-        for (auto const& t: pat.tags_and) {
-            if (is_first) {
-                is_first = false;
-            }
-            else {
-                out << '+';
-            }
-            out << t;
-        }
-        return out;
+        return pkgxx::join(out, pat.tags_and, '+');
     }
 }

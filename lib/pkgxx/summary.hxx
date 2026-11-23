@@ -7,6 +7,7 @@
 #include <ostream>
 #include <set>
 
+#include <pkgxx/numeral.hxx>
 #include <pkgxx/pkgpath.hxx>
 #include <pkgxx/pkgpattern.hxx>
 #include <pkgxx/pkgname.hxx>
@@ -47,7 +48,7 @@ namespace pkgxx {
         summary(
             std::ostream& msg,
             std::ostream& verbose,
-            unsigned concurrency,
+            positive<unsigned> const& concurrency,
             std::filesystem::path const& PACKAGES,
             std::string const& PKG_INFO,
             std::string const& PKG_SUFX);

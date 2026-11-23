@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <exception>
-#include <cassert>
 #include <condition_variable>
 #include <deque>
 #include <istream>
@@ -14,6 +13,7 @@
 
 #include <pkgxx/config.h>
 #include <pkgxx/harness.hxx>
+#include <pkgxx/numeral.hxx>
 #include <pkgxx/permissive_shared_ptr.hxx>
 
 namespace pkgxx {
@@ -59,13 +59,13 @@ namespace pkgxx {
 
             xargs_nursery(std::vector<std::string> const& cmd,
                           Parse&& parse,
-                          unsigned int concurrency) {
+                          pkgxx::positive<unsigned> const& concurrency) {
                 lock_t lk(_mtx);
 
                 std::vector<std::string> argv = {CFG_XARGS, "-r", "-0"};
                 argv.insert(argv.end(), cmd.begin(), cmd.end());
 
-                for (unsigned int i = 0; i < concurrency; i++) {
+                for (unsigned i = 0; i < concurrency; i++) {
                     _harnesses.push_back(make_permissive_shared<harness>(CFG_XARGS, argv));
 
                     std::thread parser(
@@ -176,14 +176,14 @@ namespace pkgxx {
     xargs_fold(std::vector<std::string> const& cmd,
                Split&& split,
                Parse&& parse,
-               unsigned int concurrency = std::max(1u, std::thread::hardware_concurrency())) {
+               positive<unsigned> const& concurrency =
+                   std::max(1u, std::thread::hardware_concurrency())) {
 
         static_assert(
             std::is_invocable_v<
                 Split,
                 typename detail::xargs_nursery<Parse>::split_sink&&>);
 
-        assert(concurrency > 0);
         auto nursery = detail::xargs_nursery(cmd, parse, concurrency);
         split(nursery.sink());
         return nursery.await();

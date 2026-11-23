@@ -32,7 +32,7 @@ namespace lint {
         std::vector<pkgxx::pkgpath> const& pkgpaths,
         pkgxx::value_or_ref<pkgxx::maybe_ttystream>&& output,
         bool list_makefiles,
-        unsigned concurrency) {
+        pkgxx::positive<unsigned> const& concurrency) {
 
         *output << tty::colour(tty::green)("Scanning Makefiles:") << std::endl;
         pkgxx::progress_bar pb{pkgpaths.size(), "output"_na = std::move(output)};
@@ -212,7 +212,7 @@ namespace lint {
             std::in_place_type<pkgxx::maybe_ttystream>, STDERR_FILENO, "owned"_na = false);
     }
 
-    unsigned
+    pkgxx::positive<unsigned>
     lintdb::default_concurrency() {
         return std::max(1u, std::thread::hardware_concurrency());
     }

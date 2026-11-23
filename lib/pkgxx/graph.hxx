@@ -5,14 +5,13 @@
 #include <functional>
 #include <cassert>
 #include <map>
-#include <set>
 #include <optional>
-#include <sstream>
+#include <pkgxx/string_algo.hxx>
+#include <pkgxx/unwrap.hxx>
+#include <set>
 #include <type_traits>
 #include <utility>
 #include <vector>
-
-#include <pkgxx/unwrap.hxx>
 
 namespace pkgxx {
     /// A cycle has been detected while tsorting a graph.
@@ -285,19 +284,7 @@ namespace pkgxx {
     template <typename VertexT>
     std::string
     not_a_dag<VertexT, void>::cycle() const {
-        std::stringstream ss;
-        bool is_first = true;
-
-        for (auto const& value: _vertices) {
-            if (is_first) {
-                is_first = false;
-            }
-            else {
-                ss << " -> ";
-            }
-            ss << value;
-        }
-        return ss.str();
+        return pkgxx::join(_vertices, " -> ");
     }
 #endif
 

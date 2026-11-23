@@ -45,7 +45,7 @@ int main(int argc, char* argv[]) {
         lint::environment env(opts);
 
         if (opts.help) {
-            lint::usage(argv[0]);
+            opts.usage();
             return 0;
         }
 
@@ -74,12 +74,9 @@ int main(int argc, char* argv[]) {
             return 0;
         }
         else {
-            lint::usage(argv[0]);
+            opts.usage();
             return 1;
         }
-    }
-    catch (lint::bad_options& e) {
-        return 1;
     }
     catch (std::exception& e) {
         std::cerr << argv[0] << ": " << e.what() << std::endl;

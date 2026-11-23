@@ -1,7 +1,7 @@
 #pragma once
 
 #include <set>
-#include <ostream>
+#include <iostream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -13,7 +13,7 @@ namespace pkg_chk {
         using std::set<tag>::set;
 
         tagset(std::string const& tags)
-            : tagset(static_cast<std::string_view>(tags)) {}
+            : tagset(std::string_view{tags}) {}
 
         /** Construct a set of tags by splitting comma-separated tag
          * strings.
@@ -22,6 +22,9 @@ namespace pkg_chk {
 
         friend std::ostream&
         operator<< (std::ostream& out, tagset const& tags);
+
+        friend std::istream&
+        operator>> (std::istream& in, tagset& tags);
     };
 
     /// Tag pattern: ["-"] TAG *("+" TAG)

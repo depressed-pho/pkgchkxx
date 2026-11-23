@@ -9,6 +9,7 @@
 #include "bzip2stream.hxx"
 #include "gzipstream.hxx"
 #include "harness.hxx"
+#include "numeral.hxx"
 #include "string_algo.hxx"
 #include "summary.hxx"
 #include "wwwstream.hxx"
@@ -99,7 +100,7 @@ namespace {
     read_local_summary(
         std::ostream& msg,
         std::ostream& verbose,
-        unsigned concurrency,
+        positive<unsigned> const& concurrency,
         std::filesystem::path const& PACKAGES,
         std::string const& PKG_INFO,
         std::string const& PKG_SUFX) {
@@ -212,7 +213,7 @@ namespace pkgxx {
     summary::summary(
         std::ostream& msg,
         std::ostream& verbose,
-        unsigned concurrency,
+        positive<unsigned> const& concurrency,
         std::filesystem::path const& PACKAGES,
         std::string const& PKG_INFO,
         std::string const& PKG_SUFX) {

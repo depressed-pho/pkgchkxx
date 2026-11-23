@@ -1,77 +1,58 @@
 #include <cstdlib>
 #include <iostream>
+#include <pkgxx/shell_args.hxx>
 #include <thread>
-#include <unistd.h>
 
 #include "options.hxx"
 
-extern "C" {
-    extern char* optarg;
-    extern int optind;
-}
+namespace fs = std::filesystem;
 
 namespace lint {
     options::options(int argc, char* const argv[])
-        : list_broken(false)
-        , list_makefiles(false)
-        , concurrency(std::max(1u, std::thread::hardware_concurrency()))
-        , help(false)
-        , verbose(false) {
+        : _progname{argv[0]}
+        , _op{"Allowed options"} {
 
-        int ch;
-        while ((ch = getopt(argc, argv, "BDLP:j:hv")) != -1) {
-            switch (ch) {
-            case 'B':
-                list_broken = true;
-                break;
-            case 'D':
-                std::cerr << argv[0] << ": option -D is not supported" << std::endl;
-                throw bad_options();
-            case 'L':
-                list_makefiles = true;
-                break;
-            case 'P':
-                PKGSRCDIR = optarg;
-                break;
-            case 'j':
-                if (int const n = std::atoi(optarg); n > 0) {
-                    concurrency = static_cast<unsigned>(n);
-                }
-                else {
-                    std::cerr << argv[0] << ": option -j takes a positive integer" << std::endl;
-                    throw bad_options();
-                }
-                break;
-            case 'h':
-                help = true;
-                break;
-            case 'v':
-                verbose = true;
-                break;
-            default:
-                std::string msg = "Unhandled option: ";
-                msg += static_cast<char>(ch);
-                throw std::logic_error(msg);
-            }
+        // General
+        _op.add<popl::Switch>("h", "", "Print this help (see lintpkgxx(1) for more information", &help);
+        _op.add<popl::Value<pkgxx::positive<unsigned>>>(
+            "j", "", "Parallelize certain operations with a given concurrency",
+            std::max(1u, std::thread::hardware_concurrency()),
+            &concurrency);
+        _op.add<popl::Switch>("v", "", "Be verbose", &verbose);
+
+        // Makefile
+        _op.add<popl::Switch>("B", "", "List packages marked as 'BROKEN'", &list_broken);
+        auto D = _op.add<popl::Switch, popl::Attribute::hidden>("D", "", "Debug makefile and glob parsing");
+
+        // Modifiers
+        auto P = _op.add<popl::Value<fs::path>>("P", "", "Set PKGSRCDIR");
+        _op.add<popl::Switch>("L", "", "List each Makefile when scanned", &list_makefiles);
+
+        _op.parse(argc, argv);
+
+        if (P->is_set()) {
+            PKGSRCDIR = P->value();
+        }
+
+        if (auto const& unknowns = _op.unknown_options(); !unknowns.empty()) {
+            throw std::runtime_error{
+                "unknown options: " + pkgxx::shell_args(unknowns).string()};
+        }
+
+        // -D is unsupported and ignored, but it takes any number of
+        // arguments. Allow non-options in this case.
+        if (auto const& non_opts = _op.non_option_args(); !non_opts.empty() && !D->is_set()) {
+            throw std::runtime_error{
+                "unknown arguments: " + pkgxx::shell_args(non_opts).string()};
         }
     }
 
-    void usage(std::filesystem::path const& progname) {
-        auto const& progbase = progname.filename().string();
+    void
+    options::usage() const {
+        auto const& progbase = _progname.filename().string();
         std::cerr
-            << "Usage: " << progname.string() << " [options] [makefiles]" << std::endl
+            << "Usage: " << progbase << " [options] [makefiles]" << std::endl
             << std::endl
-            << "General options:" << std::endl
-            << "    -h      Print this help (see lintpkgxx(1) for more information)" << std::endl
-            << "    -j N    Set the concurrency" << std::endl
-            << "    -v      Be verbose" << std::endl
-            << std::endl
-            << "Makefile options:" << std::endl
-            << "    -B      List packages marked as 'BROKEN'" << std::endl
-            << std::endl
-            << "Modifiers:" << std::endl
-            << "    -L      List each Makefile when scanned" << std::endl
-            << "    -P DIR  Set PKGSRCDIR" << std::endl
-            << std::endl;
+            << _op.help();
     }
 }

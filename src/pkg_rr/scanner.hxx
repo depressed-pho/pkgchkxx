@@ -6,6 +6,7 @@
 #include <vector>
 
 #include <pkgxx/mutex_guard.hxx>
+#include <pkgxx/numeral.hxx>
 #include <pkgxx/pkgname.hxx>
 #include <pkgxx/pkgpath.hxx>
 
@@ -19,7 +20,8 @@ namespace pkg_rr {
         using result_type = std::map<pkgxx::pkgbase, pkgxx::pkgpath>;
 
         /** Construct an empty scanner that does nothing. */
-        package_scanner(std::string const& PKG_INFO, unsigned concurrency)
+        package_scanner(std::string const& PKG_INFO,
+                        pkgxx::positive<unsigned> const& concurrency)
             : _pkg_info(PKG_INFO)
             , _concurrency(concurrency) {}
 
@@ -45,7 +47,7 @@ namespace pkg_rr {
 
     private:
         std::string _pkg_info;
-        unsigned _concurrency;
+        pkgxx::positive<unsigned> _concurrency;
         std::vector<
             std::tuple<
                 std::promise<result_type>,

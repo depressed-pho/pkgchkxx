@@ -109,10 +109,10 @@ namespace pkg_chk {
                     "PKGCHK_TAGS",
                     "PKGCHK_UPDATE_CONF"
                 };
-                if (opts.pkgchk_conf_path.empty()) {
+                if (!opts.pkgchk_conf_path) {
                     vars.push_back("PKGCHK_CONF_PATH");
                 }
-                if (opts.bin_pkg_path.empty()) {
+                if (!opts.bin_pkg_path) {
                     vars.push_back("PACKAGES");
                 }
                 if (geteuid() != 0) {
@@ -130,9 +130,9 @@ namespace pkg_chk {
                     verbose_var(var, value);
                 }
                 _menv.PACKAGES           =
-                    opts.bin_pkg_path.empty()
-                    ? fs::path(value_of["PACKAGES"])
-                    : url_safe_absolute(opts.bin_pkg_path);
+                    opts.bin_pkg_path
+                    ? url_safe_absolute(*opts.bin_pkg_path)
+                    : fs::path(value_of["PACKAGES"]);
                 _menv.PKG_ADD            = value_of["PKG_ADD"   ].empty() ? CFG_PKG_ADD    : value_of["PKG_ADD"   ];
                 _menv.PKG_ADMIN          = value_of["PKG_ADMIN" ].empty() ? CFG_PKG_ADMIN  : value_of["PKG_ADMIN" ];
                 _menv.PKG_DELETE         = value_of["PKG_DELETE"].empty() ? CFG_PKG_DELETE : value_of["PKG_DELETE"];
@@ -140,9 +140,9 @@ namespace pkg_chk {
                 _menv.PKG_SUFX           = value_of["PKG_SUFX"      ];
                 _menv.PKG_SYSCONFDIR     = value_of["PKG_SYSCONFDIR"];
                 _menv.PKGCHK_CONF        =
-                    opts.pkgchk_conf_path.empty()
-                    ? fs::path(value_of["PKGCHK_CONF"])
-                    : url_safe_absolute(opts.pkgchk_conf_path);
+                    opts.pkgchk_conf_path
+                    ? url_safe_absolute(*opts.pkgchk_conf_path)
+                    : fs::path(value_of["PKGCHK_CONF"]);
                 _menv.PKGCHK_NOTAGS      = value_of["PKGCHK_NOTAGS"     ];
                 _menv.PKGCHK_TAGS        = value_of["PKGCHK_TAGS"       ];
                 _menv.PKGCHK_UPDATE_CONF = value_of["PKGCHK_UPDATE_CONF"];

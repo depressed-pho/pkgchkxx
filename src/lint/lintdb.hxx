@@ -1,6 +1,7 @@
 #include <filesystem>
 #include <iterator>
 #include <optional>
+#include <pkgxx/numeral.hxx>
 #include <pkgxx/ordered.hxx>
 #include <pkgxx/pkgname.hxx>
 #include <pkgxx/pkgpath.hxx>
@@ -169,12 +170,12 @@ namespace lint {
             std::vector<pkgxx::pkgpath> const& pkgpaths,
             pkgxx::value_or_ref<pkgxx::maybe_ttystream>&& output,
             bool list_makefiles,
-            unsigned concurrency);
+            pkgxx::positive<unsigned> const& concurrency);
 
         static pkgxx::value_or_ref<pkgxx::maybe_ttystream>
         default_output();
 
-        static unsigned
+        static pkgxx::positive<unsigned>
         default_concurrency();
 
         db::detail::repr_type _repr;

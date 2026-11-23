@@ -6,6 +6,7 @@
 #include <exception>
 #include <functional>
 #include <map>
+#include <pkgxx/numeral.hxx>
 #include <set>
 #include <memory>
 #include <mutex>
@@ -22,8 +23,9 @@ namespace pkgxx {
         /** Create a nursery with a given maximum concurrency. It is
          * typically the number of available CPUs.
          */
-        nursery(unsigned concurrency
-                    = std::max(1u, std::thread::hardware_concurrency()));
+        nursery(positive<unsigned> const& concurrency
+                    = std::max(1u, std::thread::hardware_concurrency()))
+            : _concurrency(concurrency) {}
 
         /** Block until all the registered child tasks finish.
          *
@@ -181,7 +183,7 @@ namespace pkgxx {
         using condvar_t = std::condition_variable_any;
 
         mutable mutex_t _mtx;
-        unsigned _concurrency;
+        positive<unsigned> _concurrency;
 
         // The list of tasks that haven't started yet.
         std::deque<task> _pending_tasks;

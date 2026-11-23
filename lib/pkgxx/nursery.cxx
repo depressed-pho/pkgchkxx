@@ -3,9 +3,6 @@
 using namespace std::placeholders;
 
 namespace pkgxx {
-    nursery::nursery(unsigned int concurrency)
-        : _concurrency(concurrency) {}
-
     nursery::~nursery() noexcept(false) {
         std::unique_lock<mutex_t> lk(_mtx);
 

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cassert>
+#include <ostream>
+#include <sstream>
 #include <iterator>
 #include <optional>
 #include <string_view>
@@ -108,6 +110,10 @@ namespace pkgxx {
             : _str(str)
             , _seps(seps) {}
 
+        // THINKME: Maybe we should provide a variant taking a single
+        // separator in char, and optimize for it? We have places where
+        // calling words() with one separator.
+
         /// Return an iterator to the first word.
         const_iterator
         begin() const noexcept {
@@ -124,6 +130,37 @@ namespace pkgxx {
         std::string_view const _str;
         std::string_view const _seps;
     };
+
+    /// Join elements of a container with a given separator, and write it
+    /// to a stream.
+    template <typename CharT, typename Traits, typename T, typename Sep>
+    std::basic_ostream<CharT, Traits>&
+    join(std::basic_ostream<CharT, Traits>& out, T const& values, Sep const& sep) {
+        bool is_first = true;
+        for (auto const& value: values) {
+            if (is_first) {
+                is_first = false;
+            }
+            else {
+                out << sep;
+            }
+            out << value;
+        }
+        return out;
+    }
+
+    /// Join elements of a container with a given separator, and return a
+    /// string.
+    template <typename CharT  = char,
+              typename Traits = std::char_traits<CharT>,
+              typename T,
+              typename Sep>
+    std::basic_string<CharT, Traits>
+    join(T const& values, Sep const& sep) {
+        std::basic_stringstream<CharT, Traits> ss;
+        join(ss, values, sep);
+        return ss.str();
+    }
 
     /// Remove whitespaces at the beginning and the end of a string.
     inline std::string_view

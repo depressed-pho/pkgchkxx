@@ -13,6 +13,7 @@ libpkgxx_la_SOURCES = \
 	iterable.hxx \
 	makevars.hxx \
 	mutex_guard.hxx \
+	numeral.hxx \
 	nursery.cxx nursery.hxx \
 	ordered.hxx \
 	permissive_shared_ptr.hxx \

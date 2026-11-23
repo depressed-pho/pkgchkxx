@@ -16,7 +16,7 @@ namespace pkg_chk {
     checker_base::checker_base(
         bool add_missing,
         bool check_build_version,
-        unsigned concurrency,
+        pkgxx::positive<unsigned> const& concurrency,
         bool update,
         bool delete_mismatched,
         std::shared_future<std::string> const& PKG_INFO)
