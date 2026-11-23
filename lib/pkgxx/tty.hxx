@@ -609,13 +609,13 @@ namespace pkgxx {
 
         namespace literals {
             inline chunk<std::string_view>
-            operator"" _ch(char const* str, std::size_t len) {
+            operator ""_ch (char const* str, std::size_t len) {
                 return chunk<std::string_view>(
                     std::nullopt, std::string_view(str, len));
             }
 
             inline chunk<char>
-            operator"" _ch(char c) {
+            operator ""_ch (char c) {
                 // std::move() is necessary here, otherwise
                 // value_or_ref<char> would think it's an lvalue reference
                 // and only borrow this temporary char but not copy it.

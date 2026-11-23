@@ -29,6 +29,7 @@ setPath PKG_CONFIG_PATH \
 #
 setConfigArgs \
     --enable-maintainer-mode \
+    CXX="clang++" \
     CXXFLAGS="-g -O0"
 
 # -----------------------------------------------------------------------------

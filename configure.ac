@@ -50,6 +50,7 @@ AX_APPEND_COMPILE_FLAGS([ dnl
     -Werror=switch dnl
     -Werror=return-type dnl
     -Wnull-dereference dnl
+    -Wno-unknown-warning-option dnl
     -Wuninitialized dnl
     -Wno-pragmas dnl
 ], [], [-Werror])

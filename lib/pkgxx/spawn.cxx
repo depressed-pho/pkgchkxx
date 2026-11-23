@@ -90,7 +90,8 @@ namespace pkgxx {
                     // noexcept(false), but we can't. Doing so would make
                     // std::unique_ptr<file_actions> ill-formed.
 #  pragma GCC diagnostic push
-#  pragma GCC diagnostic ignored "-Wterminate"
+#  pragma GCC diagnostic ignored "-Wterminate"  // GCC
+#  pragma GCC diagnostic ignored "-Wexceptions" // Clang
                     throw std::system_error(
                         errno, std::generic_category(), "posix_spawn_file_actions_destroy");
 #  pragma GCC diagnostic pop

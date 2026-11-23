@@ -23,7 +23,7 @@ namespace pkgxx {
             if (_num_passed + _num_failed > 0) {
                 std::cout << "1.." << _num_passed + _num_failed << std::endl;
             }
-            return _num_failed;
+            return static_cast<int>(_num_failed);
         }
         catch (bailed_out const& e) {
             std::cout << "Bail out!";
