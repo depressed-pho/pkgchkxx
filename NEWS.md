@@ -3,7 +3,7 @@
 ## 0.4 -- not released yet
 
 * Improved the performance of Makefile scans performed by `pkgchkxx` and
-  `pkgrrxx`. Now they caches some Makefile variables to reduce expensive
+  `pkgrrxx`. Now they cache some Makefile variables to reduce expensive
   fork/exec that pkgsrc does. The cache is memory-only; it's intentionally
   not serialized on disk.
 * Improved the accuracy of progress bar ETA that `pkgrrxx` displays.
