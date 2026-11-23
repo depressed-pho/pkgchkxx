@@ -33,6 +33,7 @@ AS_IF([test -n "$MAKECONF"],
 # Checks for compilers.
 AC_PROG_CXX
 AX_CXX_COMPILE_STDCXX([17], [noext], [mandatory])
+AX_LIBSTDCXX_WORKAROUND
 
 AC_LANG_PUSH([C++])
 AX_APPEND_COMPILE_FLAGS([ dnl
