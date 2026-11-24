@@ -337,3 +337,11 @@ struct std::hash<pkgxx::pkgversion::alpha> {
         return std::hash<char>{}(alpha);
     }
 };
+
+template <>
+struct std::hash<pkgxx::pkgname> {
+    std::size_t
+    operator() (pkgxx::pkgname const& name) const noexcept {
+        return pkgxx::hash_combine(name.base, name.version);
+    }
+};

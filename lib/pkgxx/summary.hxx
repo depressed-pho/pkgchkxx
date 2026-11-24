@@ -5,12 +5,12 @@
 #include <map>
 #include <optional>
 #include <ostream>
-#include <set>
-
 #include <pkgxx/numeral.hxx>
 #include <pkgxx/pkgpath.hxx>
 #include <pkgxx/pkgpattern.hxx>
 #include <pkgxx/pkgname.hxx>
+#include <unordered_map>
+#include <unordered_set>
 
 namespace pkgxx {
     /** \c pkg_summary(5) variables. Things we don't use are omitted for
@@ -68,8 +68,8 @@ namespace pkgxx {
      * py-*) have more than a single PKGBASE, and we need to treat them as
      * separate packages.
      */
-    struct pkgmap: public std::map<pkgpath, std::map<pkgbase, summary>> {
-        using std::map<pkgpath, std::map<pkgbase, summary>>::map;
+    struct pkgmap: public std::unordered_map<pkgpath, std::map<pkgbase, summary>> {
+        using std::unordered_map<pkgpath, std::map<pkgbase, summary>>::unordered_map;
 
         /** Construct a \ref pkgmap from a summary of all the packages in
          * interest.

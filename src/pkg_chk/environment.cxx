@@ -270,10 +270,10 @@ namespace pkg_chk {
                 pkg_info.cin() << "exec " << PKG_INFO.get() << " \"$@\"" << std::endl;
                 pkg_info.cin().close();
 
-                std::set<pkgxx::pkgpath> pkgpaths;
+                std::unordered_set<pkgxx::pkgpath> pkgpaths;
                 for (std::string line; std::getline(pkg_info.cout(), line); ) {
                     if (!line.empty()) {
-                        pkgpaths.emplace(line);
+                        pkgpaths.emplace(std::move(line));
                     }
                 }
                 return pkgpaths;

@@ -123,9 +123,9 @@ namespace {
         }
     }
 
-    std::set<pkgxx::pkgpath>
+    std::unordered_set<pkgxx::pkgpath>
     pkgpaths_to_check(pkg_chk::environment const& env) {
-        std::set<pkgxx::pkgpath> pkgpaths;
+        std::unordered_set<pkgxx::pkgpath> pkgpaths;
         if (env.opts.delete_mismatched || env.opts.update) {
             pkgpaths = env.installed_pkgpaths.get();
         }
@@ -228,11 +228,11 @@ namespace {
     void
     delete_and_recheck(
         pkg_chk::environment const& env,
-        std::set<pkgxx::pkgpath> const& pkgpaths,
+        std::unordered_set<pkgxx::pkgpath> const& pkgpaths,
         checker& chk,
         checker::result& res) {
 
-        std::set<pkgxx::pkgpath> update_conf;
+        std::unordered_set<pkgxx::pkgpath> update_conf;
         if (env.opts.update) {
             // Save current installed set to PKGCHK_UPDATE_CONF so that
             // restarting failed update would not cause installed packages
@@ -263,7 +263,7 @@ namespace {
                 delete_pkgs(env, res.MISMATCH_TODO, chk);
                 env.msg() << "Rechecking packages after deletions" << std::endl;
             }
-            std::set<pkgxx::pkgpath> recheck_paths = pkgpaths;
+            std::unordered_set<pkgxx::pkgpath> recheck_paths = pkgpaths;
             if (env.opts.update) {
                 recheck_paths.insert(update_conf.begin(), update_conf.end());
             }
@@ -323,7 +323,7 @@ namespace {
 
     void
     add_delete_update(pkg_chk::environment const& env) {
-        std::set<pkgxx::pkgpath> const pkgpaths = pkgpaths_to_check(env);
+        std::unordered_set<pkgxx::pkgpath> const pkgpaths = pkgpaths_to_check(env);
         if (env.opts.print_pkgpaths_to_check) {
             for (pkgxx::pkgpath const& path: pkgpaths) {
                 env.msg() << path << std::endl;
@@ -476,7 +476,7 @@ namespace {
         // TODO: We don't take account of SUPERSEDES but how do we do it?
 
         using pkgname_cref = std::reference_wrapper<pkgxx::pkgname const>;
-        std::map<pkgname_cref, pkgxx::pkgvars const&> to_list;
+        std::unordered_map<pkgname_cref, pkgxx::pkgvars const&, std::hash<pkgxx::pkgname>> to_list;
         pkgxx::graph<pkgname_cref> topology;
 
         for (auto const& path:

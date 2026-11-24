@@ -36,7 +36,7 @@ namespace lint {
             [this]() {
                 auto const subdirs = pkgxx::extract_pkgmk_var(PKGSRCDIR.get(), "SUBDIR");
                 if (subdirs.has_value()) {
-                    std::set<pkgxx::category> cats;
+                    std::unordered_set<pkgxx::category> cats;
                     for (auto const& cat : pkgxx::words(*subdirs)) {
                         fs::path const abs_cat = PKGSRCDIR.get() / cat;
                         if (fs::exists(abs_cat)) {
@@ -66,7 +66,7 @@ namespace lint {
                 else {
                     warn() << "Failed to retrieve the list of official categories :"
                            << "SUBDIR not defined in " << (PKGSRCDIR.get() / "Makefile") << '.' << std::endl;
-                    return std::set<pkgxx::category> {};
+                    return std::unordered_set<pkgxx::category> {};
                 }
             }).share();
 
@@ -78,7 +78,7 @@ namespace lint {
         all_categories = std::async(
             std::launch::deferred,
             [&, this]() {
-                pkgxx::guarded<std::set<pkgxx::category>> cats;
+                pkgxx::guarded<std::unordered_set<pkgxx::category>> cats;
                 {
                     pkgxx::nursery n{opts.concurrency};
                     for (auto const& ent : fs::directory_iterator(PKGSRCDIR.get())) {
@@ -135,7 +135,7 @@ namespace lint {
                 // be using a lock-free unordered set. But is that even
                 // possible...?
                 pkgxx::guarded<
-                    std::set<pkgxx::pkgpath>
+                    std::unordered_set<pkgxx::pkgpath>
                     > pkgpaths;
                 {
                     // FIXME: Verify that each PKGDIR is registered in the category Makefile

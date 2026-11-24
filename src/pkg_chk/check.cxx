@@ -47,7 +47,7 @@ namespace pkg_chk {
                 }).share()) {}
 
     checker_base::result
-    checker_base::run(std::set<pkgxx::pkgpath> const& pkgpaths) const {
+    checker_base::run(std::unordered_set<pkgxx::pkgpath> const& pkgpaths) const {
         total(pkgpaths.size());
 
         // This is the slowest part of pkg_chk. For each package we need to
@@ -172,7 +172,7 @@ namespace pkg_chk {
 
     checker_base::result
     checker_base::run() const {
-        std::set<pkgxx::pkgpath> pkgpaths;
+        std::unordered_set<pkgxx::pkgpath> pkgpaths;
         for (auto const& [name, vars]: _installed_pkg_summary.get()) {
             if (!_deleted_pkgnames.count(name)) {
                 pkgpaths.insert(vars.PKGPATH);
@@ -194,14 +194,14 @@ namespace pkg_chk {
             std::async(
                 std::launch::deferred,
                 [this]() {
-                    std::map<pkgxx::pkgpath, std::set<pkgxx::pkgname>> ret;
+                    std::unordered_map<pkgxx::pkgpath, std::set<pkgxx::pkgname>> ret;
                     for (auto const& [name, vars]: _installed_pkg_summary.get()) {
                         ret[vars.PKGPATH].insert(name);
                     }
                     return ret;
                 }).share()) {}
 
-    std::set<pkgxx::pkgname>
+    std::unordered_set<pkgxx::pkgname>
     source_checker_base::find_latest_pkgnames(pkgxx::pkgpath const& path) const {
         // There are simply no means to enumerate every possible PKGNAME a
         // PKGPATH can provide. So we first extract the default PKGNAME
@@ -239,7 +239,7 @@ namespace pkg_chk {
         // We search non-default PKGNAMEs only when -u or -r is given,
         // otherwise -a would install every single PKGNAME that the PKGPATH
         // provides.
-        std::set<pkgxx::pkgname> pkgnames = {
+        std::unordered_set<pkgxx::pkgname> pkgnames = {
             pkgxx::pkgname(*default_pkgname)
         };
         if (_update || _delete_mismatched) {
@@ -308,7 +308,7 @@ namespace pkg_chk {
                     return pkgxx::pkgmap(_bin_pkg_summary.get());
                 }).share()) {}
 
-    std::set<pkgxx::pkgname>
+    std::unordered_set<pkgxx::pkgname>
     binary_checker_base::find_latest_pkgnames(pkgxx::pkgpath const& path) const {
         // We can enumerate every possible PKGNAME a PKGPATH can provide
         // just by querying the binary package summary. However, we cannot
@@ -319,7 +319,7 @@ namespace pkg_chk {
         // package.
         auto const& pm = _bin_pkg_map.get();
         if (auto pkgbases = pm.find(path); pkgbases != pm.end()) {
-            std::set<pkgxx::pkgname> pkgnames;
+            std::unordered_set<pkgxx::pkgname> pkgnames;
             if (_add_missing) {
                 // Guess the default pkgbase. This may be inaccurate.
                 auto guessed_default = pkgbases->second.rbegin();

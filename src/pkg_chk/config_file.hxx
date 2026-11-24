@@ -3,11 +3,11 @@
 #include <deque>
 #include <filesystem>
 #include <ostream>
+#include <pkgxx/pkgpath.hxx>
+#include <unordered_set>
 #include <utility>
 #include <variant>
 #include <vector>
-
-#include <pkgxx/pkgpath.hxx>
 
 #include "tag.hxx"
 
@@ -53,7 +53,7 @@ namespace pkg_chk {
 
         /** Obtain a set of pkgpaths in the config file, filtered by
          * applying tags. */
-        std::set<pkgxx::pkgpath>
+        std::unordered_set<pkgxx::pkgpath>
         pkgpaths(tagset const& included_tags = {},
                  tagset const& excluded_tags = {}) const;
 

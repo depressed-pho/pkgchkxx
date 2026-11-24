@@ -4,7 +4,7 @@
 #include <pkgxx/environment.hxx>
 #include <pkgxx/pkgpath.hxx>
 #include <pkgxx/tty.hxx>
-#include <set>
+#include <unordered_set>
 
 #include "options.hxx"
 
@@ -39,13 +39,13 @@ namespace lint {
         lint::options const& opts;
         std::shared_future<std::filesystem::path> PKGSRCDIR; // e.g. /usr/pkgsrc
         std::shared_future<
-            std::set<pkgxx::category>
+            std::unordered_set<pkgxx::category>
             > official_categories;
         std::shared_future<
-            std::set<pkgxx::category>
+            std::unordered_set<pkgxx::category>
             > all_categories;
         std::shared_future<
-            std::set<pkgxx::pkgpath>
+            std::unordered_set<pkgxx::pkgpath>
             > all_pkgpaths;
 
     private:

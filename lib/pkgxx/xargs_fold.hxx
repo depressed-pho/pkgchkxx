@@ -6,15 +6,14 @@
 #include <deque>
 #include <istream>
 #include <mutex>
-#include <set>
-#include <thread>
-#include <type_traits>
-#include <vector>
-
 #include <pkgxx/config.h>
 #include <pkgxx/harness.hxx>
 #include <pkgxx/numeral.hxx>
 #include <pkgxx/permissive_shared_ptr.hxx>
+#include <unordered_set>
+#include <thread>
+#include <type_traits>
+#include <vector>
 
 namespace pkgxx {
     namespace detail {
@@ -159,7 +158,7 @@ namespace pkgxx {
             mutex_t _mtx;
             std::vector<permissive_shared_ptr<harness>> _harnesses;
             std::vector<std::thread> _parsers;
-            std::set<std::thread::id> _running_parsers;
+            std::unordered_set<std::thread::id> _running_parsers;
             result_type _result;
             std::exception_ptr _ex;
             condvar_t _finished; // Signaled when a parser finishes running.

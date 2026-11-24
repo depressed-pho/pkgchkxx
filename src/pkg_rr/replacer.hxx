@@ -1,10 +1,7 @@
 #pragma once
 
 #include <iostream>
-#include <type_traits>
-#include <unordered_map>
-#include <vector>
-
+#include <map>
 #include <pkgxx/graph.hxx>
 #include <pkgxx/harness.hxx>
 #include <pkgxx/hash.hxx>
@@ -13,6 +10,10 @@
 #include <pkgxx/nursery.hxx>
 #include <pkgxx/pkgdb.hxx>
 #include <pkgxx/unwrap.hxx>
+#include <type_traits>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 #include "config.h"
 #include "environment.hxx"
@@ -31,7 +32,7 @@ namespace pkg_rr {
         run();
 
     private:
-        using todo_type = std::map<pkgxx::pkgbase, pkgxx::pkgpath>;
+        using todo_type = std::unordered_map<pkgxx::pkgbase, pkgxx::pkgpath>;
 
         std::future<todo_type>
         check_mismatch(pkg_rr::package_scanner& scanner) const;
@@ -85,7 +86,7 @@ namespace pkg_rr {
                 > const& old_depends,
             std::map<pkgxx::pkgbase, pkgxx::pkgpath> const& new_depends);
 
-        std::map<std::string, std::string>
+        std::unordered_map<std::string, std::string>
         make_vars_for_pkg(pkgxx::pkgbase const& base) const;
 
         void
@@ -93,7 +94,7 @@ namespace pkg_rr {
             pkgxx::pkgbase const& base,
             pkgxx::pkgpath const& path,
             std::initializer_list<std::string> const& targets,
-            std::map<std::string, std::string> const& vars) const;
+            std::unordered_map<std::string, std::string> const& vars) const;
 
         pkgxx::harness
         spawn_su(std::string const& cmd) const;
@@ -164,7 +165,7 @@ namespace pkg_rr {
          * this happens, we need to update the graph and re-tsort it. The
          * check must be done once (and only once) for every installed
          * package. The value is the PKGVERSION obtained from source. */
-        std::map<pkgxx::pkgbase, pkgxx::pkgversion> DEPENDS_CHECKED;
+        std::unordered_map<pkgxx::pkgbase, pkgxx::pkgversion> DEPENDS_CHECKED;
 
         // See a comment in source_depends().
         std::unordered_map<
@@ -173,7 +174,7 @@ namespace pkg_rr {
             > mutable pattern_to_base_cache;
 
         // See a comment in is_pkg_installed().
-        std::set<pkgxx::pkgbase> mutable definitely_installed;
+        std::unordered_set<pkgxx::pkgbase> mutable definitely_installed;
 
         pkgxx::tty::style _pkgname_sty;
         pkgxx::tty::style _new_deps_sty;

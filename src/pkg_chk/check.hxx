@@ -6,14 +6,14 @@
 #include <future>
 #include <map>
 #include <ostream>
-#include <set>
-
 #include <pkgxx/build_version.hxx>
 #include <pkgxx/numeral.hxx>
 #include <pkgxx/pkgname.hxx>
 #include <pkgxx/stream.hxx>
 #include <pkgxx/summary.hxx>
 #include <pkgxx/tty.hxx>
+#include <set>
+#include <unordered_set>
 
 namespace pkg_chk {
     struct checker_base {
@@ -33,7 +33,7 @@ namespace pkg_chk {
 
         /// Run \c pkg_chk for each package path in \c pkgpaths.
         result
-        run(std::set<pkgxx::pkgpath> const& pkgpaths) const;
+        run(std::unordered_set<pkgxx::pkgpath> const& pkgpaths) const;
 
         /// Run \c pkg_chk for each installed package.
         result
@@ -49,7 +49,7 @@ namespace pkg_chk {
 
     protected:
         /// Return the set of latest PKGNAMEs provided by a given PKGPATH.
-        virtual std::set<pkgxx::pkgname>
+        virtual std::unordered_set<pkgxx::pkgname>
         find_latest_pkgnames(pkgxx::pkgpath const& path) const = 0;
 
         /// Return the build version of a given package, or \c std::nullopt
@@ -95,7 +95,7 @@ namespace pkg_chk {
         std::shared_future<pkgxx::summary>           _installed_pkg_summary;
         std::shared_future<std::set<pkgxx::pkgname>> _installed_pkgnames;
 
-        std::set<pkgxx::pkgname> _deleted_pkgnames;
+        std::unordered_set<pkgxx::pkgname> _deleted_pkgnames;
     };
 
     /// Obtains data from source.
@@ -104,7 +104,7 @@ namespace pkg_chk {
             std::shared_future<std::filesystem::path> const& PKGSRCDIR);
 
     protected:
-        virtual std::set<pkgxx::pkgname>
+        virtual std::unordered_set<pkgxx::pkgname>
         find_latest_pkgnames(pkgxx::pkgpath const& path) const override;
 
         virtual std::optional<pkgxx::build_version>
@@ -112,7 +112,7 @@ namespace pkg_chk {
 
         std::shared_future<std::filesystem::path> _PKGSRCDIR;
         std::shared_future<
-            std::map<
+            std::unordered_map<
                 pkgxx::pkgpath,
                 std::set<pkgxx::pkgname>
                 >
@@ -127,7 +127,7 @@ namespace pkg_chk {
             std::shared_future<pkgxx::summary> const& bin_pkg_summary);
 
     protected:
-        virtual std::set<pkgxx::pkgname>
+        virtual std::unordered_set<pkgxx::pkgname>
         find_latest_pkgnames(pkgxx::pkgpath const& path) const override;
 
         virtual std::optional<pkgxx::build_version>
@@ -155,7 +155,7 @@ namespace pkg_chk {
             : _use_source(use_source) {}
 
     protected:
-        virtual std::set<pkgxx::pkgname>
+        virtual std::unordered_set<pkgxx::pkgname>
         find_latest_pkgnames(pkgxx::pkgpath const& path) const override {
             return _use_source
                 ? source_checker_base::find_latest_pkgnames(path)

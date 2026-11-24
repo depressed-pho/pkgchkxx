@@ -1,20 +1,19 @@
 #pragma once
 
 #include <filesystem>
-#include <map>
+#include <unordered_map>
 #include <optional>
 #include <ostream>
-#include <string>
-
 #include <pkgxx/pkgname.hxx>
 #include <pkgxx/pkgpath.hxx>
+#include <string>
 
 namespace pkgxx {
     /** Class that represents a build version of a package. It is a map
      * from a file path to its RCS Id string.
      */
-    struct build_version: std::map<std::filesystem::path, std::string> {
-        using std::map<std::filesystem::path, std::string>::map;
+    struct build_version: std::unordered_map<std::filesystem::path, std::string> {
+        using std::unordered_map<std::filesystem::path, std::string>::unordered_map;
 
         /** Retrieve a build version from a binary package file, or \c
          * std::nullopt if the file does not exist.

@@ -1,14 +1,14 @@
 #pragma once
 
 #include <future>
-#include <set>
-#include <tuple>
-#include <vector>
-
 #include <pkgxx/mutex_guard.hxx>
 #include <pkgxx/numeral.hxx>
 #include <pkgxx/pkgname.hxx>
 #include <pkgxx/pkgpath.hxx>
+#include <tuple>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 namespace pkg_rr {
     /** Obtaining the set of installed packages having a specific flag is a
@@ -17,7 +17,7 @@ namespace pkg_rr {
      * flags for aggregation and obtain resulting sets all at once. */
     struct package_scanner {
         /** A result of a single operation. */
-        using result_type = std::map<pkgxx::pkgbase, pkgxx::pkgpath>;
+        using result_type = std::unordered_map<pkgxx::pkgbase, pkgxx::pkgpath>;
 
         /** Construct an empty scanner that does nothing. */
         package_scanner(std::string const& PKG_INFO,
@@ -35,7 +35,7 @@ namespace pkg_rr {
         std::future<result_type>
         add_axis(
             std::string_view const& flag,
-            std::set<pkgxx::pkgbase> const& exclude = {}) {
+            std::unordered_set<pkgxx::pkgbase> const& exclude = {}) {
 
             auto& axis = _axes.emplace_back(
                 std::promise<result_type>(),
@@ -51,9 +51,9 @@ namespace pkg_rr {
         std::vector<
             std::tuple<
                 std::promise<result_type>,
-                pkgxx::guarded<result_type>, // result
-                std::string,                 // flag
-                std::set<pkgxx::pkgbase>     // exclude
+                pkgxx::guarded<result_type>,       // result
+                std::string,                       // flag
+                std::unordered_set<pkgxx::pkgbase> // exclude
             >
         > _axes;
     };

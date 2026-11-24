@@ -1,5 +1,4 @@
 #include <cassert>
-
 #include <pkgxx/mutex_guard.hxx>
 #include <pkgxx/nursery.hxx>
 #include <pkgxx/pkgdb.hxx>

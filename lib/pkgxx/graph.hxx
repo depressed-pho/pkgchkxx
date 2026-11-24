@@ -237,6 +237,12 @@ namespace pkgxx {
             >
         shortest_path_impl(vertex_id const& src, vertex_id const& dest) const;
 
+        // NOTE: We can't use std::unordered_map here, because _vertices
+        // holds pointers to VertexT in _vertex_id_of. The pointers will be
+        // invalidated as soon as std::unordered_map is rehashed. But when
+        // we switch to C++20, we can probably use std::shared_ptr<> in
+        // these maps and use a wrapper-transparent overload of
+        // std::unordered_map::find().
         std::map<VertexT, vertex_id> _vertex_id_of;
         std::map<vertex_id, vertex> _vertices;
 

@@ -4,12 +4,12 @@
 #include <functional>
 #include <future>
 #include <memory>
-#include <set>
-#include <string>
-
 #include <pkgxx/environment.hxx>
 #include <pkgxx/summary.hxx>
 #include <pkgxx/tty.hxx>
+#include <set>
+#include <string>
+#include <unordered_set>
 
 #include "options.hxx"
 #include "tag.hxx"
@@ -69,8 +69,8 @@ namespace pkg_chk {
         std::shared_future<pkgxx::summary> bin_pkg_summary;
         std::shared_future<pkgxx::pkgmap>  bin_pkg_map;
 
-        std::shared_future<std::set<pkgxx::pkgname>> installed_pkgnames; // Fastest to compute.
-        std::shared_future<std::set<pkgxx::pkgpath>> installed_pkgpaths; // Moderately slow.
+        std::shared_future<std::set          <pkgxx::pkgname>> installed_pkgnames; // Fastest to compute.
+        std::shared_future<std::unordered_set<pkgxx::pkgpath>> installed_pkgpaths; // Moderately slow.
 
         std::shared_future<tagset>  included_tags;
         std::shared_future<tagset>  excluded_tags;

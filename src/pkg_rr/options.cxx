@@ -34,8 +34,8 @@ namespace {
         return in;
     }
 
-    struct excludes: public std::set<pkgxx::pkgbase> {
-        using std::set<pkgxx::pkgbase>::set;
+    struct excludes: public std::unordered_set<pkgxx::pkgbase> {
+        using std::unordered_set<pkgxx::pkgbase>::unordered_set;
     };
 
     std::ostream&

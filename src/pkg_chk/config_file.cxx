@@ -92,9 +92,9 @@ namespace pkg_chk {
         }
     }
 
-    std::set<pkgxx::pkgpath>
+    std::unordered_set<pkgxx::pkgpath>
     config::pkgpaths(tagset const& included_tags, tagset const& excluded_tags) const {
-        std::set<pkgxx::pkgpath> pkgpaths;
+        std::unordered_set<pkgxx::pkgpath> pkgpaths;
 
         tagset current_tags; // included_tags - excluded_tags
         std::set_difference(

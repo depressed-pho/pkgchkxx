@@ -434,7 +434,7 @@ namespace pkg_rr {
             decltype(depgraph_installed())
             > depgraph;
 
-        std::set<pkgxx::pkgbase> to_scan;
+        std::unordered_set<pkgxx::pkgbase> to_scan;
         for (auto const& [base, _path]: REPLACE_TODO) {
             to_scan.insert(base);
         }
@@ -597,7 +597,7 @@ namespace pkg_rr {
         }
     }
 
-    std::map<std::string, std::string>
+    std::unordered_map<std::string, std::string>
     rolling_replacer::make_vars_for_pkg(pkgxx::pkgbase const& base) const {
         // Set PKGNAME_REQD to give underlying make processes a chance
         // to set options derived from the package name.  For example,
@@ -614,7 +614,7 @@ namespace pkg_rr {
         pkgxx::pkgbase const& base,
         pkgxx::pkgpath const& path,
         std::initializer_list<std::string> const& targets,
-        std::map<std::string, std::string> const& vars) const {
+        std::unordered_map<std::string, std::string> const& vars) const {
 
         auto const& pkgdir = env.PKGSRCDIR.get() / path;
         if (!fs::exists(pkgdir / "Makefile")) {

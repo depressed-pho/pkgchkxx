@@ -5,14 +5,14 @@
 #include <deque>
 #include <exception>
 #include <functional>
-#include <map>
 #include <pkgxx/numeral.hxx>
-#include <set>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <thread>
 #include <type_traits>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 namespace pkgxx {
@@ -189,13 +189,13 @@ namespace pkgxx {
         std::deque<task> _pending_tasks;
 
         // The pool of worker threads.
-        std::map<std::thread::id, std::unique_ptr<worker>> _workers;
+        std::unordered_map<std::thread::id, std::unique_ptr<worker>> _workers;
 
         // The set of busy worker threads.
-        std::set<std::thread::id> _busy_workers;
+        std::unordered_set<std::thread::id> _busy_workers;
 
         // The set of idle worker threads.
-        std::set<std::thread::id> _idle_workers;
+        std::unordered_set<std::thread::id> _idle_workers;
 
         // An exception thrown by a task.
         std::exception_ptr _ex;
