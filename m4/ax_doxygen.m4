@@ -18,7 +18,7 @@ AC_DEFUN([AX_DOXYGEN], [
     # Strangely, Doxyfile wants a directory where the dia binary resides,
     # not a path to dia itself.
     AS_IF([test x"$DIA" != x],
-          [DIA_PATH=`AS_DIRNAME([["$DIA_PATH"]])`],
+          [DIA_PATH=`AS_DIRNAME([["$DIA"]])`],
           [DIA_PATH=])
 
     AM_CONDITIONAL([ENABLE_DOXYGEN], [test x"$enable_doxygen" != x"no" && test -n "$DOXYGEN"])
