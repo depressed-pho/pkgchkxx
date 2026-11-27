@@ -4,7 +4,6 @@
 #include <exception>
 #include <istream>
 #include <memory>
-#include <optional>
 #include <string>
 #include <streambuf>
 #include <fetch.h>
@@ -40,11 +39,11 @@ namespace pkgxx {
             }
         };
 
-        static constexpr int const buf_size = 1024;
+        static constexpr int const buf_size = 8192;
         using buffer_t = std::array<char_type, buf_size>;
 
         std::unique_ptr<fetchIO, fetchIO_deleter> _fio;
-        std::optional<buffer_t> _read_buf;
+        std::unique_ptr<buffer_t> _read_buf;
     };
 
     /** An input stream that fetches a resource with URL.
@@ -61,7 +60,7 @@ namespace pkgxx {
         /// Construct an instance of \ref wwwistream by moving a buffer out
         /// of another instance.
         wwwistream(wwwistream&& other)
-            : std::istream(std::move(other))
+            : std::istream(nullptr)
             , _buf(std::move(other._buf)) {
 
             other.set_rdbuf(nullptr);

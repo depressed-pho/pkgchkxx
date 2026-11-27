@@ -5,8 +5,10 @@
 
 namespace pkgxx {
     fdstreambuf::fdstreambuf(int fd, bool owned)
-        : _fd(fd)
-        , _owned(owned) {}
+        : _fd       {fd}
+        , _owned    {owned}
+        , _read_buf {std::make_unique<buffer_t>()}
+        , _write_buf{std::make_unique<buffer_t>()} {}
 
     fdstreambuf::~fdstreambuf() {
         close();
@@ -27,24 +29,22 @@ namespace pkgxx {
 #if !defined(DOXYGEN)
     int
     fdstreambuf::sync() {
-        if (pbase() != nullptr && pptr() > pbase()) {
-            std::size_t const n_write = static_cast<std::size_t>(pptr() - pbase());
-            for (std::size_t n_remaining = n_write; n_remaining > 0; ) {
-                ssize_t const n_written = write(_fd, _write_buf->data(), n_write);
-                if (n_written > 0) {
-                    n_remaining -= static_cast<std::size_t>(n_written);
-                    continue;
-                }
-                else if (n_written == -1 && errno == EINTR) {
-                    continue;
-                }
-                else {
-                    return -1;
-                }
+        std::size_t const n_write = static_cast<std::size_t>(pptr() - pbase());
+        for (std::size_t n_remaining = n_write; n_remaining > 0; ) {
+            ssize_t const n_written = write(_fd, _write_buf->data(), n_write);
+            if (n_written > 0) {
+                n_remaining -= static_cast<std::size_t>(n_written);
+                continue;
             }
-            setp(_write_buf->data(),
-                 _write_buf->data() + _write_buf->size());
+            else if (n_written == -1 && errno == EINTR) {
+                continue;
+            }
+            else {
+                return -1;
+            }
         }
+        setp(_write_buf->data(),
+             _write_buf->data() + _write_buf->size());
         return 0;
     }
 #endif
@@ -52,12 +52,7 @@ namespace pkgxx {
 #if !defined(DOXYGEN)
     fdstreambuf::int_type
     fdstreambuf::overflow(int_type ch) {
-        if (pbase() == nullptr) {
-            // An overflow has happened because we haven't allocated a
-            // buffer yet.
-            _write_buf = buffer_t();
-        }
-        else if (pptr() > pbase()) {
+        if (pbase() != nullptr && pptr() > pbase()) {
             // An overflow has happened either because the buffer became
             // full, or because it's being closed. Flush it now.
             std::size_t const n_write = static_cast<std::size_t>(pptr() - pbase());
@@ -91,12 +86,6 @@ namespace pkgxx {
 #if !defined(DOXYGEN)
     fdstreambuf::int_type
     fdstreambuf::underflow() {
-        if (eback() == nullptr) {
-            // An underflow has happened because we haven't allocated a
-            // buffer yet.
-            _read_buf = buffer_t();
-        }
-
         while (true) {
             ssize_t const n_read = read(_fd, _read_buf->data(), _read_buf->size());
             if (n_read > 0) {

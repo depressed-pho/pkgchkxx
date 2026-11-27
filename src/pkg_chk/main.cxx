@@ -37,7 +37,7 @@ namespace {
     void
     normalize_pkgname(pkgxx::pkgname& name) {
         // FIXME: This is bad. Don't guess. Consult pkg_info instead.
-        name.base = std::regex_replace(name.base, RE_PYTHON_PREFIX, "py-");
+        name.base = std::regex_replace(name.base.string(), RE_PYTHON_PREFIX, "py-");
     }
 
     bool

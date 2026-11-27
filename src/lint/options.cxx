@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <pkgxx/shell_args.hxx>
+#include <pkgxx/xdg_basedir.hxx>
 #include <thread>
 
 #include "options.hxx"
@@ -12,6 +13,9 @@ namespace lint {
         : _progname{argv[0]}
         , _op{"Allowed options"} {
 
+        auto const default_database_file =
+            pkgxx::XDG_STATE_HOME() / "lintpkgxx.db";
+
         // General
         _op.add<popl::Switch>("h", "", "Print this help (see lintpkgxx(1) for more information", &help);
         _op.add<popl::Value<pkgxx::positive<unsigned>>>(
@@ -22,13 +26,29 @@ namespace lint {
 
         // Makefile
         _op.add<popl::Switch>("B", "", "List packages marked as 'BROKEN'", &list_broken);
-        auto D = _op.add<popl::Switch, popl::Attribute::hidden>("D", "", "Debug makefile and glob parsing");
+        auto D = _op.add<popl::Switch, popl::Attribute::hidden>(
+            "D", "", "Debug makefile and glob parsing");
+
+        // Misc
+        auto E = _op.add<popl::Implicit<fs::path>>(
+            "E", "", "Export the internal pkgsrc database to file", default_database_file);
+        _op.add<popl::Switch, popl::Attribute::hidden>("", "xml", "", &export_as_xml);
+        auto I = _op.add<popl::Implicit<fs::path>>(
+            "I", "", "Import the internal pkgsrc database from file", default_database_file);
 
         // Modifiers
         auto P = _op.add<popl::Value<fs::path>>("P", "", "Set PKGSRCDIR");
         _op.add<popl::Switch>("L", "", "List each Makefile when scanned", &list_makefiles);
 
         _op.parse(argc, argv);
+
+        if (E->is_set()) {
+            export_db = E->value();
+        }
+
+        if (I->is_set()) {
+            import_db = I->value();
+        }
 
         if (P->is_set()) {
             PKGSRCDIR = P->value();

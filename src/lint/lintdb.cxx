@@ -1,15 +1,24 @@
 #include <algorithm>
+#include <cereal/archives/portable_binary.hpp>
+#include <cereal/archives/xml.hpp>
+#include <cereal/version.hpp>
+#include <cerrno>
+#include <fstream>
+#include <pkgxx/gzipstream.hxx>
 #include <pkgxx/harness.hxx>
 #include <pkgxx/makevars.hxx>
 #include <pkgxx/mutex_guard.hxx>
 #include <pkgxx/nursery.hxx>
 #include <pkgxx/progress_bar.hxx>
 #include <pkgxx/shell_args.hxx>
+#include <pkgxx/stream.hxx>
+#include <system_error>
 #include <thread>
 #include <unistd.h>
 
 #include "lintdb.hxx"
 
+namespace fs  = std::filesystem;
 namespace tty = pkgxx::tty;
 
 namespace {
@@ -39,7 +48,7 @@ namespace lint {
         pkgxx::guarded<decltype(_repr)> repr;
         {
             pkgxx::nursery n{concurrency};
-            for (auto& pkgpath : pkgpaths) {
+            for (auto& pkgpath: pkgpaths) {
                 n.start_soon(
                     [&]() {
                         auto const abs_pkgpath = pkgsrcdir / pkgpath;
@@ -60,15 +69,14 @@ namespace lint {
                                 "BOOTSTRAP_DEPENDS",
                                 "TOOL_DEPENDS",
                                 "BUILD_DEPENDS",
-                                "DEPENDS",
-                                "INDIRECT_BUILD_DEPENDS",
-                                "INDIRECT_DEPENDS"
+                                "DEPENDS"
                             };
                             auto vars_map =
                                 pkgxx::extract_pkgmk_vars(abs_pkgpath, var_names).value();
 
-                            db::variables vars{pkgxx::pkgname{vars_map["PKGNAME"]}};
-                            for (auto& reason : pkgxx::shell_args(vars_map["BROKEN"])) {
+                            db::variables vars;
+                            vars.PKGNAME = pkgxx::pkgname{vars_map["PKGNAME"]};
+                            for (auto& reason: pkgxx::shell_args(vars_map["BROKEN"])) {
                                 vars.BROKEN.push_back(std::move(reason));
                             }
                             auto const store_deps = [&](auto const& var_name,
@@ -100,16 +108,14 @@ namespace lint {
                                     throw bad_depends_item{var_name, dep};
                                 }
                             };
-                            store_deps("BOOTSTRAP_DEPENDS"     , &db::variables::BOOTSTRAP_DEPENDS     );
-                            store_deps("TOOL_DEPENDS"          , &db::variables::TOOL_DEPENDS          );
-                            store_deps("BUILD_DEPENDS"         , &db::variables::BUILD_DEPENDS         );
-                            store_deps("DEPENDS"               , &db::variables::DEPENDS               );
-                            store_deps("INDIRECT_BUILD_DEPENDS", &db::variables::INDIRECT_BUILD_DEPENDS);
-                            store_deps("INDIRECT_DEPENDS"      , &db::variables::INDIRECT_DEPENDS      );
+                            store_deps("BOOTSTRAP_DEPENDS", &db::variables::BOOTSTRAP_DEPENDS);
+                            store_deps("TOOL_DEPENDS"     , &db::variables::TOOL_DEPENDS     );
+                            store_deps("BUILD_DEPENDS"    , &db::variables::BUILD_DEPENDS    );
+                            store_deps("DEPENDS"          , &db::variables::DEPENDS          );
 
-                            auto pkgbase = vars.PKGNAME.base;
+                            pkgxx::pkgbase base = vars.PKGNAME.base; // Copy it.
                             (*repr.lock())[std::move(pkgpath)]
-                                .emplace(std::move(pkgbase), std::move(vars));
+                                .emplace(std::move(base), std::move(vars));
                         }
                         catch (pkgxx::process_exited_for_failure const& e) {
                             // We don't appreciate it but this can
@@ -148,6 +154,80 @@ namespace lint {
             }
         }
         _repr = repr.take();
+    }
+
+    lintdb::lintdb(std::filesystem::path const& path) {
+        std::fstream file{path, std::ios_base::in};
+        if (!file) {
+            throw std::system_error{
+                errno, std::generic_category(), "Failed to open " + path.string()};
+        }
+
+        // Peek the first 2 octets of the file. If they are 0x1F 0x8B it's
+        // a gzip header and thus the file is gzipped.
+        char head[2];
+        file.read(head, 2);
+        if (!file) {
+            // Not even 2 octets could be read.
+            throw std::runtime_error{"Truncated database file"};
+        }
+        file.putback(head[1]);
+        file.putback(head[0]);
+
+        pkgxx::any_istream raw =
+            head[0] == 0x1F && head[1] == 0x8B
+            ? pkgxx::any_istream{pkgxx::gunzipistream{file}}
+            : pkgxx::any_istream{std::move(file)};
+
+        // Peek the first 4 octets of the uncompressed stream.
+        char magic[4];
+        raw.read(magic, 4);
+        if (!raw) {
+            // Not even 4 octets could be read.
+            throw std::runtime_error{"Truncated database file"};
+        }
+
+        if (magic[0] == 'L' && magic[1] == 'N' && magic[2] == 'D' && magic[3] == 'B') {
+            // The next octet is a format type.
+            auto const fmt_ch = raw.get();
+            if (!raw) {
+                throw std::runtime_error{"Truncated database file"};
+            }
+
+            auto const fmt = decltype(raw)::traits_type::to_char_type(fmt_ch);
+            switch (fmt) {
+            case 0x01:
+                // It's a cereal portable binary. 3 octets follow, which
+                // are version numbers of cereal.
+                char vers[3];
+                raw.read(vers, 3);
+                if (!raw) {
+                    throw std::runtime_error{"Truncated database file"};
+                }
+                if (vers[0] == static_cast<char>(CEREAL_VERSION_MAJOR) &&
+                         vers[1] == static_cast<char>(CEREAL_VERSION_MINOR) &&
+                         vers[2] == static_cast<char>(CEREAL_VERSION_PATCH)) {
+                    // We know how to deserialise this!
+                    cereal::PortableBinaryInputArchive ar{raw};
+                    ar(cereal::make_nvp("lintdb", *this));
+                }
+                else {
+                    throw std::runtime_error{"Database version incompatible"};
+                }
+                break;
+            default:
+                throw std::runtime_error{"Unknown database format"};
+            }
+        }
+        else if (magic[0] == '<' && magic[1] == '?' && magic[2] == 'x' && magic[3] == 'm') {
+            // This is presumably an XML file.
+            raw.putback(magic[3]);
+            raw.putback(magic[2]);
+            raw.putback(magic[1]);
+            raw.putback(magic[0]);
+            cereal::XMLInputArchive ar{raw};
+            ar(cereal::make_nvp("lintdb", *this));
+        }
     }
 
     namespace db {
@@ -203,6 +283,55 @@ namespace lint {
                 ++(*this);
                 return it;
             }
+        }
+    }
+
+    void
+    lintdb::save(std::filesystem::path const& path, lintdb::format const fmt) const {
+        fs::create_directories(path.parent_path());
+        std::fstream file{path, std::ios_base::out};
+        if (!file) {
+            throw std::system_error{
+                errno, std::generic_category(), "Failed to open " + path.string()};
+        }
+
+        switch (fmt) {
+        case format::bin:
+            {
+                pkgxx::gzipostream gz{file};
+                /*
+                 * Write a header in the compressed stream:
+                 * +========+=========+
+                 * | Magic  | Format  |
+                 * +--------+---------+
+                 * | 'LNDB' | 1 octet | where format 0x01 denotes cereal
+                 * +========+=========+ portable binary.
+                 *
+                 * If the format is 0x01, 3 more octets follow:
+                 * +=======+=======+=======+
+                 * | Major | Minor | Patch | which are major/minor/patch
+                 * +=======+=======+=======+ versions of cereal.
+                 */
+                gz << "LNDB"
+                   << static_cast<char>(0x01)
+                   << static_cast<char>(CEREAL_VERSION_MAJOR)
+                   << static_cast<char>(CEREAL_VERSION_MINOR)
+                   << static_cast<char>(CEREAL_VERSION_PATCH);
+
+                cereal::PortableBinaryOutputArchive ar{gz};
+                ar(cereal::make_nvp("lintdb", *this));
+            }
+            break;
+
+        case format::xml:
+            {
+                cereal::XMLOutputArchive ar{file};
+                ar(cereal::make_nvp("lintdb", *this));
+            }
+            break;
+
+        default:
+            std::abort(); // Impossible
         }
     }
 

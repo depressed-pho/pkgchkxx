@@ -1,12 +1,14 @@
 #pragma once
 
 #include <cassert>
+#include <cereal/cereal.hpp>
 #include <iomanip>
 #include <optional>
 #include <ostream>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <variant>
 #include <vector>
@@ -15,13 +17,13 @@
 #include <pkgxx/ordered.hxx>
 
 namespace pkgxx {
-    struct bad_pkgname: public std::runtime_error {
-        bad_pkgname(std::string_view const& name);
+    struct bad_pkgbase: public std::runtime_error {
+        bad_pkgbase(std::string_view const& base);
 
         virtual char const*
         what() const noexcept override;
 
-        std::string name;
+        std::string base;
 
     private:
         mutable std::optional<std::string> msg;
@@ -39,8 +41,64 @@ namespace pkgxx {
         mutable std::optional<std::string> msg;
     };
 
-    /** A type alias that represents a PKGBASE. */
-    using pkgbase = std::string;
+    struct bad_pkgname: public std::runtime_error {
+        bad_pkgname(std::string_view const& name);
+
+        virtual char const*
+        what() const noexcept override;
+
+        std::string name;
+
+    private:
+        mutable std::optional<std::string> msg;
+    };
+
+    /** A class that represents a PKGBASE. */
+    struct pkgbase: ordered<pkgbase> {
+        /** Constructing an empty PKGBASE is not disallowed but is
+         * discouraged, because it's not a valid PKGBASE.
+         */
+        pkgbase() = default;
+
+        pkgbase(pkgbase const&) = default;
+        pkgbase(pkgbase&&)      = default;
+
+        template <typename T,
+                  typename = std::enable_if_t<std::is_constructible_v<std::string, T&&>>>
+        pkgbase(T&& base)
+            : _base(std::forward<T>(base)) {
+
+            if (_base.empty()) {
+                throw bad_pkgbase{_base};
+            }
+        }
+
+        pkgbase& operator= (pkgbase const&) = default;
+        pkgbase& operator= (pkgbase&&)      = default;
+
+        std::string const&
+        string() const noexcept {
+            return _base;
+        }
+
+        friend bool
+        operator== (pkgbase const& a, pkgbase const& b) noexcept {
+            return a._base == b._base;
+        }
+
+        friend bool
+        operator< (pkgbase const& a, pkgbase const& b) noexcept {
+            return a._base < b._base;
+        }
+
+        friend std::ostream&
+        operator<< (std::ostream& out, pkgbase const& base) {
+            return out << base._base;
+        }
+
+    private:
+        std::string _base;
+    };
 
     /** A class that represents a package version. */
     struct pkgversion: ordered<pkgversion> {
@@ -176,11 +234,13 @@ namespace pkgxx {
             >;
 
         /** Construct an empty \ref pkgversion object representing negative
-         * infinity with respect to ordering.
+         * infinity with respect to ordering. It's not a valid PKGVERSION
+         * though.
          */
         pkgversion()
             : _rev(0) {}
 
+    public:
         /** Parse a PKGVERSION string. Throws \ref pkgxx::bad_pkgversion if
          * it's malformed.
          */
@@ -250,6 +310,11 @@ namespace pkgxx {
      * PKGVERSION.
      */
     struct pkgname: ordered<pkgname> {
+        /** Constructing an empty PKGNAME is not disallowed but is
+         * discouraged, because it's not a valid PKGNAME.
+         */
+        pkgname() = default;
+
         /** Parse a PKGNAME string e.g. <tt>foo-1.0</tt>. Throws \ref
          * pkgxx::bad_pkgname if it's malformed.
          */
@@ -267,6 +332,20 @@ namespace pkgxx {
             std::stringstream ss;
             ss << *this;
             return ss.str();
+        }
+
+        /** Serialise the PKGNAME. */
+        template <typename Archive>
+        std::string
+        save_minimal(Archive&) const {
+            return string();
+        }
+
+        /** Deserialise the PKGNAME. */
+        template <typename Archive>
+        void
+        load_minimal(Archive const&, std::string const& name) {
+            *this = pkgname{name};
         }
 
         /// \ref pkgname equality.
@@ -300,6 +379,14 @@ namespace pkgxx {
         pkgversion version; ///< The PKGVERSION.
     };
 }
+
+template <>
+struct std::hash<pkgxx::pkgbase> {
+    std::size_t
+    operator() (pkgxx::pkgbase const& base) const noexcept {
+        return std::hash<std::string>{}(base.string());
+    }
+};
 
 template <>
 struct std::hash<pkgxx::pkgversion> {

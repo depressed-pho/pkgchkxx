@@ -18,14 +18,14 @@ namespace pkgxx {
     pkgpath::pkgpath(std::string_view const& path) {
         auto const slash = path.find('/');
         if (slash == std::string_view::npos) {
-            throw bad_pkgpath(path);
+            throw bad_pkgpath{path};
         }
 
         category = path.substr(0, slash);
         subdir   = path.substr(slash + 1);
 
         if (category.length() == 0 || subdir.length() == 0) {
-            throw bad_pkgpath(path);
+            throw bad_pkgpath{path};
         }
     }
 }

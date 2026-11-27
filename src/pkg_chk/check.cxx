@@ -264,7 +264,7 @@ namespace pkg_chk {
                                 pkgxx::extract_pkgmk_var(
                                     _PKGSRCDIR.get() / path,
                                     "PKGNAME",
-                                    {{"PKGNAME_REQD", installed_pkgname.base + "-[0-9]*"}}).value());
+                                    {{"PKGNAME_REQD", installed_pkgname.base.string() + "-[0-9]*"}}).value());
                         // If it doesn't support this PKGNAME_REQD, it
                         // reports a PKGNAME whose PKGBASE doesn't match
                         // the requested one.

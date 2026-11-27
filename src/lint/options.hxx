@@ -18,6 +18,11 @@ namespace lint {
         // Makefile
         bool list_broken;                               // -B
 
+        // Misc
+        std::optional<std::filesystem::path> export_db; // -E
+        bool export_as_xml;                             // --xml
+        std::optional<std::filesystem::path> import_db; // -I
+
         // Modifiers
         std::optional<std::filesystem::path> PKGSRCDIR; // -P
         bool list_makefiles;                            // -L

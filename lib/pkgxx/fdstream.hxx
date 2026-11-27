@@ -55,13 +55,13 @@ namespace pkgxx {
 #endif
 
     private:
-        static constexpr int const buf_size = 1024;
+        static constexpr int const buf_size = 8192;
         using buffer_t = std::array<char_type, buf_size>;
 
-        int _fd;
-        bool _owned;
-        std::optional<buffer_t> _read_buf;
-        std::optional<buffer_t> _write_buf;
+        int                       _fd;
+        bool                      _owned; //< Should we close the fd on destruction?
+        std::unique_ptr<buffer_t> _read_buf;
+        std::unique_ptr<buffer_t> _write_buf;
     };
 
     /** An output stream that writes data to a POSIX file descriptor.
@@ -80,7 +80,7 @@ namespace pkgxx {
         /** Construct an instance of \ref fdostream by moving a buffer out
          * of another instance. */
         fdostream(fdostream&& other)
-            : std::ostream(std::move(other))
+            : std::ostream(nullptr)
             , _buf(std::move(other._buf)) {
 
             other.set_rdbuf(nullptr);
@@ -130,7 +130,7 @@ namespace pkgxx {
         /** Construct an instance of \ref fdistream by moving a buffer out
          * of another instance. */
         fdistream(fdistream&& other)
-            : std::istream(std::move(other))
+            : std::istream(nullptr)
             , _buf(std::move(other._buf)) {
 
             other.set_rdbuf(nullptr);
@@ -183,8 +183,8 @@ namespace pkgxx {
         /** Construct an instance of \ref fdstream by moving a buffer out
          * of another instance. */
         fdstream(fdstream&& other)
-            : std::istream(std::move(other))
-            , std::ostream(std::move(other))
+            : std::istream(nullptr)
+            , std::ostream(nullptr)
             , _buf(std::move(other._buf)) {
 
             other.set_rdbuf(nullptr);

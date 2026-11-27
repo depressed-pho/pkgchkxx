@@ -18,7 +18,7 @@ namespace pkgxx {
         /** \c positive<T> is default-constructible iff \c T is an integral
          * type. Its default value is \c 1.
          */
-        template <typename = std::enable_if_t<std::is_integral_v<T>>>
+        template <bool B = std::is_integral_v<T>, typename = std::enable_if_t<B>>
         positive()
             : _val{1} {}
 
@@ -29,7 +29,7 @@ namespace pkgxx {
          * throw a \c std::range_error.
          */
         template<typename U,
-                 typename = std::enable_if_t<std::is_constructible_v<T, U&&>>>
+                 bool B = std::is_constructible_v<T, U&&>, typename = std::enable_if_t<B>>
         positive(U&& val) {
             if (val > static_cast<std::decay_t<U>>(0)) {
                 _val = val;
@@ -49,7 +49,7 @@ namespace pkgxx {
          * \c std::range_error.
          */
         template<typename U,
-                 typename = std::enable_if_t<std::is_assignable_v<T, U&&>>>
+                 bool B = std::is_assignable_v<T, U&&>, typename = std::enable_if_t<B>>
         positive<T>&
         operator= (U&& val) {
             if (val > static_cast<std::decay_t<U>>(0)) {

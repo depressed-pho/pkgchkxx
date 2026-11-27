@@ -6,76 +6,122 @@
 #include <utility>
 
 namespace pkgxx {
-    /// Type-erasing wrapper for any types deriving from \c std::ostream.
+    /** Type-erasing wrapper for any output streams deriving from \c
+     * std::ostream.
+     */
     struct any_ostream: public std::ostream {
-        /// \ref any_ostream is not DefaultConstructible.
-        any_ostream() = delete;
+        /** \ref any_ostream is DefaultConstructible but
+         * default-constructed stream discards everything written to it.
+         */
+        any_ostream()
+            : std::ostream{nullptr} {}
 
-        /// \ref any_ostream is not CopyConstructible.
+        /** \ref any_ostream is not CopyConstructible. */
         any_ostream(any_ostream const&) = delete;
 
-        /// \ref any_ostream is MoveConstructible.
+        /** \ref any_ostream is MoveConstructible. */
         any_ostream(any_ostream&& src)
-            : std::ostream(std::move(src))
-            , _buf(std::move(src._buf)) {
+            : std::ostream{nullptr}
+            , _s{std::move(src._s)} {
 
-            rdbuf(&_buf);
+            rdbuf(_s->rdbuf());
+            src.rdbuf(nullptr);
         }
 
-        /// Forward an ostream into an instance of \ref any_ostream.
+        /** Move an ostream in an instance of \ref any_ostream.
+         */
         template <typename OStream>
         any_ostream(OStream&& s)
-            : std::ostream(nullptr)
-            , _buf(std::forward<OStream>(s)) {
+            : std::ostream{nullptr}
+            , _s{std::make_unique<std::decay_t<OStream>>(std::move(s))} {
 
-            static_assert(std::is_base_of_v<std::ostream, OStream>);
-            rdbuf(&_buf);
+            static_assert(std::is_rvalue_reference_v<decltype(s)>);
+            rdbuf(_s->rdbuf());
         }
 
-        /// Forward-assign an ostream. The previously stored ostream will
-        /// be discarded.
+        /** Move-assign an instance of \ref any_ostream. The previously
+         * stored ostream will be discarded.
+         */
+        any_ostream&
+        operator= (any_ostream&& src) {
+            _s = std::move(src._s);
+            rdbuf(_s->rdbuf());
+            src.set_rdbuf(nullptr);
+            return *this;
+        }
+
+        /** Move-assign an ostream. The previously stored ostream will be
+         * discarded.
+         */
         template <typename OStream>
         any_ostream&
-        operator== (OStream&& s) {
-            static_assert(std::is_base_of_v<std::ostream, OStream>);
-            _buf = std::forward<OStream>(s);
+        operator= (OStream&& s) {
+            static_assert(std::is_rvalue_reference_v<decltype(s)>);
+            _s = std::make_unique<std::decay_t<OStream>>(std::move(s));
+            rdbuf(_s->rdbuf());
             return *this;
         }
 
     private:
-        struct proxy_buf: public std::streambuf {
-            proxy_buf() = delete;
+        std::unique_ptr<std::ostream> _s;
+    };
 
-            template <typename OStream>
-            proxy_buf(OStream&& s)
-                : _sp(std::make_unique<OStream>(std::forward<OStream>(s))) {}
+    /** Type-erasing wrapper for any input streams deriving from \c
+     * std::istream.
+     */
+    struct any_istream: public std::istream {
+        /** \ref any_istream is DefaultConstructible but
+         * default-constructed stream is always at EOF.
+         */
+        any_istream()
+            : std::istream{nullptr} {}
 
-            template <typename OStream>
-            proxy_buf&
-            operator== (OStream&& s) {
-                _sp = std::make_unique<OStream>(std::forward<OStream>(s));
-                return *this;
-            }
+        /** \ref any_istream is not CopyConstructible. */
+        any_istream(any_istream const&) = delete;
 
-        protected:
-            virtual int_type
-            overflow(int_type ch = traits_type::eof()) override {
-                if (!traits_type::eq_int_type(ch, traits_type::eof())) {
-                    _sp->put(traits_type::to_char_type(ch));
-                }
-                return ch;
-            }
+        /** \ref any_istream is MoveConstructible. */
+        any_istream(any_istream&& src)
+            : std::istream{nullptr}
+            , _s{std::move(src._s)} {
 
-            virtual std::streamsize
-            xsputn(const char_type* s, std::streamsize count) override {
-                _sp->write(s, count);
-                return count;
-            }
+            rdbuf(_s->rdbuf());
+            src.set_rdbuf(nullptr);
+        }
 
-        private:
-            std::unique_ptr<std::ostream> _sp;
-        };
+        /** Move an istream into an instance of \ref any_istream. */
+        template <typename IStream>
+        any_istream(IStream&& s)
+            : std::istream{nullptr}
+            , _s{std::make_unique<std::decay_t<IStream>>(std::move(s))} {
 
-        proxy_buf _buf;
+            static_assert(std::is_rvalue_reference_v<decltype(s)>);
+            rdbuf(_s->rdbuf());
+        }
+
+        /** Move-assign an instance of \ref any_istream. The previously
+         * stored istream will be discarded.
+         */
+        any_istream&
+        operator= (any_istream&& src) {
+            _s = std::move(src._s);
+            rdbuf(_s->rdbuf());
+            src.set_rdbuf(nullptr);
+            return *this;
+        }
+
+        /** Move-assign an istream. The previously stored istream will be
+         * discarded.
+         */
+        template <typename IStream>
+        any_istream&
+        operator= (IStream&& s) {
+            static_assert(std::is_rvalue_reference_v<decltype(s)>);
+            _s = std::make_unique<std::decay_t<IStream>>(std::move(s));
+            rdbuf(_s->rdbuf());
+            return *this;
+        }
+
+    private:
+        std::unique_ptr<std::istream> _s;
     };
 }

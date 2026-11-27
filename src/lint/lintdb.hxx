@@ -1,3 +1,6 @@
+#include <cereal/cereal.hpp>
+#include <cereal/types/string.hpp>
+#include <cereal/types/vector.hpp>
 #include <filesystem>
 #include <iterator>
 #include <optional>
@@ -25,22 +28,31 @@
 namespace lint {
     namespace db {
         struct dependency {
-            dependency(pkgxx::pkgpattern pattern,
-                       pkgxx::pkgpath    path)
-                : pattern{pattern}
-                , path{path} {}
+            dependency() {}
+
+            dependency(pkgxx::pkgpattern&& pattern,
+                       pkgxx::pkgpath&& path)
+                : pattern{std::move(pattern)}
+                , path{std::move(path)} {}
 
             pkgxx::pkgpattern pattern;
             pkgxx::pkgpath    path;
+
+            template <typename Archive>
+            void
+            serialize(Archive& ar, std::uint32_t const version) {
+                switch (version) {
+                case 0:
+                    ar(cereal::make_nvp("pattern", pattern));
+                    ar(cereal::make_nvp("pkgpath", path));
+                    break;
+                default:
+                    throw std::runtime_error{"dependency version incompatible"};
+                }
+            }
         };
 
         struct variables {
-            variables(pkgxx::pkgname const& pkgname)
-                : PKGNAME(pkgname) {}
-
-            variables(pkgxx::pkgname&& pkgname)
-                : PKGNAME(std::move(pkgname)) {}
-
             pkgxx::pkgname PKGNAME;
 
             /** The values of BROKEN with quotes and escapes interpreted as
@@ -54,8 +66,26 @@ namespace lint {
             std::vector<dependency> TOOL_DEPENDS;
             std::vector<dependency> BUILD_DEPENDS;
             std::vector<dependency> DEPENDS;
-            std::vector<dependency> INDIRECT_BUILD_DEPENDS;
-            std::vector<dependency> INDIRECT_DEPENDS;
+            // Don't care about INDIRECT_BUILD_DEPENDS and
+            // INDIRECT_DEPENDS. They will appear somewhere in
+            // BUILD_DEPENDS or DEPENDS anyway.
+
+            template <typename Archive>
+            void
+            serialize(Archive& ar, std::uint32_t const version) {
+                switch (version) {
+                case 0:
+                    ar(cereal::make_nvp("pkgname"          , PKGNAME));
+                    ar(cereal::make_nvp("broken"           , BROKEN));
+                    ar(cereal::make_nvp("bootstrap-depends", BOOTSTRAP_DEPENDS));
+                    ar(cereal::make_nvp("tool-depends"     , TOOL_DEPENDS));
+                    ar(cereal::make_nvp("build-depends"    , BUILD_DEPENDS));
+                    ar(cereal::make_nvp("depends"          , DEPENDS));
+                    break;
+                default:
+                    throw std::runtime_error{"variables version incompatible"};
+                }
+            }
         };
     }
 
@@ -141,6 +171,16 @@ namespace lint {
     using namespace na::literals;
 
     struct lintdb {
+        enum class format {
+            bin,
+            xml
+        };
+
+    private:
+        /** Constructing an empty database is most likely a mistake. */
+        lintdb() = default;
+
+    public:
         /** Construct a database by scanning Makefile's. \c Paths is a
          * container of \c pkgxx::pkgpath providing the set of PKGPATHs to
          * scan.
@@ -154,6 +194,9 @@ namespace lint {
                 na::get("list_makefiles"_na = false                , std::forward<Args>(args)...),
                 na::get("concurrency"_na    = default_concurrency(), std::forward<Args>(args)...)) {}
 
+        /** Load a database from file. */
+        lintdb(std::filesystem::path const& path);
+
         /** Return an unspecified iterable object that can be used for
          * iterating over \c db::variables for each package in the
          * database.
@@ -161,6 +204,167 @@ namespace lint {
         db::detail::packages
         packages() const& {
             return db::detail::packages{_repr};
+        }
+
+        /** Export the database to the given file path. */
+        void
+        save(std::filesystem::path const& path, format fmt = format::bin) const;
+
+    private:
+        friend class cereal::access;
+
+        /* Represent lintdb as like a map<pkgpath, vector<variables>>. No
+         * need to serialise pkgbase separately, because it's also in
+         * variables::PKGNAME. We could actually construct the map and
+         * serialise it, but that would be expensive. We can do
+         * better. Let's represent lintdb as a custom variable-sized
+         * container and serialize its contents dynamically. The resulting
+         * structure is as follows:
+         *
+         * <lintdb size="dynamic">
+         *   <value0>
+         *     <pkgpath>pkgtools/pkgchkxx</pkgpath>
+         *     <packages size="dynamic">
+         *       <value0>
+         *         <pkgname>lzip-1.26</pkgname>
+         *         <broken size="dynamic"/>
+         *         <depends size="dynamic">
+         *           <value0>
+         *             <pattern>pkgconf>=1.9.4</pattern>
+         *             <pkgpath>devel/pkgconf</pkgpath>
+         *           </value0>
+         *         </depends>
+         *       </value0>
+         *     </packages>
+         *   </value0>
+         * </lintdb>
+         */
+
+        template <bool is_ref>
+        struct pkgs_helper {
+
+            using pkgs_type =
+                std::conditional_t<
+                    is_ref,
+                    std::unordered_map<pkgxx::pkgbase, db::variables> const&,
+                    std::unordered_map<pkgxx::pkgbase, db::variables>
+                    >;
+
+            template <bool B = is_ref, typename = std::enable_if_t<B>>
+            pkgs_helper(pkgs_type const& pkgs)
+                : pkgs{pkgs} {}
+
+            template <bool B = is_ref, typename = std::enable_if_t<!B>>
+            pkgs_helper() {}
+
+            template <typename Archive>
+            void
+            save(Archive& ar) const {
+                ar(cereal::make_size_tag(static_cast<cereal::size_type>(pkgs.size())));
+                for (auto const& [_, vars]: pkgs) {
+                    ar(vars);
+                }
+            }
+
+            template <typename Archive>
+            void
+            load(Archive& ar) {
+                cereal::size_type size;
+                ar(cereal::make_size_tag(size));
+                pkgs.reserve(static_cast<typename pkgs_type::size_type>(size));
+                for (cereal::size_type i = 0; i < size; i++) {
+                    db::variables vars;
+                    ar(vars);
+                    pkgxx::pkgbase base = vars.PKGNAME.base; // Copy it.
+                    pkgs.emplace(std::move(base), std::move(vars));
+                }
+            }
+
+            pkgs_type pkgs;
+        };
+
+        /// If it's called with a single argument, is_ref should be deduced
+        /// to true.
+        template <typename Pkgs>
+        pkgs_helper(Pkgs const&) -> pkgs_helper<true>;
+
+        template <bool is_ref>
+        struct path_pkgs_helper {
+
+            using path_type =
+                std::conditional_t<
+                    is_ref,
+                    pkgxx::pkgpath const&,
+                    pkgxx::pkgpath
+                    >;
+
+            using ph_type =
+                std::conditional_t<
+                    is_ref,
+                    pkgs_helper<is_ref> const&,
+                    pkgs_helper<is_ref>
+                    >;
+
+            template <bool B = is_ref, typename = std::enable_if_t<B>>
+            path_pkgs_helper(path_type const& path, ph_type const& ph)
+                : path{path}
+                , ph{ph} {}
+
+            template <bool B = is_ref, typename = std::enable_if_t<!B>>
+            path_pkgs_helper() {}
+
+            template <typename Archive>
+            void
+            serialize(Archive& ar) {
+                ar(cereal::make_nvp("pkgpath", path));
+                ar(cereal::make_nvp("packages", ph));
+            }
+
+            path_type path;
+            ph_type ph;
+        };
+
+        /// If it's called with two arguments, is_ref should be deduced to
+        /// true.
+        template <typename PathType, typename PHType>
+        path_pkgs_helper(PathType const&, PHType const&) -> path_pkgs_helper<true>;
+
+        /// If it's called with no arguments, is_ref should be deduced to
+        /// false. Clang emits a warning about this rule, caliming it isn't
+        /// needed, but that's wrong. Removing it makes
+        /// "path_pkgs_helper{}" fail to compile.
+        path_pkgs_helper() -> path_pkgs_helper<false>;
+
+        /** Serialise the entire database. */
+        template <typename Archive>
+        void
+        save(Archive& ar, std::uint32_t const) const {
+            ar(cereal::make_size_tag(static_cast<cereal::size_type>(_repr.size())));
+            for (auto const& [path, pkgs]: _repr) {
+                ar(path_pkgs_helper{path, pkgs_helper{pkgs}});
+            }
+        }
+
+        /** Deserialise the entire database. */
+        template <typename Archive>
+        void
+        load(Archive& ar, std::uint32_t const version) {
+            switch (version) {
+            case 0:
+                {
+                    cereal::size_type size;
+                    ar(cereal::make_size_tag(size));
+                    _repr.reserve(static_cast<db::detail::repr_type::size_type>(size));
+                    for (cereal::size_type i = 0; i < size; i++) {
+                        path_pkgs_helper pph;
+                        ar(pph);
+                        _repr.emplace(std::move(pph.path), std::move(pph.ph.pkgs));
+                    }
+                }
+                break;
+            default:
+                throw std::runtime_error{"lintdb version incompatible"};
+            }
         }
 
     private:

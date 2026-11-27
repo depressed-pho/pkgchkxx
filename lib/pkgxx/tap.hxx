@@ -34,7 +34,11 @@ namespace pkgxx {
 
         template <typename T0, typename T1>
         void
-        is(T0&& got, T1&& expected, name_t const& name = std::nullopt);
+        is(T0 const& got, T1 const& expected, name_t const& name = std::nullopt);
+
+        template <typename T0, typename T1>
+        void
+        lt(T0 const& got, T1 const& expected, name_t const& name = std::nullopt);
 
         [[noreturn]] void
         BAIL_OUT(reason_t const& reason = std::nullopt);
@@ -46,9 +50,30 @@ namespace pkgxx {
 
     // Implementation
 
+    namespace detail {
+        inline constexpr int const MAX_SHOW_LENGTH = 256;
+
+        template <typename T>
+        std::string
+        show(const T& val) {
+            std::stringstream ss;
+            ss << val;
+            auto const str = ss.str();
+
+            if (str.length() <= MAX_SHOW_LENGTH) {
+                return str;
+            }
+            else {
+                std::stringstream ss;
+                ss << str.length() << " bytes of string";
+                return ss.str();
+            }
+        }
+    }
+
     template <typename T0, typename T1>
     void
-    tap::is(T0&& got, T1&& expected, name_t const& name) {
+    tap::is(T0 const& got, T1 const& expected, name_t const& name) {
         if (got == expected) {
             pass(name);
         }
@@ -56,7 +81,24 @@ namespace pkgxx {
             fail(name);
 
             std::stringstream ss;
-            ss << "Expected " << expected << " but got " << got;
+            ss << "Expected " << detail::show(expected)
+               << " but got " << detail::show(got);
+            diag(ss.str());
+        }
+    }
+
+    template <typename T0, typename T1>
+    void
+    tap::lt(T0 const& got, T1 const& expected, name_t const& name) {
+        if (got < expected) {
+            pass(name);
+        }
+        else {
+            fail(name);
+
+            std::stringstream ss;
+            ss << "Expected "         << detail::show(expected)
+               << " to be less than " << detail::show(got);
             diag(ss.str());
         }
     }

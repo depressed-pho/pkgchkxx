@@ -1,13 +1,13 @@
 #pragma once
 
+#include <cereal/cereal.hpp>
 #include <exception>
 #include <filesystem>
 #include <optional>
 #include <ostream>
-#include <string_view>
-
 #include <pkgxx/hash.hxx>
 #include <pkgxx/ordered.hxx>
+#include <string_view>
 
 namespace pkgxx {
     struct bad_pkgpath: public std::runtime_error {
@@ -29,7 +29,10 @@ namespace pkgxx {
      * sub-directory.
      */
     struct pkgpath {
-        pkgpath() = delete;
+        /** Constructing an empty PKGPATH is not disallowed but is
+         * discouraged, because it's not a valid PKGPATH.
+         */
+        pkgpath() = default;
 
         /** Parse a PKGPATH string. */
         pkgpath(std::string_view const& dir);
@@ -66,10 +69,26 @@ namespace pkgxx {
             return std::filesystem::path(category) / subdir;
         }
 
-        /// Print the string representation of PKGPATH to an output stream.
+        /** Serialise the PKGPATH. */
+        template <typename Archive>
+        std::string
+        save_minimal(Archive&) const {
+            return string();
+        }
+
+        /** Deserialise the PKGPATH. */
+        template <typename Archive>
+        void
+        load_minimal(Archive const&, std::string const& path) {
+            *this = pkgpath{path};
+        }
+
+        /** Print the string representation of PKGPATH to an output
+         * stream.
+         */
         friend std::ostream&
-        operator<< (std::ostream& out, pkgpath const& dir) {
-            out << dir.category << '/' << dir.subdir;
+        operator<< (std::ostream& out, pkgpath const& path) {
+            out << path.category << '/' << path.subdir;
             return out;
         }
 

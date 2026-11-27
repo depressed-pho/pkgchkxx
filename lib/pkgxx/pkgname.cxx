@@ -20,14 +20,14 @@ namespace {
 }
 
 namespace pkgxx {
-    bad_pkgname::bad_pkgname(std::string_view const& name)
+    bad_pkgbase::bad_pkgbase(std::string_view const& base)
         : std::runtime_error("")
-        , name(name) {}
+        , base(base) {}
 
     char const*
-    bad_pkgname::what() const noexcept {
+    bad_pkgbase::what() const noexcept {
         if (!msg) {
-            msg.emplace("Malformed PKGNAME: " + name);
+            msg.emplace("Malformed PKGBASE: " + base);
         }
         return msg->c_str();
     }
@@ -40,6 +40,18 @@ namespace pkgxx {
     bad_pkgversion::what() const noexcept {
         if (!msg) {
             msg.emplace("Malformed PKGVERSION: " + version);
+        }
+        return msg->c_str();
+    }
+
+    bad_pkgname::bad_pkgname(std::string_view const& name)
+        : std::runtime_error("")
+        , name(name) {}
+
+    char const*
+    bad_pkgname::what() const noexcept {
+        if (!msg) {
+            msg.emplace("Malformed PKGNAME: " + name);
         }
         return msg->c_str();
     }

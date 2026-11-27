@@ -3,7 +3,9 @@
 #include "wwwstream.hxx"
 
 namespace pkgxx {
-    wwwstreambuf::wwwstreambuf(std::string const& url) {
+    wwwstreambuf::wwwstreambuf(std::string const& url)
+        : _read_buf{std::make_unique<buffer_t>()} {
+
         if (fetchIO* fio = fetchGetURL(url.c_str(), ""); fio != nullptr) {
             _fio = std::unique_ptr<fetchIO, fetchIO_deleter>(fio);
         }
@@ -23,12 +25,6 @@ namespace pkgxx {
 #if !defined(DOXYGEN)
     wwwstreambuf::int_type
     wwwstreambuf::underflow() {
-        if (eback() == nullptr) {
-            // An underflow has happened because we haven't allocated a
-            // buffer yet.
-            _read_buf = buffer_t();
-        }
-
         while (true) {
             ssize_t const n_read = fetchIO_read(_fio.get(), _read_buf->data(), _read_buf->size());
             if (n_read > 0) {

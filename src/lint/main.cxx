@@ -59,14 +59,31 @@ int main(int argc, char* argv[]) {
             std::launch::deferred,
             [&]() {
                 using namespace na::literals;
-                return lint::lintdb{
-                    env.PKGSRCDIR.get(),
-                    env.all_pkgpaths.get(),
-                    "concurrency"_na = env.opts.concurrency};
+                if (opts.import_db) {
+                    env.msg() << "Loading database from " << *opts.import_db << std::endl;
+                    return lint::lintdb{*opts.import_db};
+                }
+                else {
+                    return lint::lintdb{
+                        env.PKGSRCDIR.get(),
+                        env.all_pkgpaths.get(),
+                        "concurrency"_na = env.opts.concurrency};
+                }
             });
 
         if (opts.list_broken) {
             list_broken_packages(env, db.get());
+            did_something = true;
+        }
+
+        if (auto const& path = opts.export_db; path) {
+            auto const& db_ = db.get();
+            env.msg() << "Saving database to " << *path << std::endl;
+            db_.save(
+                *path,
+                opts.export_as_xml
+                ? lint::lintdb::format::xml
+                : lint::lintdb::format::bin);
             did_something = true;
         }
 

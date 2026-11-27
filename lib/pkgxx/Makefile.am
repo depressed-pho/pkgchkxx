@@ -36,7 +36,8 @@ libpkgxx_la_SOURCES = \
 	value_or_ref.hxx \
 	varcache.hxx varcache.cxx \
 	wwwstream.cxx wwwstream.hxx \
-	xargs_fold.hxx
+	xargs_fold.hxx \
+	xdg_basedir.cxx xdg_basedir.hxx
 
 libpkgxx_la_CXXFLAGS = \
 	-I$(top_builddir)/lib \

@@ -263,6 +263,15 @@ namespace pkgxx {
             glob
             >;
 
+        /// Construct an invalid pattern. Don't do this unless absolutely
+        /// necessary.
+        explicit pkgpattern()
+            : pkgpattern(std::string_view{""}) {}
+
+        /// Parse a package name pattern string.
+        explicit pkgpattern(std::string const& patstr)
+            : pkgpattern(std::string_view{patstr}) {}
+
         /// Parse a package name pattern string.
         explicit pkgpattern(std::string_view const& patstr);
 
@@ -272,7 +281,7 @@ namespace pkgxx {
 
         /// Construct a package pattern that matches a specific package base.
         explicit pkgpattern(pkgxx::pkgbase const& base)
-            : _pat(glob {base}) {}
+            : _pat(glob {base.string()}) {}
 
         /// Construct a package pattern by copying one of pattern variants.
         pkgpattern(pattern_type const& pat)
@@ -313,6 +322,20 @@ namespace pkgxx {
             std::stringstream ss;
             ss << *this;
             return ss.str();
+        }
+
+        /// Serialise the pattern.
+        template <typename Archive>
+        std::string
+        save_minimal(Archive&) const {
+            return string();
+        }
+
+        /// Deserialise the pattern.
+        template <typename Archive>
+        void
+        load_minimal(Archive const&, std::string const& pat) {
+            *this = pkgpattern{pat};
         }
 
         /// Print a string representation of \ref pkgpattern to an output
@@ -468,7 +491,7 @@ namespace pkgxx {
 
         for (auto it = s.lower_bound(pkgname(pkgbase(literal), pkgversion()));
              it != s.end() &&
-                 starts_with(detail::pkgname_at(it).base, literal);
+                 starts_with(detail::pkgname_at(it).base.string(), literal);
              it++) {
 
             auto const name_str = detail::pkgname_at(it).string();

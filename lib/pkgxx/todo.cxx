@@ -32,13 +32,13 @@ namespace pkgxx {
 
                 auto const it = find(m[1]);
                 if (it == end() || it->second.name.version < version) {
-                    emplace_hint(
-                        it,
-                        base,
-                        todo_entry {
-                            pkgname(base, std::move(version)),
-                            std::move(comment)
-                        });
+                    todo_entry ent{
+                        // Copy the base here.
+                        pkgname(base, std::move(version)),
+                        std::move(comment)
+                    };
+                    // Then move it.
+                    emplace_hint(it, std::move(base), std::move(ent));
                 }
             }
         }

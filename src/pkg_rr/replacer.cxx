@@ -605,7 +605,7 @@ namespace pkg_rr {
         // package name (so, when building py34-foo, use python-3.4,
         // not python-2.7).
         auto ret = opts.make_vars;
-        ret["PKGNAME_REQD"] = base + "-[0-9]*";
+        ret["PKGNAME_REQD"] = base.string() + "-[0-9]*";
         return ret;
     }
 
@@ -720,9 +720,11 @@ namespace pkg_rr {
         auto vars =
             pkgxx::extract_pkgmk_vars(
                 pkgdir,
-                // THINKME: What about INDIRECT_BUILD_DEPENDS and
-                // INDIRECT_DEPENDS?
+                // Don't care about INDIRECT_BUILD_DEPENDS and
+                // INDIRECT_DEPENDS. They will appear somewhere in
+                // BUILD_DEPENDS or DEPENDS anyway.
                 {"PKGVERSION", "BUILD_DEPENDS", "TOOL_DEPENDS", "DEPENDS"},
+                // FIXME: But what about BOOTSTRAP_DEPENDS?
                 make_vars_for_pkg(base));
         if (!vars.has_value()) {
             throw replace_failed("Makefile is missing from " + pkgdir.string());
@@ -796,8 +798,8 @@ namespace pkg_rr {
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wc++20-extensions"
                             make_vars["PKGNAME_REQD"] = dep_pattern.string();
-                            auto const& dep_base
-                                = pkgxx::extract_pkgmk_var<pkgxx::pkgbase>(
+                            auto const& dep_base =
+                                pkgxx::extract_pkgmk_var(
                                     env.PKGSRCDIR.get() / dep_path, "PKGBASE", make_vars);
 #pragma GCC diagnostic pop
                             if (dep_base.has_value()) {
@@ -844,7 +846,9 @@ namespace pkg_rr {
             // If the package wasn't installed before we did, it's clear
             // that the user didn't explicitly ask to install it.
             if (!opts.dry_run)
-                run_su(env.PKG_ADMIN.get() + ' ' + pkgxx::shell_args{"set", "automatic=YES", base}.string());
+                run_su(env.PKG_ADMIN.get()
+                       + ' '
+                       + pkgxx::shell_args{"set", "automatic=YES", base.string()}.string());
         }
 
         clean(base, path);
