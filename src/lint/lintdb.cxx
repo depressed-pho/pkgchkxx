@@ -221,12 +221,23 @@ namespace lint {
         }
         else if (magic[0] == '<' && magic[1] == '?' && magic[2] == 'x' && magic[3] == 'm') {
             // This is presumably an XML file.
+#if 0
             raw.putback(magic[3]);
             raw.putback(magic[2]);
             raw.putback(magic[1]);
             raw.putback(magic[0]);
             cereal::XMLInputArchive ar{raw};
             ar(cereal::make_nvp("lintdb", *this));
+#else
+            // For some reason it calls
+            // cereal::XMLInputArchive::NodeInfo::NodeInfo() with a nullptr
+            // and it dereferences the null. I haven't yet investigated the
+            // cause deeply.
+            throw std::runtime_error{
+                "Loading a database from an XML file is temporarily disabled for now, "
+                "because there seems to be a bug in cereal that leads to SIGSEGV."
+            };
+#endif
         }
     }
 
